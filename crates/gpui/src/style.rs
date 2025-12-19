@@ -249,6 +249,7 @@ pub struct Style {
     pub box_shadow: Vec<BoxShadow>,
 
     /// The text style of this element
+    #[refineable]
     pub text: TextStyleRefinement,
 
     /// The mouse cursor style shown when the mouse pointer is over an element.
@@ -1452,6 +1453,23 @@ mod tests {
                     }
                 )
             ]
+        );
+    }
+
+    #[perf]
+    fn test_text_style_refinement() {
+        let mut style = Style::default();
+        style.refine(&StyleRefinement::default().text_size(px(20.0)));
+        style.refine(&StyleRefinement::default().font_weight(FontWeight::SEMIBOLD));
+
+        assert_eq!(
+            Some(AbsoluteLength::from(px(20.0))),
+            style.text_style().unwrap().font_size
+        );
+
+        assert_eq!(
+            Some(FontWeight::SEMIBOLD),
+            style.text_style().unwrap().font_weight
         );
     }
 }
