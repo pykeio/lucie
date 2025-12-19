@@ -5,13 +5,11 @@ use std::{borrow::Cow, mem, pin::Pin, task::Poll, time::Duration};
 use anyhow::anyhow;
 use bytes::{BufMut, Bytes, BytesMut};
 use futures_io::AsyncRead;
-use futures_util::{FutureExt as _, TryStreamExt as _};
-use http_client::{RedirectPolicy, Url, http};
+use futures_util::future::BoxFuture;
+use futures_util::{FutureExt as _, Stream, TryStreamExt as _};
+use gpui::http::{AsyncBody, AsyncBodyInner, HttpClient, Response, Uri, http};
 use regex::Regex;
-use reqwest::{
-    header::{HeaderMap, HeaderValue},
-    redirect,
-};
+use reqwest::header::{HeaderMap, HeaderValue};
 
 const DEFAULT_CAPACITY: usize = 4096;
 static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
@@ -19,16 +17,14 @@ static REDACT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"key=[^&]+")
 
 pub struct ReqwestClient {
     client: reqwest::Client,
-    proxy: Option<Url>,
+    proxy: Option<Uri>,
     user_agent: Option<HeaderValue>,
     handle: tokio::runtime::Handle,
 }
 
 impl ReqwestClient {
     fn builder() -> reqwest::ClientBuilder {
-        reqwest::Client::builder()
-            .use_rustls_tls()
-            .connect_timeout(Duration::from_secs(10))
+        reqwest::Client::builder().connect_timeout(Duration::from_secs(10))
     }
 
     pub fn new() -> Self {
@@ -45,7 +41,7 @@ impl ReqwestClient {
         Ok(client.into())
     }
 
-    pub fn proxy_and_user_agent(proxy: Option<Url>, user_agent: &str) -> anyhow::Result<Self> {
+    pub fn proxy_and_user_agent(proxy: Option<Uri>, user_agent: &str) -> anyhow::Result<Self> {
         let user_agent = HeaderValue::from_str(user_agent)?;
 
         let mut map = HeaderMap::new();
@@ -54,7 +50,7 @@ impl ReqwestClient {
         let client_has_proxy;
 
         if let Some(proxy) = proxy.as_ref().and_then(|proxy_url| {
-            reqwest::Proxy::all(proxy_url.clone())
+            reqwest::Proxy::all(proxy_url.to_string())
                 .inspect_err(|e| {
                     log::error!(
                         "Failed to parse proxy URL '{}': {}",
@@ -71,9 +67,7 @@ impl ReqwestClient {
             client_has_proxy = false;
         };
 
-        let client = client
-            .use_preconfigured_tls(http_client_tls::tls_config())
-            .build()?;
+        let client = client.build()?;
         let mut client: ReqwestClient = client.into();
         client.proxy = client_has_proxy.then_some(proxy).flatten();
         client.user_agent = Some(user_agent);
@@ -111,13 +105,13 @@ impl From<reqwest::Client> for ReqwestClient {
 // https://docs.rs/tokio-util/0.7.12/tokio_util/io/struct.ReaderStream.html
 // except outside of Tokio's aegis
 struct StreamReader {
-    reader: Option<Pin<Box<dyn futures::AsyncRead + Send + Sync>>>,
+    reader: Option<Pin<Box<dyn AsyncRead + Send + Sync>>>,
     buf: BytesMut,
     capacity: usize,
 }
 
 impl StreamReader {
-    fn new(reader: Pin<Box<dyn futures::AsyncRead + Send + Sync>>) -> Self {
+    fn new(reader: Pin<Box<dyn AsyncRead + Send + Sync>>) -> Self {
         Self {
             reader: Some(reader),
             buf: BytesMut::new(),
@@ -126,7 +120,7 @@ impl StreamReader {
     }
 }
 
-impl futures::Stream for StreamReader {
+impl Stream for StreamReader {
     type Item = std::io::Result<Bytes>;
 
     fn poll_next(
@@ -168,7 +162,7 @@ impl futures::Stream for StreamReader {
 /// Implementation from <https://docs.rs/tokio-util/0.7.12/src/tokio_util/util/poll_buf.rs.html>
 /// Specialized for this use case
 pub fn poll_read_buf(
-    io: &mut Pin<Box<dyn futures::AsyncRead + Send + Sync>>,
+    io: &mut Pin<Box<dyn AsyncRead + Send + Sync>>,
     cx: &mut std::task::Context<'_>,
     buf: &mut BytesMut,
 ) -> Poll<std::io::Result<usize>> {
@@ -213,8 +207,8 @@ fn redact_error(mut error: reqwest::Error) -> reqwest::Error {
     error
 }
 
-impl http_client::HttpClient for ReqwestClient {
-    fn proxy(&self) -> Option<&Url> {
+impl HttpClient for ReqwestClient {
+    fn proxy(&self) -> Option<&Uri> {
         self.proxy.as_ref()
     }
 
@@ -224,26 +218,24 @@ impl http_client::HttpClient for ReqwestClient {
 
     fn send(
         &self,
-        req: http::Request<http_client::AsyncBody>,
-    ) -> futures::future::BoxFuture<
-        'static,
-        anyhow::Result<http_client::Response<http_client::AsyncBody>>,
-    > {
+        req: http::Request<AsyncBody>,
+    ) -> BoxFuture<'static, anyhow::Result<Response<AsyncBody>>> {
         let (parts, body) = req.into_parts();
 
         let mut request = self.client.request(parts.method, parts.uri.to_string());
         request = request.headers(parts.headers);
-        if let Some(redirect_policy) = parts.extensions.get::<RedirectPolicy>() {
-            request = request.redirect_policy(match redirect_policy {
-                RedirectPolicy::NoFollow => redirect::Policy::none(),
-                RedirectPolicy::FollowLimit(limit) => redirect::Policy::limited(*limit as usize),
-                RedirectPolicy::FollowAll => redirect::Policy::limited(100),
-            });
-        }
+        // TODO: this is only supported in zed-reqwest...
+        // if let Some(redirect_policy) = parts.extensions.get::<RedirectPolicy>() {
+        //     request = request.redirect_policy(match redirect_policy {
+        //         RedirectPolicy::NoFollow => redirect::Policy::none(),
+        //         RedirectPolicy::FollowLimit(limit) => redirect::Policy::limited(*limit as usize),
+        //         RedirectPolicy::FollowAll => redirect::Policy::limited(100),
+        //     });
+        // }
         let request = request.body(match body.0 {
-            http_client::Inner::Empty => reqwest::Body::default(),
-            http_client::Inner::Bytes(cursor) => cursor.into_inner().into(),
-            http_client::Inner::AsyncReader(stream) => {
+            AsyncBodyInner::Empty => reqwest::Body::default(),
+            AsyncBodyInner::Bytes(cursor) => cursor.into_inner().into(),
+            AsyncBodyInner::AsyncReader(stream) => {
                 reqwest::Body::wrap_stream(StreamReader::new(stream))
             }
         });
@@ -263,9 +255,9 @@ impl http_client::HttpClient for ReqwestClient {
 
             let bytes = response
                 .bytes_stream()
-                .map_err(futures::io::Error::other)
+                .map_err(futures_io::Error::other)
                 .into_async_read();
-            let body = http_client::AsyncBody::from_reader(bytes);
+            let body = AsyncBody::from_reader(bytes);
 
             builder.body(body).map_err(|e| anyhow!(e))
         }
@@ -275,7 +267,7 @@ impl http_client::HttpClient for ReqwestClient {
 
 #[cfg(test)]
 mod tests {
-    use http_client::{HttpClient, Url};
+    use gpui::http::{HttpClient, Uri};
 
     use crate::ReqwestClient;
 
@@ -284,34 +276,34 @@ mod tests {
         let client = ReqwestClient::new();
         assert_eq!(client.proxy(), None);
 
-        let proxy = Url::parse("http://localhost:10809").unwrap();
+        let proxy = Uri::from_static("http://localhost:10809");
         let client = ReqwestClient::proxy_and_user_agent(Some(proxy.clone()), "test").unwrap();
         assert_eq!(client.proxy(), Some(&proxy));
 
-        let proxy = Url::parse("https://localhost:10809").unwrap();
+        let proxy = Uri::from_static("https://localhost:10809");
         let client = ReqwestClient::proxy_and_user_agent(Some(proxy.clone()), "test").unwrap();
         assert_eq!(client.proxy(), Some(&proxy));
 
-        let proxy = Url::parse("socks4://localhost:10808").unwrap();
+        let proxy = Uri::from_static("socks4://localhost:10808");
         let client = ReqwestClient::proxy_and_user_agent(Some(proxy.clone()), "test").unwrap();
         assert_eq!(client.proxy(), Some(&proxy));
 
-        let proxy = Url::parse("socks4a://localhost:10808").unwrap();
+        let proxy = Uri::from_static("socks4a://localhost:10808");
         let client = ReqwestClient::proxy_and_user_agent(Some(proxy.clone()), "test").unwrap();
         assert_eq!(client.proxy(), Some(&proxy));
 
-        let proxy = Url::parse("socks5://localhost:10808").unwrap();
+        let proxy = Uri::from_static("socks5://localhost:10808");
         let client = ReqwestClient::proxy_and_user_agent(Some(proxy.clone()), "test").unwrap();
         assert_eq!(client.proxy(), Some(&proxy));
 
-        let proxy = Url::parse("socks5h://localhost:10808").unwrap();
+        let proxy = Uri::from_static("socks5h://localhost:10808");
         let client = ReqwestClient::proxy_and_user_agent(Some(proxy.clone()), "test").unwrap();
         assert_eq!(client.proxy(), Some(&proxy));
     }
 
     #[test]
     fn test_invalid_proxy_uri() {
-        let proxy = Url::parse("socks://127.0.0.1:20170").unwrap();
+        let proxy = Uri::from_static("socks://127.0.0.1:20170");
         let client = ReqwestClient::proxy_and_user_agent(Some(proxy), "test").unwrap();
         assert!(
             client.proxy.is_none(),
