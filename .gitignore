@@ -1,0 +1,10 @@
+# Build artifacts
+**/target
+
+# IDE and editor
+.DS_Store
+.idea
+*.xcodeproj
+*.xcworkspace
+DerivedData/
+xcuserdata/
