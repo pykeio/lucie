@@ -1,5 +1,6 @@
 # Build artifacts
 **/target
+/Cargo.lock
 
 # IDE and editor
 .DS_Store
