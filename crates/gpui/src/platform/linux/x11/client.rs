@@ -1,6 +1,5 @@
-use crate::{Capslock, ResultExt as _, RunnableVariant, TaskTiming, profiler, xcb_flush};
+use crate::{Capslock, RunnableVariant, TaskTiming, profiler, xcb_flush};
 use anyhow::{Context as _, anyhow};
-use ashpd::WindowIdentifier;
 use calloop::{
     EventLoop, LoopHandle, RegistrationToken,
     generic::{FdWrapper, Generic},
@@ -53,9 +52,8 @@ use crate::platform::{
     blade::BladeContext,
     linux::{
         DEFAULT_CURSOR_ICON_NAME, LinuxClient, get_xkb_compose_state, is_within_click_distance,
-        log_cursor_icon_warning, open_uri_internal,
+        log_cursor_icon_warning,
         platform::{DOUBLE_CLICK_INTERVAL, SCROLL_LINES},
-        reveal_path_internal,
         xdg_desktop_portal::{Event as XDPEvent, XDPEventSource},
     },
 };
@@ -437,7 +435,7 @@ impl X11Client {
             .to_string();
         let keyboard_layout = LinuxKeyboardLayout::new(layout_name.into());
 
-        let gpu_context = BladeContext::new().notify_err("Unable to init GPU context");
+        let gpu_context = BladeContext::new().context("Unable to init GPU context")?;
 
         let resource_database = x11rb::resource_manager::new_from_default(&xcb_connection)
             .context("Failed to create resource database")?;
@@ -1541,16 +1539,6 @@ impl LinuxClient for X11Client {
         state.xcb_connection.flush().log_err();
     }
 
-    fn open_uri(&self, uri: &str) {
-        #[cfg(any(feature = "wayland", feature = "x11"))]
-        open_uri_internal(self.background_executor(), uri, None);
-    }
-
-    fn reveal_path(&self, path: PathBuf) {
-        #[cfg(any(feature = "x11", feature = "wayland"))]
-        reveal_path_internal(self.background_executor(), path, None);
-    }
-
     fn write_to_primary(&self, item: crate::ClipboardItem) {
         let state = self.0.borrow_mut();
         state
@@ -1669,16 +1657,6 @@ impl LinuxClient for X11Client {
         }
 
         Some(handles)
-    }
-
-    fn window_identifier(&self) -> impl Future<Output = Option<WindowIdentifier>> + Send + 'static {
-        let state = self.0.borrow();
-        state
-            .keyboard_focused_window
-            .and_then(|focused_window| state.windows.get(&focused_window))
-            .map(|window| window.window.x_window as u64)
-            .map(|x_window| std::future::ready(Some(WindowIdentifier::from_xid(x_window))))
-            .unwrap_or(std::future::ready(None))
     }
 }
 

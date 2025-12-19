@@ -7,7 +7,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ashpd::WindowIdentifier;
 use calloop::{
     EventLoop, LoopHandle,
     timer::{TimeoutAction, Timer},
@@ -76,8 +75,8 @@ use crate::{
     FileDropEvent, ForegroundExecutor, KeyDownEvent, KeyUpEvent, Keystroke, LinuxCommon,
     LinuxKeyboardLayout, Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent,
     MouseExitEvent, MouseMoveEvent, MouseUpEvent, NavigationDirection, Pixels, PlatformDisplay,
-    PlatformInput, PlatformKeyboardLayout, Point, ResultExt as _, SCROLL_LINES, ScrollDelta,
-    ScrollWheelEvent, Size, TouchPhase, WindowParams, point, profiler, px, size,
+    PlatformInput, PlatformKeyboardLayout, Point, SCROLL_LINES, ScrollDelta, ScrollWheelEvent,
+    Size, TouchPhase, WindowParams, point, profiler, px, size,
 };
 use crate::{
     RunnableVariant, TaskTiming,
@@ -86,8 +85,7 @@ use crate::{
 use crate::{
     SharedString,
     platform::linux::{
-        LinuxClient, get_xkb_compose_state, is_within_click_distance, open_uri_internal, read_fd,
-        reveal_path_internal,
+        LinuxClient, get_xkb_compose_state, is_within_click_distance, read_fd,
         wayland::{
             clipboard::{Clipboard, DataOffer, FILE_LIST_MIME_TYPE, TEXT_MIME_TYPES},
             cursor::Cursor,
@@ -266,10 +264,6 @@ pub(crate) struct KeyRepeat {
 }
 
 pub(crate) enum PendingActivation {
-    /// URI to open in the web browser.
-    Uri(String),
-    /// Path to open in the file explorer.
-    Path(PathBuf),
     /// A window from ourselves to raise.
     Window(ObjectId),
 }
@@ -532,7 +526,7 @@ impl WaylandClient {
             .unwrap();
 
         // This could be unified with the notification handling in zed/main:fail_to_open_window.
-        let gpu_context = BladeContext::new().notify_err("Unable to init GPU context");
+        let gpu_context = BladeContext::new().expect("Unable to init GPU context");
 
         let seat = seat.unwrap();
         let globals = Globals::new(
@@ -756,42 +750,6 @@ impl LinuxClient for WaylandClient {
         }
     }
 
-    fn open_uri(&self, uri: &str) {
-        let mut state = self.0.borrow_mut();
-        if let (Some(activation), Some(window)) = (
-            state.globals.activation.clone(),
-            state.mouse_focused_window.clone(),
-        ) {
-            state.pending_activation = Some(PendingActivation::Uri(uri.to_string()));
-            let token = activation.get_activation_token(&state.globals.qh, ());
-            let serial = state.serial_tracker.get(SerialKind::MousePress);
-            token.set_serial(serial, &state.wl_seat);
-            token.set_surface(&window.surface());
-            token.commit();
-        } else {
-            let executor = state.common.background_executor.clone();
-            open_uri_internal(executor, uri, None);
-        }
-    }
-
-    fn reveal_path(&self, path: PathBuf) {
-        let mut state = self.0.borrow_mut();
-        if let (Some(activation), Some(window)) = (
-            state.globals.activation.clone(),
-            state.mouse_focused_window.clone(),
-        ) {
-            state.pending_activation = Some(PendingActivation::Path(path));
-            let token = activation.get_activation_token(&state.globals.qh, ());
-            let serial = state.serial_tracker.get(SerialKind::MousePress);
-            token.set_serial(serial, &state.wl_seat);
-            token.set_surface(&window.surface());
-            token.commit();
-        } else {
-            let executor = state.common.background_executor.clone();
-            reveal_path_internal(executor, path, None);
-        }
-    }
-
     fn with_common<R>(&self, f: impl FnOnce(&mut LinuxCommon) -> R) -> R {
         f(&mut self.0.borrow_mut().common)
     }
@@ -875,20 +833,6 @@ impl LinuxClient for WaylandClient {
 
     fn compositor_name(&self) -> &'static str {
         "Wayland"
-    }
-
-    fn window_identifier(&self) -> impl Future<Output = Option<WindowIdentifier>> + Send + 'static {
-        async fn inner(surface: Option<wl_surface::WlSurface>) -> Option<WindowIdentifier> {
-            if let Some(surface) = surface {
-                ashpd::WindowIdentifier::from_wayland(&surface).await
-            } else {
-                None
-            }
-        }
-
-        let client_state = self.0.borrow();
-        let active_window = client_state.keyboard_focused_window.as_ref();
-        inner(active_window.map(|aw| aw.surface()))
     }
 }
 
@@ -1157,10 +1101,6 @@ impl Dispatch<xdg_activation_token_v1::XdgActivationTokenV1, ()> for WaylandClie
         if let xdg_activation_token_v1::Event::Done { token } = event {
             let executor = state.common.background_executor.clone();
             match state.pending_activation.take() {
-                Some(PendingActivation::Uri(uri)) => open_uri_internal(executor, &uri, Some(token)),
-                Some(PendingActivation::Path(path)) => {
-                    reveal_path_internal(executor, path, Some(token))
-                }
                 Some(PendingActivation::Window(window)) => {
                     let Some(window) = get_window(&mut state, &window) else {
                         return;

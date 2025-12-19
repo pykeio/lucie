@@ -17,7 +17,6 @@ use anyhow::{Context as _, anyhow};
 use calloop::LoopSignal;
 use futures::channel::oneshot;
 use util::ResultExt as _;
-use util::command::{new_smol_command, new_std_command};
 #[cfg(any(feature = "wayland", feature = "x11"))]
 use xkbcommon::xkb::{self, Keycode, Keysym, State};
 
@@ -43,50 +42,6 @@ pub(crate) const KEYRING_LABEL: &str = "zed-github-account";
 const FILE_PICKER_PORTAL_MISSING: &str =
     "Couldn't open file picker due to missing xdg-desktop-portal implementation.";
 
-#[cfg(any(feature = "x11", feature = "wayland"))]
-pub trait ResultExt {
-    type Ok;
-
-    fn notify_err(self, msg: &'static str) -> Self::Ok;
-}
-
-#[cfg(any(feature = "x11", feature = "wayland"))]
-impl<T> ResultExt for anyhow::Result<T> {
-    type Ok = T;
-
-    fn notify_err(self, msg: &'static str) -> T {
-        match self {
-            Ok(v) => v,
-            Err(e) => {
-                use ashpd::desktop::notification::{Notification, NotificationProxy, Priority};
-                use futures::executor::block_on;
-
-                let proxy = block_on(NotificationProxy::new()).expect(msg);
-
-                let notification_id = "dev.zed.Oops";
-                block_on(
-                    proxy.add_notification(
-                        notification_id,
-                        Notification::new("Zed failed to launch")
-                            .body(Some(
-                                format!(
-                                    "{e:?}. See https://zed.dev/docs/linux for troubleshooting steps."
-                                )
-                                .as_str(),
-                            ))
-                            .priority(Priority::High)
-                            .icon(ashpd::desktop::Icon::with_names(&[
-                                "dialog-question-symbolic",
-                            ])),
-                    )
-                ).expect(msg);
-
-                panic!("{msg}");
-            }
-        }
-    }
-}
-
 pub trait LinuxClient {
     fn compositor_name(&self) -> &'static str;
     fn with_common<R>(&self, f: impl FnOnce(&mut LinuxCommon) -> R) -> R;
@@ -102,8 +57,6 @@ pub trait LinuxClient {
         options: WindowParams,
     ) -> anyhow::Result<Box<dyn PlatformWindow>>;
     fn set_cursor_style(&self, style: CursorStyle);
-    fn open_uri(&self, uri: &str);
-    fn reveal_path(&self, path: PathBuf);
     fn write_to_primary(&self, item: ClipboardItem);
     fn write_to_clipboard(&self, item: ClipboardItem);
     fn read_from_primary(&self) -> Option<ClipboardItem>;
@@ -111,18 +64,10 @@ pub trait LinuxClient {
     fn active_window(&self) -> Option<AnyWindowHandle>;
     fn window_stack(&self) -> Option<Vec<AnyWindowHandle>>;
     fn run(&self);
-
-    #[cfg(any(feature = "wayland", feature = "x11"))]
-    fn window_identifier(
-        &self,
-    ) -> impl Future<Output = Option<ashpd::WindowIdentifier>> + Send + 'static {
-        std::future::ready::<Option<ashpd::WindowIdentifier>>(None)
-    }
 }
 
 #[derive(Default)]
 pub(crate) struct PlatformHandlers {
-    pub(crate) open_urls: Option<Box<dyn FnMut(Vec<String>)>>,
     pub(crate) quit: Option<Box<dyn FnMut()>>,
     pub(crate) reopen: Option<Box<dyn FnMut()>>,
     pub(crate) app_menu_action: Option<Box<dyn FnMut(&dyn Action)>>,
@@ -216,56 +161,6 @@ impl<P: LinuxClient + 'static> Platform for P {
         self.compositor_name()
     }
 
-    fn restart(&self, binary_path: Option<PathBuf>) {
-        use std::os::unix::process::CommandExt as _;
-
-        // get the process id of the current process
-        let app_pid = std::process::id().to_string();
-        // get the path to the executable
-        let app_path = if let Some(path) = binary_path {
-            path
-        } else {
-            match self.app_path() {
-                Ok(path) => path,
-                Err(err) => {
-                    log::error!("Failed to get app path: {:?}", err);
-                    return;
-                }
-            }
-        };
-
-        log::info!("Restarting process, using app path: {:?}", app_path);
-
-        // Script to wait for the current process to exit and then restart the app.
-        let script = format!(
-            r#"
-            while kill -0 {pid} 2>/dev/null; do
-                sleep 0.1
-            done
-
-            {app_path}
-            "#,
-            pid = app_pid,
-            app_path = app_path.display()
-        );
-
-        #[allow(
-            clippy::disallowed_methods,
-            reason = "We are restarting ourselves, using std command thus is fine"
-        )]
-        let restart_process = new_std_command("/usr/bin/env")
-            .arg("bash")
-            .arg("-c")
-            .arg(script)
-            .process_group(0)
-            .spawn();
-
-        match restart_process {
-            Ok(_) => self.quit(),
-            Err(e) => log::error!("failed to spawn restart script: {:?}", e),
-        }
-    }
-
     fn activate(&self, _ignoring_other_apps: bool) {
         log::info!("activate is not implemented on Linux, ignoring the call")
     }
@@ -304,161 +199,6 @@ impl<P: LinuxClient + 'static> Platform for P {
         options: WindowParams,
     ) -> anyhow::Result<Box<dyn PlatformWindow>> {
         self.open_window(handle, options)
-    }
-
-    fn open_url(&self, url: &str) {
-        self.open_uri(url);
-    }
-
-    fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>) {
-        self.with_common(|common| common.callbacks.open_urls = Some(callback));
-    }
-
-    fn prompt_for_paths(
-        &self,
-        options: PathPromptOptions,
-    ) -> oneshot::Receiver<Result<Option<Vec<PathBuf>>>> {
-        let (done_tx, done_rx) = oneshot::channel();
-
-        #[cfg(not(any(feature = "wayland", feature = "x11")))]
-        let _ = (done_tx.send(Ok(None)), options);
-
-        #[cfg(any(feature = "wayland", feature = "x11"))]
-        let identifier = self.window_identifier();
-
-        #[cfg(any(feature = "wayland", feature = "x11"))]
-        self.foreground_executor()
-            .spawn(async move {
-                let title = if options.directories {
-                    "Open Folder"
-                } else {
-                    "Open File"
-                };
-
-                let request = match ashpd::desktop::file_chooser::OpenFileRequest::default()
-                    .identifier(identifier.await)
-                    .modal(true)
-                    .title(title)
-                    .accept_label(options.prompt.as_ref().map(crate::SharedString::as_str))
-                    .multiple(options.multiple)
-                    .directory(options.directories)
-                    .send()
-                    .await
-                {
-                    Ok(request) => request,
-                    Err(err) => {
-                        let result = match err {
-                            ashpd::Error::PortalNotFound(_) => anyhow!(FILE_PICKER_PORTAL_MISSING),
-                            err => err.into(),
-                        };
-                        let _ = done_tx.send(Err(result));
-                        return;
-                    }
-                };
-
-                let result = match request.response() {
-                    Ok(response) => Ok(Some(
-                        response
-                            .uris()
-                            .iter()
-                            .filter_map(|uri| uri.to_file_path().ok())
-                            .collect::<Vec<_>>(),
-                    )),
-                    Err(ashpd::Error::Response(_)) => Ok(None),
-                    Err(e) => Err(e.into()),
-                };
-                let _ = done_tx.send(result);
-            })
-            .detach();
-        done_rx
-    }
-
-    fn prompt_for_new_path(
-        &self,
-        directory: &Path,
-        suggested_name: Option<&str>,
-    ) -> oneshot::Receiver<Result<Option<PathBuf>>> {
-        let (done_tx, done_rx) = oneshot::channel();
-
-        #[cfg(not(any(feature = "wayland", feature = "x11")))]
-        let _ = (done_tx.send(Ok(None)), directory, suggested_name);
-
-        #[cfg(any(feature = "wayland", feature = "x11"))]
-        let identifier = self.window_identifier();
-
-        #[cfg(any(feature = "wayland", feature = "x11"))]
-        self.foreground_executor()
-            .spawn({
-                let directory = directory.to_owned();
-                let suggested_name = suggested_name.map(|s| s.to_owned());
-
-                async move {
-                    let mut request_builder =
-                        ashpd::desktop::file_chooser::SaveFileRequest::default()
-                            .identifier(identifier.await)
-                            .modal(true)
-                            .title("Save File")
-                            .current_folder(directory)
-                            .expect("pathbuf should not be nul terminated");
-
-                    if let Some(suggested_name) = suggested_name {
-                        request_builder = request_builder.current_name(suggested_name.as_str());
-                    }
-
-                    let request = match request_builder.send().await {
-                        Ok(request) => request,
-                        Err(err) => {
-                            let result = match err {
-                                ashpd::Error::PortalNotFound(_) => {
-                                    anyhow!(FILE_PICKER_PORTAL_MISSING)
-                                }
-                                err => err.into(),
-                            };
-                            let _ = done_tx.send(Err(result));
-                            return;
-                        }
-                    };
-
-                    let result = match request.response() {
-                        Ok(response) => Ok(response
-                            .uris()
-                            .first()
-                            .and_then(|uri| uri.to_file_path().ok())),
-                        Err(ashpd::Error::Response(_)) => Ok(None),
-                        Err(e) => Err(e.into()),
-                    };
-                    let _ = done_tx.send(result);
-                }
-            })
-            .detach();
-
-        done_rx
-    }
-
-    fn can_select_mixed_files_and_dirs(&self) -> bool {
-        // org.freedesktop.portal.FileChooser only supports "pick files" and "pick directories".
-        false
-    }
-
-    fn reveal_path(&self, path: &Path) {
-        self.reveal_path(path.to_owned());
-    }
-
-    fn open_with_system(&self, path: &Path) {
-        let path = path.to_owned();
-        self.background_executor()
-            .spawn(async move {
-                let _ = new_smol_command("xdg-open")
-                    .arg(path)
-                    .spawn()
-                    .context("invoking xdg-open")
-                    .log_err()?
-                    .status()
-                    .await
-                    .log_err()?;
-                Some(())
-            })
-            .detach();
     }
 
     fn on_quit(&self, callback: Box<dyn FnMut()>) {
@@ -525,78 +265,8 @@ impl<P: LinuxClient + 'static> Platform for P {
         self.with_common(|common| common.auto_hide_scrollbars)
     }
 
-    fn write_credentials(&self, url: &str, username: &str, password: &[u8]) -> Task<Result<()>> {
-        let url = url.to_string();
-        let username = username.to_string();
-        let password = password.to_vec();
-        self.background_executor().spawn(async move {
-            let keyring = oo7::Keyring::new().await?;
-            keyring.unlock().await?;
-            keyring
-                .create_item(
-                    KEYRING_LABEL,
-                    &vec![("url", &url), ("username", &username)],
-                    password,
-                    true,
-                )
-                .await?;
-            Ok(())
-        })
-    }
-
-    fn read_credentials(&self, url: &str) -> Task<Result<Option<(String, Vec<u8>)>>> {
-        let url = url.to_string();
-        self.background_executor().spawn(async move {
-            let keyring = oo7::Keyring::new().await?;
-            keyring.unlock().await?;
-
-            let items = keyring.search_items(&vec![("url", &url)]).await?;
-
-            for item in items.into_iter() {
-                if item.label().await.is_ok_and(|label| label == KEYRING_LABEL) {
-                    let attributes = item.attributes().await?;
-                    let username = attributes
-                        .get("username")
-                        .context("Cannot find username in stored credentials")?;
-                    item.unlock().await?;
-                    let secret = item.secret().await?;
-
-                    // we lose the zeroizing capabilities at this boundary,
-                    // a current limitation GPUI's credentials api
-                    return Ok(Some((username.to_string(), secret.to_vec())));
-                } else {
-                    continue;
-                }
-            }
-            Ok(None)
-        })
-    }
-
-    fn delete_credentials(&self, url: &str) -> Task<Result<()>> {
-        let url = url.to_string();
-        self.background_executor().spawn(async move {
-            let keyring = oo7::Keyring::new().await?;
-            keyring.unlock().await?;
-
-            let items = keyring.search_items(&vec![("url", &url)]).await?;
-
-            for item in items.into_iter() {
-                if item.label().await.is_ok_and(|label| label == KEYRING_LABEL) {
-                    item.delete().await?;
-                    return Ok(());
-                }
-            }
-
-            Ok(())
-        })
-    }
-
     fn window_appearance(&self) -> WindowAppearance {
         self.with_common(|common| common.appearance)
-    }
-
-    fn register_url_scheme(&self, _: &str) -> Task<anyhow::Result<()>> {
-        Task::ready(Err(anyhow!("register_url_scheme unimplemented")))
     }
 
     fn write_to_primary(&self, item: ClipboardItem) {
@@ -616,72 +286,6 @@ impl<P: LinuxClient + 'static> Platform for P {
     }
 
     fn add_recent_document(&self, _path: &Path) {}
-}
-
-#[cfg(any(feature = "wayland", feature = "x11"))]
-pub(super) fn open_uri_internal(
-    executor: BackgroundExecutor,
-    uri: &str,
-    activation_token: Option<String>,
-) {
-    if let Some(uri) = ashpd::url::Url::parse(uri).log_err() {
-        executor
-            .spawn(async move {
-                match ashpd::desktop::open_uri::OpenFileRequest::default()
-                    .activation_token(activation_token.clone().map(ashpd::ActivationToken::from))
-                    .send_uri(&uri)
-                    .await
-                    .and_then(|e| e.response())
-                {
-                    Ok(()) => return,
-                    Err(e) => log::error!("Failed to open with dbus: {}", e),
-                }
-
-                for mut command in open::commands(uri.to_string()) {
-                    if let Some(token) = activation_token.as_ref() {
-                        command.env("XDG_ACTIVATION_TOKEN", token);
-                    }
-                    let program = format!("{:?}", command.get_program());
-                    match smol::process::Command::from(command).spawn() {
-                        Ok(mut cmd) => {
-                            cmd.status().await.log_err();
-                            return;
-                        }
-                        Err(e) => {
-                            log::error!("Failed to open with {}: {}", program, e)
-                        }
-                    }
-                }
-            })
-            .detach();
-    }
-}
-
-#[cfg(any(feature = "x11", feature = "wayland"))]
-pub(super) fn reveal_path_internal(
-    executor: BackgroundExecutor,
-    path: PathBuf,
-    activation_token: Option<String>,
-) {
-    executor
-        .spawn(async move {
-            if let Some(dir) = File::open(path.clone()).log_err() {
-                match ashpd::desktop::open_uri::OpenDirectoryRequest::default()
-                    .activation_token(activation_token.map(ashpd::ActivationToken::from))
-                    .send(&dir.as_fd())
-                    .await
-                {
-                    Ok(_) => return,
-                    Err(e) => log::error!("Failed to open with dbus: {}", e),
-                }
-                if path.is_dir() {
-                    open::that_detached(path).log_err();
-                } else {
-                    open::that_detached(path.parent().unwrap_or(Path::new(""))).log_err();
-                }
-            }
-        })
-        .detach();
 }
 
 #[allow(unused)]

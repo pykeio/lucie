@@ -190,16 +190,6 @@ impl Application {
         }));
     }
 
-    /// Register a handler to be invoked when the platform instructs the application
-    /// to open one or more URLs.
-    pub fn on_open_urls<F>(&self, mut callback: F) -> &Self
-    where
-        F: 'static + FnMut(Vec<String>),
-    {
-        self.0.borrow().platform.on_open_urls(Box::new(callback));
-        self
-    }
-
     /// Invokes a handler when an already-running application is launched.
     /// On macOS, this can occur when the application icon is double-clicked or the app is launched via the dock.
     pub fn on_reopen<F>(&self, mut callback: F) -> &Self
@@ -1083,41 +1073,6 @@ impl App {
         self.platform.read_from_clipboard()
     }
 
-    /// Writes credentials to the platform keychain.
-    pub fn write_credentials(
-        &self,
-        url: &str,
-        username: &str,
-        password: &[u8],
-    ) -> Task<Result<()>> {
-        self.platform.write_credentials(url, username, password)
-    }
-
-    /// Reads credentials from the platform keychain.
-    pub fn read_credentials(&self, url: &str) -> Task<Result<Option<(String, Vec<u8>)>>> {
-        self.platform.read_credentials(url)
-    }
-
-    /// Deletes credentials from the platform keychain.
-    pub fn delete_credentials(&self, url: &str) -> Task<Result<()>> {
-        self.platform.delete_credentials(url)
-    }
-
-    /// Directs the platform's default browser to open the given URL.
-    pub fn open_url(&self, url: &str) {
-        self.platform.open_url(url);
-    }
-
-    /// Registers the given URL scheme (e.g. `zed` for `zed://` urls) to be
-    /// opened by the current app.
-    ///
-    /// On some platforms (e.g. macOS) you may be able to register URL schemes
-    /// as part of app distribution, but this method exists to let you register
-    /// schemes at runtime.
-    pub fn register_url_scheme(&self, scheme: &str) -> Task<Result<()>> {
-        self.platform.register_url_scheme(scheme)
-    }
-
     /// Returns the full pathname of the current app bundle.
     ///
     /// Returns an error if the app is not being run from a bundle.
@@ -1137,58 +1092,9 @@ impl App {
         self.platform.path_for_auxiliary_executable(name)
     }
 
-    /// Displays a platform modal for selecting paths.
-    ///
-    /// When one or more paths are selected, they'll be relayed asynchronously via the returned oneshot channel.
-    /// If cancelled, a `None` will be relayed instead.
-    /// May return an error on Linux if the file picker couldn't be opened.
-    pub fn prompt_for_paths(
-        &self,
-        options: PathPromptOptions,
-    ) -> oneshot::Receiver<Result<Option<Vec<PathBuf>>>> {
-        self.platform.prompt_for_paths(options)
-    }
-
-    /// Displays a platform modal for selecting a new path where a file can be saved.
-    ///
-    /// The provided directory will be used to set the initial location.
-    /// When a path is selected, it is relayed asynchronously via the returned oneshot channel.
-    /// If cancelled, a `None` will be relayed instead.
-    /// May return an error on Linux if the file picker couldn't be opened.
-    pub fn prompt_for_new_path(
-        &self,
-        directory: &Path,
-        suggested_name: Option<&str>,
-    ) -> oneshot::Receiver<Result<Option<PathBuf>>> {
-        self.platform.prompt_for_new_path(directory, suggested_name)
-    }
-
-    /// Reveals the specified path at the platform level, such as in Finder on macOS.
-    pub fn reveal_path(&self, path: &Path) {
-        self.platform.reveal_path(path)
-    }
-
-    /// Opens the specified path with the system's default application.
-    pub fn open_with_system(&self, path: &Path) {
-        self.platform.open_with_system(path)
-    }
-
     /// Returns whether the user has configured scrollbars to auto-hide at the platform level.
     pub fn should_auto_hide_scrollbars(&self) -> bool {
         self.platform.should_auto_hide_scrollbars()
-    }
-
-    /// Restarts the application.
-    pub fn restart(&mut self) {
-        self.restart_observers
-            .clone()
-            .retain(&(), |observer| observer(self));
-        self.platform.restart(self.restart_path.take())
-    }
-
-    /// Sets the path to use when restarting the application.
-    pub fn set_restart_path(&mut self, path: PathBuf) {
-        self.restart_path = Some(path);
     }
 
     /// Returns the HTTP client for the application.
@@ -2114,11 +2020,6 @@ impl App {
     #[cfg(any(test, feature = "test-support", debug_assertions))]
     pub fn get_name(&self) -> Option<&'static str> {
         self.name
-    }
-
-    /// Returns `true` if the platform file picker supports selecting a mix of files and directories.
-    pub fn can_select_mixed_files_and_dirs(&self) -> bool {
-        self.platform.can_select_mixed_files_and_dirs()
     }
 
     /// Removes an image from the sprite atlas on all windows.

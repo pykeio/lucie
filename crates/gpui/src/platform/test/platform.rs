@@ -34,7 +34,6 @@ pub(crate) struct TestPlatform {
     pub(crate) prompts: RefCell<TestPrompts>,
     pub opened_url: RefCell<Option<String>>,
     pub text_system: Arc<dyn PlatformTextSystem>,
-    pub expect_restart: RefCell<Option<oneshot::Sender<Option<PathBuf>>>>,
     #[cfg(target_os = "windows")]
     bitmap_factory: std::mem::ManuallyDrop<IWICImagingFactory>,
     weak: Weak<Self>,
@@ -74,7 +73,6 @@ impl TestPlatform {
             active_cursor: Default::default(),
             active_display: Rc::new(TestDisplay::new()),
             active_window: Default::default(),
-            expect_restart: Default::default(),
             current_clipboard_item: Mutex::new(None),
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             current_primary_item: Mutex::new(None),
@@ -209,12 +207,6 @@ impl Platform for TestPlatform {
 
     fn quit(&self) {}
 
-    fn restart(&self, path: Option<PathBuf>) {
-        if let Some(tx) = self.expect_restart.take() {
-            tx.send(path).unwrap();
-        }
-    }
-
     fn activate(&self, _ignoring_other_apps: bool) {
         //
     }
@@ -262,44 +254,6 @@ impl Platform for TestPlatform {
 
     fn window_appearance(&self) -> WindowAppearance {
         WindowAppearance::Light
-    }
-
-    fn open_url(&self, url: &str) {
-        *self.opened_url.borrow_mut() = Some(url.to_string())
-    }
-
-    fn on_open_urls(&self, _callback: Box<dyn FnMut(Vec<String>)>) {
-        unimplemented!()
-    }
-
-    fn prompt_for_paths(
-        &self,
-        _options: crate::PathPromptOptions,
-    ) -> oneshot::Receiver<Result<Option<Vec<std::path::PathBuf>>>> {
-        unimplemented!()
-    }
-
-    fn prompt_for_new_path(
-        &self,
-        directory: &std::path::Path,
-        _suggested_name: Option<&str>,
-    ) -> oneshot::Receiver<Result<Option<std::path::PathBuf>>> {
-        let (tx, rx) = oneshot::channel();
-        self.background_executor()
-            .set_waiting_hint(Some(format!("PROMPT FOR PATH: {:?}", directory)));
-        self.prompts
-            .borrow_mut()
-            .new_path
-            .push_back((directory.to_path_buf(), tx));
-        rx
-    }
-
-    fn can_select_mixed_files_and_dirs(&self) -> bool {
-        true
-    }
-
-    fn reveal_path(&self, _path: &std::path::Path) {
-        unimplemented!()
     }
 
     fn on_quit(&self, _callback: Box<dyn FnMut()>) {}
@@ -351,26 +305,6 @@ impl Platform for TestPlatform {
 
     fn read_from_clipboard(&self) -> Option<ClipboardItem> {
         self.current_clipboard_item.lock().clone()
-    }
-
-    fn write_credentials(&self, _url: &str, _username: &str, _password: &[u8]) -> Task<Result<()>> {
-        Task::ready(Ok(()))
-    }
-
-    fn read_credentials(&self, _url: &str) -> Task<Result<Option<(String, Vec<u8>)>>> {
-        Task::ready(Ok(None))
-    }
-
-    fn delete_credentials(&self, _url: &str) -> Task<Result<()>> {
-        Task::ready(Ok(()))
-    }
-
-    fn register_url_scheme(&self, _: &str) -> Task<anyhow::Result<()>> {
-        unimplemented!()
-    }
-
-    fn open_with_system(&self, _path: &Path) {
-        unimplemented!()
     }
 }
 

@@ -90,10 +90,6 @@ impl LinuxClient for HeadlessClient {
 
     fn set_cursor_style(&self, _style: CursorStyle) {}
 
-    fn open_uri(&self, _uri: &str) {}
-
-    fn reveal_path(&self, _path: std::path::PathBuf) {}
-
     fn write_to_primary(&self, _item: crate::ClipboardItem) {}
 
     fn write_to_clipboard(&self, _item: crate::ClipboardItem) {}

@@ -331,21 +331,9 @@ impl TestAppContext {
         self.test_platform.pending_prompt()
     }
 
-    /// All the urls that have been opened with cx.open_url() during this test.
-    pub fn opened_url(&self) -> Option<String> {
-        self.test_platform.opened_url.borrow().clone()
-    }
-
     /// Simulates the user resizing the window to the new size.
     pub fn simulate_window_resize(&self, window_handle: AnyWindowHandle, size: Size<Pixels>) {
         self.test_window(window_handle).simulate_resize(size);
-    }
-
-    /// Returns true if there's an alert dialog open.
-    pub fn expect_restart(&self) -> oneshot::Receiver<Option<PathBuf>> {
-        let (tx, rx) = futures::channel::oneshot::channel();
-        self.test_platform.expect_restart.borrow_mut().replace(tx);
-        rx
     }
 
     /// Returns all windows open in the test.

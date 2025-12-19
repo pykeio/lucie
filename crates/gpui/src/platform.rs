@@ -153,7 +153,6 @@ pub(crate) trait Platform: 'static {
 
     fn run(&self, on_finish_launching: Box<dyn 'static + FnOnce()>);
     fn quit(&self);
-    fn restart(&self, binary_path: Option<PathBuf>);
     fn activate(&self, ignoring_other_apps: bool);
     fn hide(&self);
     fn hide_other_apps(&self);
@@ -174,23 +173,6 @@ pub(crate) trait Platform: 'static {
 
     /// Returns the appearance of the application's windows.
     fn window_appearance(&self) -> WindowAppearance;
-
-    fn open_url(&self, url: &str);
-    fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>);
-    fn register_url_scheme(&self, url: &str) -> Task<Result<()>>;
-
-    fn prompt_for_paths(
-        &self,
-        options: PathPromptOptions,
-    ) -> oneshot::Receiver<Result<Option<Vec<PathBuf>>>>;
-    fn prompt_for_new_path(
-        &self,
-        directory: &Path,
-        suggested_name: Option<&str>,
-    ) -> oneshot::Receiver<Result<Option<PathBuf>>>;
-    fn can_select_mixed_files_and_dirs(&self) -> bool;
-    fn reveal_path(&self, path: &Path);
-    fn open_with_system(&self, path: &Path);
 
     fn on_quit(&self, callback: Box<dyn FnMut()>);
     fn on_reopen(&self, callback: Box<dyn FnMut()>);
@@ -229,10 +211,6 @@ pub(crate) trait Platform: 'static {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     fn read_from_primary(&self) -> Option<ClipboardItem>;
     fn read_from_clipboard(&self) -> Option<ClipboardItem>;
-
-    fn write_credentials(&self, url: &str, username: &str, password: &[u8]) -> Task<Result<()>>;
-    fn read_credentials(&self, url: &str) -> Task<Result<Option<(String, Vec<u8>)>>>;
-    fn delete_credentials(&self, url: &str) -> Task<Result<()>>;
 
     fn keyboard_layout(&self) -> Box<dyn PlatformKeyboardLayout>;
     fn keyboard_mapper(&self) -> Rc<dyn PlatformKeyboardMapper>;

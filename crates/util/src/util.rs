@@ -1,7 +1,4 @@
 pub mod arc_cow;
-pub mod command;
-#[cfg(target_os = "windows")]
-pub mod shell;
 
 use anyhow::Result;
 

@@ -20,8 +20,7 @@ use windows::{
     Win32::{
         Foundation::*,
         Graphics::{Direct3D11::ID3D11Device, Gdi::*},
-        Security::Credentials::*,
-        System::{Com::*, LibraryLoader::*, Ole::*, SystemInformation::*},
+        System::{Com::*, LibraryLoader::*, Ole::*},
         UI::{Input::KeyboardAndMouse::*, Shell::*, WindowsAndMessaging::*},
     },
     core::*,
@@ -66,7 +65,6 @@ pub(crate) struct WindowsPlatformState {
 
 #[derive(Default)]
 struct PlatformCallbacks {
-    open_urls: Cell<Option<Box<dyn FnMut(Vec<String>)>>>,
     quit: Cell<Option<Box<dyn FnMut()>>>,
     reopen: Cell<Option<Box<dyn FnMut()>>>,
     app_menu_action: Cell<Option<Box<dyn FnMut(&dyn Action)>>>,
@@ -360,45 +358,6 @@ impl Platform for WindowsPlatform {
             .detach();
     }
 
-    fn restart(&self, binary_path: Option<PathBuf>) {
-        let pid = std::process::id();
-        let Some(app_path) = binary_path.or(self.app_path().log_err()) else {
-            return;
-        };
-        let script = format!(
-            r#"
-            $pidToWaitFor = {}
-            $exePath = "{}"
-
-            while ($true) {{
-                $process = Get-Process -Id $pidToWaitFor -ErrorAction SilentlyContinue
-                if (-not $process) {{
-                    Start-Process -FilePath $exePath
-                    break
-                }}
-                Start-Sleep -Seconds 0.1
-            }}
-            "#,
-            pid,
-            app_path.display(),
-        );
-
-        #[allow(
-            clippy::disallowed_methods,
-            reason = "We are restarting ourselves, using std command thus is fine"
-        )] // todo(shell): There might be no powershell on the system
-        let restart_process =
-            util::command::new_std_command(util::shell::get_windows_system_shell())
-                .arg("-command")
-                .arg(script)
-                .spawn();
-
-        match restart_process {
-            Ok(_) => self.quit(),
-            Err(e) => log::error!("failed to spawn restart script: {:?}", e),
-        }
-    }
-
     fn activate(&self, _ignoring_other_apps: bool) {}
 
     fn hide(&self) {}
@@ -441,90 +400,6 @@ impl Platform for WindowsPlatform {
 
     fn window_appearance(&self) -> WindowAppearance {
         system_appearance().log_err().unwrap_or_default()
-    }
-
-    fn open_url(&self, url: &str) {
-        if url.is_empty() {
-            return;
-        }
-        let url_string = url.to_string();
-        self.background_executor()
-            .spawn(async move {
-                open_target(&url_string)
-                    .with_context(|| format!("Opening url: {}", url_string))
-                    .log_err();
-            })
-            .detach();
-    }
-
-    fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>) {
-        self.inner.state.callbacks.open_urls.set(Some(callback));
-    }
-
-    fn prompt_for_paths(
-        &self,
-        options: PathPromptOptions,
-    ) -> Receiver<Result<Option<Vec<PathBuf>>>> {
-        let (tx, rx) = oneshot::channel();
-        let window = self.find_current_active_window();
-        self.foreground_executor()
-            .spawn(async move {
-                let _ = tx.send(file_open_dialog(options, window));
-            })
-            .detach();
-
-        rx
-    }
-
-    fn prompt_for_new_path(
-        &self,
-        directory: &Path,
-        suggested_name: Option<&str>,
-    ) -> Receiver<Result<Option<PathBuf>>> {
-        let directory = directory.to_owned();
-        let suggested_name = suggested_name.map(|s| s.to_owned());
-        let (tx, rx) = oneshot::channel();
-        let window = self.find_current_active_window();
-        self.foreground_executor()
-            .spawn(async move {
-                let _ = tx.send(file_save_dialog(directory, suggested_name, window));
-            })
-            .detach();
-
-        rx
-    }
-
-    fn can_select_mixed_files_and_dirs(&self) -> bool {
-        // The FOS_PICKFOLDERS flag toggles between "only files" and "only folders".
-        false
-    }
-
-    fn reveal_path(&self, path: &Path) {
-        if path.as_os_str().is_empty() {
-            return;
-        }
-        let path = path.to_path_buf();
-        self.background_executor()
-            .spawn(async move {
-                open_target_in_explorer(&path)
-                    .with_context(|| format!("Revealing path {} in explorer", path.display()))
-                    .log_err();
-            })
-            .detach();
-    }
-
-    fn open_with_system(&self, path: &Path) {
-        if path.as_os_str().is_empty() {
-            return;
-        }
-        let path = path.to_path_buf();
-        self.background_executor()
-            .spawn(async move {
-                open_target(&path)
-                    .with_context(|| format!("Opening {} with system", path.display()))
-                    .log_err();
-            })
-            .detach();
     }
 
     fn on_quit(&self, callback: Box<dyn FnMut()>) {
@@ -602,93 +477,6 @@ impl Platform for WindowsPlatform {
 
     fn read_from_clipboard(&self) -> Option<ClipboardItem> {
         read_from_clipboard()
-    }
-
-    fn write_credentials(&self, url: &str, username: &str, password: &[u8]) -> Task<Result<()>> {
-        let mut password = password.to_vec();
-        let mut username = username.encode_utf16().chain(Some(0)).collect_vec();
-        let mut target_name = windows_credentials_target_name(url)
-            .encode_utf16()
-            .chain(Some(0))
-            .collect_vec();
-        self.foreground_executor().spawn(async move {
-            let credentials = CREDENTIALW {
-                LastWritten: unsafe { GetSystemTimeAsFileTime() },
-                Flags: CRED_FLAGS(0),
-                Type: CRED_TYPE_GENERIC,
-                TargetName: PWSTR::from_raw(target_name.as_mut_ptr()),
-                CredentialBlobSize: password.len() as u32,
-                CredentialBlob: password.as_ptr() as *mut _,
-                Persist: CRED_PERSIST_LOCAL_MACHINE,
-                UserName: PWSTR::from_raw(username.as_mut_ptr()),
-                ..CREDENTIALW::default()
-            };
-            unsafe { CredWriteW(&credentials, 0) }?;
-            Ok(())
-        })
-    }
-
-    fn read_credentials(&self, url: &str) -> Task<Result<Option<(String, Vec<u8>)>>> {
-        let mut target_name = windows_credentials_target_name(url)
-            .encode_utf16()
-            .chain(Some(0))
-            .collect_vec();
-        self.foreground_executor().spawn(async move {
-            let mut credentials: *mut CREDENTIALW = std::ptr::null_mut();
-            let result = unsafe {
-                CredReadW(
-                    PCWSTR::from_raw(target_name.as_ptr()),
-                    CRED_TYPE_GENERIC,
-                    None,
-                    &mut credentials,
-                )
-            };
-
-            if let Err(err) = result {
-                // ERROR_NOT_FOUND means the credential doesn't exist.
-                // Return Ok(None) to match macOS and Linux behavior.
-                if err.code().0 == ERROR_NOT_FOUND.0 as i32 {
-                    return Ok(None);
-                }
-                return Err(err.into());
-            }
-
-            if credentials.is_null() {
-                Ok(None)
-            } else {
-                let username: String = unsafe { (*credentials).UserName.to_string()? };
-                let credential_blob = unsafe {
-                    std::slice::from_raw_parts(
-                        (*credentials).CredentialBlob,
-                        (*credentials).CredentialBlobSize as usize,
-                    )
-                };
-                let password = credential_blob.to_vec();
-                unsafe { CredFree(credentials as *const _ as _) };
-                Ok(Some((username, password)))
-            }
-        })
-    }
-
-    fn delete_credentials(&self, url: &str) -> Task<Result<()>> {
-        let mut target_name = windows_credentials_target_name(url)
-            .encode_utf16()
-            .chain(Some(0))
-            .collect_vec();
-        self.foreground_executor().spawn(async move {
-            unsafe {
-                CredDeleteW(
-                    PCWSTR::from_raw(target_name.as_ptr()),
-                    CRED_TYPE_GENERIC,
-                    None,
-                )?
-            };
-            Ok(())
-        })
-    }
-
-    fn register_url_scheme(&self, _: &str) -> Task<anyhow::Result<()>> {
-        Task::ready(Err(anyhow!("register_url_scheme unimplemented")))
     }
 
     fn perform_dock_menu_action(&self, action: usize) {

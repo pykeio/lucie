@@ -58,10 +58,7 @@ use std::{
     slice, str,
     sync::{Arc, OnceLock},
 };
-use util::{
-    ResultExt,
-    command::{new_smol_command, new_std_command},
-};
+use util::ResultExt;
 
 #[allow(non_upper_case_globals)]
 const NSUTF8StringEncoding: NSUInteger = 4;
@@ -140,10 +137,6 @@ unsafe fn build_classes() {
                 sel!(applicationDockMenu:),
                 handle_dock_menu as extern "C" fn(&mut Object, Sel, id) -> id,
             );
-            decl.add_method(
-                sel!(application:openURLs:),
-                open_urls as extern "C" fn(&mut Object, Sel, id, id),
-            );
 
             decl.add_method(
                 sel!(onKeyboardLayoutChange:),
@@ -173,7 +166,6 @@ pub(crate) struct MacPlatformState {
     validate_menu_command: Option<Box<dyn FnMut(&dyn Action) -> bool>>,
     will_open_menu: Option<Box<dyn FnMut()>>,
     menu_actions: Vec<Box<dyn Action>>,
-    open_urls: Option<Box<dyn FnMut(Vec<String>)>>,
     finish_launching: Option<Box<dyn FnOnce()>>,
     dock_menu: Option<id>,
     menus: Option<Vec<OwnedMenu>>,
@@ -214,7 +206,6 @@ impl MacPlatform {
             validate_menu_command: None,
             will_open_menu: None,
             menu_actions: Default::default(),
-            open_urls: None,
             finish_launching: None,
             dock_menu: None,
             on_keyboard_layout_change: None,
@@ -528,45 +519,6 @@ impl Platform for MacPlatform {
         }
     }
 
-    fn restart(&self, _binary_path: Option<PathBuf>) {
-        use std::os::unix::process::CommandExt as _;
-
-        let app_pid = std::process::id().to_string();
-        let app_path = self
-            .app_path()
-            .ok()
-            // When the app is not bundled, `app_path` returns the
-            // directory containing the executable. Disregard this
-            // and get the path to the executable itself.
-            .and_then(|path| (path.extension()?.to_str()? == "app").then_some(path))
-            .unwrap_or_else(|| std::env::current_exe().unwrap());
-
-        // Wait until this process has exited and then re-open this path.
-        let script = r#"
-            while kill -0 $0 2> /dev/null; do
-                sleep 0.1
-            done
-            open "$1"
-        "#;
-
-        #[allow(
-            clippy::disallowed_methods,
-            reason = "We are restarting ourselves, using std command thus is fine"
-        )]
-        let restart_process = new_std_command("/bin/bash")
-            .arg("-c")
-            .arg(script)
-            .arg(app_pid)
-            .arg(app_path)
-            .process_group(0)
-            .spawn();
-
-        match restart_process {
-            Ok(_) => self.quit(),
-            Err(e) => log::error!("failed to spawn restart script: {:?}", e),
-        }
-    }
-
     fn activate(&self, ignoring_other_apps: bool) {
         unsafe {
             let app = NSApplication::sharedApplication(nil);
@@ -635,236 +587,6 @@ impl Platform for MacPlatform {
             let appearance: id = msg_send![app, effectiveAppearance];
             WindowAppearance::from_native(appearance)
         }
-    }
-
-    fn open_url(&self, url: &str) {
-        unsafe {
-            let ns_url = NSURL::alloc(nil).initWithString_(ns_string(url));
-            if ns_url.is_null() {
-                log::error!("Failed to create NSURL from string: {}", url);
-                return;
-            }
-            let url = ns_url.autorelease();
-            let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
-            msg_send![workspace, openURL: url]
-        }
-    }
-
-    fn register_url_scheme(&self, scheme: &str) -> Task<anyhow::Result<()>> {
-        // API only available post Monterey
-        // https://developer.apple.com/documentation/appkit/nsworkspace/3753004-setdefaultapplicationaturl
-        let (done_tx, done_rx) = oneshot::channel();
-        if Self::os_version() < Version::new(12, 0, 0) {
-            return Task::ready(Err(anyhow!(
-                "macOS 12.0 or later is required to register URL schemes"
-            )));
-        }
-
-        let bundle_id = unsafe {
-            let bundle: id = msg_send![class!(NSBundle), mainBundle];
-            let bundle_id: id = msg_send![bundle, bundleIdentifier];
-            if bundle_id == nil {
-                return Task::ready(Err(anyhow!("Can only register URL scheme in bundled apps")));
-            }
-            bundle_id
-        };
-
-        unsafe {
-            let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
-            let scheme: id = ns_string(scheme);
-            let app: id = msg_send![workspace, URLForApplicationWithBundleIdentifier: bundle_id];
-            if app == nil {
-                return Task::ready(Err(anyhow!(
-                    "Cannot register URL scheme until app is installed"
-                )));
-            }
-            let done_tx = Cell::new(Some(done_tx));
-            let block = ConcreteBlock::new(move |error: id| {
-                let result = if error == nil {
-                    Ok(())
-                } else {
-                    let msg: id = msg_send![error, localizedDescription];
-                    Err(anyhow!("Failed to register: {msg:?}"))
-                };
-
-                if let Some(done_tx) = done_tx.take() {
-                    let _ = done_tx.send(result);
-                }
-            });
-            let block = block.copy();
-            let _: () = msg_send![workspace, setDefaultApplicationAtURL: app toOpenURLsWithScheme: scheme completionHandler: block];
-        }
-
-        self.background_executor()
-            .spawn(async { crate::Flatten::flatten(done_rx.await.map_err(|e| anyhow!(e))) })
-    }
-
-    fn on_open_urls(&self, callback: Box<dyn FnMut(Vec<String>)>) {
-        self.0.lock().open_urls = Some(callback);
-    }
-
-    fn prompt_for_paths(
-        &self,
-        options: PathPromptOptions,
-    ) -> oneshot::Receiver<Result<Option<Vec<PathBuf>>>> {
-        let (done_tx, done_rx) = oneshot::channel();
-        self.foreground_executor()
-            .spawn(async move {
-                unsafe {
-                    let panel = NSOpenPanel::openPanel(nil);
-                    panel.setCanChooseDirectories_(options.directories.to_objc());
-                    panel.setCanChooseFiles_(options.files.to_objc());
-                    panel.setAllowsMultipleSelection_(options.multiple.to_objc());
-
-                    panel.setCanCreateDirectories(true.to_objc());
-                    panel.setResolvesAliases_(false.to_objc());
-                    let done_tx = Cell::new(Some(done_tx));
-                    let block = ConcreteBlock::new(move |response: NSModalResponse| {
-                        let result = if response == NSModalResponse::NSModalResponseOk {
-                            let mut result = Vec::new();
-                            let urls = panel.URLs();
-                            for i in 0..urls.count() {
-                                let url = urls.objectAtIndex(i);
-                                if url.isFileURL() == YES
-                                    && let Ok(path) = ns_url_to_path(url)
-                                {
-                                    result.push(path)
-                                }
-                            }
-                            Some(result)
-                        } else {
-                            None
-                        };
-
-                        if let Some(done_tx) = done_tx.take() {
-                            let _ = done_tx.send(Ok(result));
-                        }
-                    });
-                    let block = block.copy();
-
-                    if let Some(prompt) = options.prompt {
-                        let _: () = msg_send![panel, setPrompt: ns_string(&prompt)];
-                    }
-
-                    let _: () = msg_send![panel, beginWithCompletionHandler: block];
-                }
-            })
-            .detach();
-        done_rx
-    }
-
-    fn prompt_for_new_path(
-        &self,
-        directory: &Path,
-        suggested_name: Option<&str>,
-    ) -> oneshot::Receiver<Result<Option<PathBuf>>> {
-        let directory = directory.to_owned();
-        let suggested_name = suggested_name.map(|s| s.to_owned());
-        let (done_tx, done_rx) = oneshot::channel();
-        self.foreground_executor()
-            .spawn(async move {
-                unsafe {
-                    let panel = NSSavePanel::savePanel(nil);
-                    let path = ns_string(directory.to_string_lossy().as_ref());
-                    let url = NSURL::fileURLWithPath_isDirectory_(nil, path, true.to_objc());
-                    panel.setDirectoryURL(url);
-
-                    if let Some(suggested_name) = suggested_name {
-                        let name_string = ns_string(&suggested_name);
-                        let _: () = msg_send![panel, setNameFieldStringValue: name_string];
-                    }
-
-                    let done_tx = Cell::new(Some(done_tx));
-                    let block = ConcreteBlock::new(move |response: NSModalResponse| {
-                        let mut result = None;
-                        if response == NSModalResponse::NSModalResponseOk {
-                            let url = panel.URL();
-                            if url.isFileURL() == YES {
-                                result = ns_url_to_path(panel.URL()).ok().map(|mut result| {
-                                    let Some(filename) = result.file_name() else {
-                                        return result;
-                                    };
-                                    let chunks = filename
-                                        .as_bytes()
-                                        .split(|&b| b == b'.')
-                                        .collect::<Vec<_>>();
-
-                                    // https://github.com/zed-industries/zed/issues/16969
-                                    // Workaround a bug in macOS Sequoia that adds an extra file-extension
-                                    // sometimes. e.g. `a.sql` becomes `a.sql.s` or `a.txtx` becomes `a.txtx.txt`
-                                    //
-                                    // This is conditional on OS version because I'd like to get rid of it, so that
-                                    // you can manually create a file called `a.sql.s`. That said it seems better
-                                    // to break that use-case than breaking `a.sql`.
-                                    if chunks.len() == 3
-                                        && chunks[1].starts_with(chunks[2])
-                                        && Self::os_version() >= Version::new(15, 0, 0)
-                                    {
-                                        let new_filename = OsStr::from_bytes(
-                                            &filename.as_bytes()
-                                                [..chunks[0].len() + 1 + chunks[1].len()],
-                                        )
-                                        .to_owned();
-                                        result.set_file_name(&new_filename);
-                                    }
-                                    result
-                                })
-                            }
-                        }
-
-                        if let Some(done_tx) = done_tx.take() {
-                            let _ = done_tx.send(Ok(result));
-                        }
-                    });
-                    let block = block.copy();
-                    let _: () = msg_send![panel, beginWithCompletionHandler: block];
-                }
-            })
-            .detach();
-
-        done_rx
-    }
-
-    fn can_select_mixed_files_and_dirs(&self) -> bool {
-        true
-    }
-
-    fn reveal_path(&self, path: &Path) {
-        unsafe {
-            let path = path.to_path_buf();
-            self.0
-                .lock()
-                .background_executor
-                .spawn(async move {
-                    let full_path = ns_string(path.to_str().unwrap_or(""));
-                    let root_full_path = ns_string("");
-                    let workspace: id = msg_send![class!(NSWorkspace), sharedWorkspace];
-                    let _: BOOL = msg_send![
-                        workspace,
-                        selectFile: full_path
-                        inFileViewerRootedAtPath: root_full_path
-                    ];
-                })
-                .detach();
-        }
-    }
-
-    fn open_with_system(&self, path: &Path) {
-        let path = path.to_owned();
-        self.0
-            .lock()
-            .background_executor
-            .spawn(async move {
-                if let Some(mut child) = new_smol_command("open")
-                    .arg(path)
-                    .spawn()
-                    .context("invoking open command")
-                    .log_err()
-                {
-                    child.status().await.log_err();
-                }
-            })
-            .detach();
     }
 
     fn on_quit(&self, callback: Box<dyn FnMut()>) {
@@ -1132,111 +854,6 @@ impl Platform for MacPlatform {
         // If it wasn't a string or a supported image type, give up.
         None
     }
-
-    fn write_credentials(&self, url: &str, username: &str, password: &[u8]) -> Task<Result<()>> {
-        let url = url.to_string();
-        let username = username.to_string();
-        let password = password.to_vec();
-        self.background_executor().spawn(async move {
-            unsafe {
-                use security::*;
-
-                let url = CFString::from(url.as_str());
-                let username = CFString::from(username.as_str());
-                let password = CFData::from_buffer(&password);
-
-                // First, check if there are already credentials for the given server. If so, then
-                // update the username and password.
-                let mut verb = "updating";
-                let mut query_attrs = CFMutableDictionary::with_capacity(2);
-                query_attrs.set(kSecClass as *const _, kSecClassInternetPassword as *const _);
-                query_attrs.set(kSecAttrServer as *const _, url.as_CFTypeRef());
-
-                let mut attrs = CFMutableDictionary::with_capacity(4);
-                attrs.set(kSecClass as *const _, kSecClassInternetPassword as *const _);
-                attrs.set(kSecAttrServer as *const _, url.as_CFTypeRef());
-                attrs.set(kSecAttrAccount as *const _, username.as_CFTypeRef());
-                attrs.set(kSecValueData as *const _, password.as_CFTypeRef());
-
-                let mut status = SecItemUpdate(
-                    query_attrs.as_concrete_TypeRef(),
-                    attrs.as_concrete_TypeRef(),
-                );
-
-                // If there were no existing credentials for the given server, then create them.
-                if status == errSecItemNotFound {
-                    verb = "creating";
-                    status = SecItemAdd(attrs.as_concrete_TypeRef(), ptr::null_mut());
-                }
-                anyhow::ensure!(status == errSecSuccess, "{verb} password failed: {status}");
-            }
-            Ok(())
-        })
-    }
-
-    fn read_credentials(&self, url: &str) -> Task<Result<Option<(String, Vec<u8>)>>> {
-        let url = url.to_string();
-        self.background_executor().spawn(async move {
-            let url = CFString::from(url.as_str());
-            let cf_true = CFBoolean::true_value().as_CFTypeRef();
-
-            unsafe {
-                use security::*;
-
-                // Find any credentials for the given server URL.
-                let mut attrs = CFMutableDictionary::with_capacity(5);
-                attrs.set(kSecClass as *const _, kSecClassInternetPassword as *const _);
-                attrs.set(kSecAttrServer as *const _, url.as_CFTypeRef());
-                attrs.set(kSecReturnAttributes as *const _, cf_true);
-                attrs.set(kSecReturnData as *const _, cf_true);
-
-                let mut result = CFTypeRef::from(ptr::null());
-                let status = SecItemCopyMatching(attrs.as_concrete_TypeRef(), &mut result);
-                match status {
-                    security::errSecSuccess => {}
-                    security::errSecItemNotFound | security::errSecUserCanceled => return Ok(None),
-                    _ => anyhow::bail!("reading password failed: {status}"),
-                }
-
-                let result = CFType::wrap_under_create_rule(result)
-                    .downcast::<CFDictionary>()
-                    .context("keychain item was not a dictionary")?;
-                let username = result
-                    .find(kSecAttrAccount as *const _)
-                    .context("account was missing from keychain item")?;
-                let username = CFType::wrap_under_get_rule(*username)
-                    .downcast::<CFString>()
-                    .context("account was not a string")?;
-                let password = result
-                    .find(kSecValueData as *const _)
-                    .context("password was missing from keychain item")?;
-                let password = CFType::wrap_under_get_rule(*password)
-                    .downcast::<CFData>()
-                    .context("password was not a string")?;
-
-                Ok(Some((username.to_string(), password.bytes().to_vec())))
-            }
-        })
-    }
-
-    fn delete_credentials(&self, url: &str) -> Task<Result<()>> {
-        let url = url.to_string();
-
-        self.background_executor().spawn(async move {
-            unsafe {
-                use security::*;
-
-                let url = CFString::from(url.as_str());
-                let mut query_attrs = CFMutableDictionary::with_capacity(2);
-                query_attrs.set(kSecClass as *const _, kSecClassInternetPassword as *const _);
-                query_attrs.set(kSecAttrServer as *const _, url.as_CFTypeRef());
-
-                let status = SecItemDelete(query_attrs.as_concrete_TypeRef());
-                anyhow::ensure!(status == errSecSuccess, "delete password failed: {status}");
-            }
-            Ok(())
-        })
-    }
 }
 
 impl MacPlatform {
@@ -1438,30 +1055,6 @@ extern "C" fn on_keyboard_layout_change(this: &mut Object, _: Sel, _: id) {
             .lock()
             .on_keyboard_layout_change
             .get_or_insert(callback);
-    }
-}
-
-extern "C" fn open_urls(this: &mut Object, _: Sel, _: id, urls: id) {
-    let urls = unsafe {
-        (0..urls.count())
-            .filter_map(|i| {
-                let url = urls.objectAtIndex(i);
-                match CStr::from_ptr(url.absoluteString().UTF8String() as *mut c_char).to_str() {
-                    Ok(string) => Some(string.to_string()),
-                    Err(err) => {
-                        log::error!("error converting path to string: {}", err);
-                        None
-                    }
-                }
-            })
-            .collect::<Vec<_>>()
-    };
-    let platform = unsafe { get_mac_platform(this) };
-    let mut lock = platform.0.lock();
-    if let Some(mut callback) = lock.open_urls.take() {
-        drop(lock);
-        callback(urls);
-        platform.0.lock().open_urls.get_or_insert(callback);
     }
 }
 
