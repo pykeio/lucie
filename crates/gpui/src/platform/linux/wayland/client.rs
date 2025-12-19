@@ -13,7 +13,6 @@ use calloop::{
 };
 use calloop_wayland_source::WaylandSource;
 use filedescriptor::Pipe;
-use http_client::Url;
 use rapidhash::fast::RapidHashMap;
 use smallvec::SmallVec;
 use util::ResultExt as _;
@@ -94,6 +93,7 @@ use crate::{
         },
         xdg_desktop_portal::{Event as XDPEvent, XDPEventSource},
     },
+    util::file_url_to_path,
 };
 
 /// Used to convert evdev scancode to xkb scancode
@@ -1920,11 +1920,8 @@ impl Dispatch<wl_data_device::WlDataDevice, ()> for WaylandClientStatePtr {
                                 }
                             };
 
-                            let paths: SmallVec<[_; 2]> = file_list
-                                .lines()
-                                .filter_map(|path| Url::parse(path).log_err())
-                                .filter_map(|url| url.to_file_path().log_err())
-                                .collect();
+                            let paths: SmallVec<[_; 2]> =
+                                file_list.lines().filter_map(file_url_to_path).collect();
                             let position = Point::new(x.into(), y.into());
 
                             // Prevent dropping text from other programs.

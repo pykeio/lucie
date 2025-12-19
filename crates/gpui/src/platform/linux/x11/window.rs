@@ -1283,7 +1283,7 @@ impl PlatformWindow for X11Window {
         _msg: &str,
         _detail: Option<&str>,
         _answers: &[PromptButton],
-    ) -> Option<futures::channel::oneshot::Receiver<usize>> {
+    ) -> Option<futures_channel::oneshot::Receiver<usize>> {
         None
     }
 

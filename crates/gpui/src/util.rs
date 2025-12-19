@@ -84,3 +84,22 @@ pub(crate) fn atomic_incr_if_not_zero(counter: &AtomicUsize) -> usize {
         }
     }
 }
+
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+pub(crate) fn file_url_to_path(url: &str) -> Option<std::path::PathBuf> {
+    const FILE_SCHEME: &str = "file://";
+    let url = percent_encoding::percent_decode_str(url)
+        .decode_utf8()
+        .ok()?;
+    if !url.starts_with(FILE_SCHEME) {
+        return None;
+    }
+
+    let path_str = &url[FILE_SCHEME.len()..];
+    if !path_str.starts_with("/") {
+        // has hostname, we're not doing all that
+        return None;
+    }
+
+    std::path::Path::new(path_str).canonicalize().ok()
+}

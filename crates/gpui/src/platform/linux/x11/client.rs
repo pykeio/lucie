@@ -5,7 +5,6 @@ use calloop::{
     generic::{FdWrapper, Generic},
 };
 use core::str;
-use http_client::Url;
 use log::Level;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use smallvec::SmallVec;
@@ -62,6 +61,7 @@ use crate::{
     LinuxKeyboardLayout, Modifiers, ModifiersChangedEvent, MouseButton, Pixels, Platform,
     PlatformDisplay, PlatformInput, PlatformKeyboardLayout, Point, RequestFrameOptions,
     ScrollDelta, Size, TouchPhase, WindowParams, X11Window, modifiers_from_xinput_info, point, px,
+    util::file_url_to_path,
 };
 
 /// Value for DeviceId parameters which selects all devices.
@@ -547,7 +547,7 @@ impl X11Client {
     ) -> Result<(), EventHandlerError> {
         loop {
             let mut events = Vec::new();
-            let mut windows_to_refresh = RapidHashSet::new();
+            let mut windows_to_refresh = RapidHashSet::default();
 
             let mut last_key_release = None;
 
@@ -889,11 +889,8 @@ impl X11Client {
                     return Some(());
                 };
                 if let Ok(file_list) = str::from_utf8(&reply.value) {
-                    let paths: SmallVec<[_; 2]> = file_list
-                        .lines()
-                        .filter_map(|path| Url::parse(path).log_err())
-                        .filter_map(|url| url.to_file_path().log_err())
-                        .collect();
+                    let paths: SmallVec<[_; 2]> =
+                        file_list.lines().filter_map(file_url_to_path).collect();
                     let input = PlatformInput::FileDrop(FileDropEvent::Entered {
                         position: state.xdnd_state.position,
                         paths: crate::ExternalPaths(paths),
@@ -2391,7 +2388,7 @@ fn legacy_get_randr_scale_factor(connection: &XCBConnection, root: u32) -> Optio
 
     let mut crtc_infos: RapidHashMap<randr::Crtc, randr::GetCrtcInfoReply> =
         RapidHashMap::default();
-    let mut valid_outputs: RapidHashSet<randr::Output> = RapidHashSet::new();
+    let mut valid_outputs: RapidHashSet<randr::Output> = RapidHashSet::default();
     for (crtc, cookie) in crtc_cookies {
         if let Ok(reply) = cookie.reply()
             && reply.width > 0
