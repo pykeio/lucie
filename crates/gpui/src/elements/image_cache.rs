@@ -5,7 +5,7 @@ use crate::{
     hash,
 };
 
-use futures::{FutureExt, future::Shared};
+use futures_util::{FutureExt, future::Shared};
 use refineable::Refineable;
 use smallvec::SmallVec;
 use std::{collections::HashMap, fmt, sync::Arc};

@@ -1,7 +1,8 @@
 use crate::{App, SharedString, SharedUri};
-use futures::{Future, TryFutureExt};
+use futures_util::TryFutureExt;
 
 use std::fmt::Debug;
+use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};

@@ -4,7 +4,8 @@ use std::{borrow::Cow, mem, pin::Pin, task::Poll, time::Duration};
 
 use anyhow::anyhow;
 use bytes::{BufMut, Bytes, BytesMut};
-use futures::{AsyncRead, FutureExt as _, TryStreamExt as _};
+use futures_io::AsyncRead;
+use futures_util::{FutureExt as _, TryStreamExt as _};
 use http_client::{RedirectPolicy, Url, http};
 use regex::Regex;
 use reqwest::{

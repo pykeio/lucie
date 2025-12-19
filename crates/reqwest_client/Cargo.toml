@@ -18,7 +18,8 @@ doctest = true
 [dependencies]
 anyhow.workspace = true
 bytes.workspace = true
-futures.workspace = true
+futures-io.workspace = true
+futures-util.workspace = true
 gpui = { workspace = true, default-features = false }
 serde.workspace = true
 log.workspace = true

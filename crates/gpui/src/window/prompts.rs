@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use futures::channel::oneshot;
+use futures_channel::oneshot;
 
 use crate::{
     AnyView, App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable,

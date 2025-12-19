@@ -169,7 +169,7 @@ mod tests {
             .timer(long_duration)
             .with_timeout(short_duration, &cx.executor());
         cx.executor().advance_clock(short_duration * 2);
-        futures::FutureExt::now_or_never(fut)
+        futures_util::FutureExt::now_or_never(fut)
             .unwrap_or_else(|| panic!("timeout should have triggered"))
             .expect_err("timeout");
     }

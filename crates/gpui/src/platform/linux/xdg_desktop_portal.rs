@@ -5,7 +5,7 @@
 use ashpd::desktop::settings::{ColorScheme, Settings};
 use calloop::channel::Channel;
 use calloop::{EventSource, Poll, PostAction, Readiness, Token, TokenFactory};
-use smol::stream::StreamExt;
+use futures_util::StreamExt;
 
 use crate::{BackgroundExecutor, WindowAppearance};
 

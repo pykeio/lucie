@@ -2,6 +2,7 @@ use std::{
     any::{TypeId, type_name},
     cell::{BorrowMutError, Ref, RefCell, RefMut},
     collections::VecDeque,
+    future::Future,
     marker::PhantomData,
     mem,
     ops::{Deref, DerefMut},
@@ -13,10 +14,10 @@ use std::{
 
 use anyhow::{Context as _, Result, anyhow};
 use derive_more::{Deref, DerefMut};
-use futures::{
-    Future, FutureExt,
-    channel::oneshot,
-    future::{LocalBoxFuture, Shared},
+use futures_core::future::BoxFuture;
+use futures_util::{
+    FutureExt,
+    future::{LocalBoxFuture, Shared, join_all},
 };
 use itertools::Itertools;
 use parking_lot::RwLock;
@@ -738,7 +739,7 @@ impl App {
         self.flush_effects();
         self.quitting = true;
 
-        let futures = futures::future::join_all(futures);
+        let futures = join_all(futures);
         if self
             .background_executor
             .block_with_timeout(SHUTDOWN_TIMEOUT, futures)
@@ -2289,7 +2290,7 @@ impl HttpClient for NullHttpClient {
     fn send(
         &self,
         _req: http::Request<AsyncBody>,
-    ) -> futures::future::BoxFuture<'static, anyhow::Result<http::Response<AsyncBody>>> {
+    ) -> BoxFuture<'static, anyhow::Result<http::Response<AsyncBody>>> {
         async move {
             anyhow::bail!("No HttpClient available");
         }

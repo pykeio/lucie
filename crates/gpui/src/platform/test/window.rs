@@ -171,7 +171,7 @@ impl PlatformWindow for TestWindow {
         msg: &str,
         detail: Option<&str>,
         answers: &[PromptButton],
-    ) -> Option<futures::channel::oneshot::Receiver<usize>> {
+    ) -> Option<futures_channel::oneshot::Receiver<usize>> {
         Some(
             self.0
                 .lock()

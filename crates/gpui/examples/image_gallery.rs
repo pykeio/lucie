@@ -1,4 +1,4 @@
-use futures::FutureExt;
+use futures_util::FutureExt;
 use gpui::{
     App, AppContext, Application, Asset as _, AssetLogger, Bounds, ClickEvent, Context, ElementId,
     Entity, ImageAssetLoader, ImageCache, ImageCacheProvider, KeyBinding, Menu, MenuItem,

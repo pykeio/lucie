@@ -103,9 +103,7 @@ pub use taffy::{AvailableSpace, LayoutId};
 #[cfg(any(test, feature = "test-support"))]
 pub use test::*;
 pub use text_system::*;
-#[cfg(any(test, feature = "test-support"))]
-pub use util::smol_timeout;
-pub use util::{FutureExt, Timeout, arc_cow::ArcCow};
+pub use util::arc_cow::ArcCow;
 pub use view::*;
 pub use window::*;
 

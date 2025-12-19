@@ -5,7 +5,7 @@ use crate::{
     WindowAppearance, WindowParams,
 };
 use anyhow::Result;
-use futures::channel::oneshot;
+use futures_channel::oneshot;
 use parking_lot::Mutex;
 use std::{
     cell::RefCell,
@@ -82,20 +82,6 @@ impl TestPlatform {
             bitmap_factory,
             text_system,
         })
-    }
-
-    pub(crate) fn simulate_new_path_selection(
-        &self,
-        select_path: impl FnOnce(&std::path::Path) -> Option<std::path::PathBuf>,
-    ) {
-        let (path, tx) = self
-            .prompts
-            .borrow_mut()
-            .new_path
-            .pop_front()
-            .expect("no pending new path prompt");
-        self.background_executor().set_waiting_hint(None);
-        tx.send(Ok(select_path(&path))).ok();
     }
 
     #[track_caller]

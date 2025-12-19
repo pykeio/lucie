@@ -34,7 +34,7 @@ use crate::{
 };
 use anyhow::Result;
 use async_task::Runnable;
-use futures::channel::oneshot;
+use futures_channel::oneshot;
 use image::codecs::gif::GifDecoder;
 use image::{AnimationDecoder as _, Frame};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};

@@ -21,6 +21,7 @@ default = ["font-kit", "wayland", "x11", "windows-manifest"]
 test-support = [
     "leak-detection",
     "util/test-support",
+    "tokio/test-util",
     # "http_client/test-support",
     "wayland",
     "x11",
@@ -89,7 +90,12 @@ bytemuck = { version = "1", optional = true }
 ctor.workspace = true
 derive_more.workspace = true
 etagere = "0.2"
-futures.workspace = true
+futures-core.workspace = true
+futures-util.workspace = true
+futures-channel.workspace = true
+futures-io.workspace = true
+futures-lite.workspace = true
+tokio = { workspace = true, features = [ "rt", "rt-multi-thread", "time", "sync" ] }
 gpui_macros.workspace = true
 image.workspace = true
 inventory.workspace = true

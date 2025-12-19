@@ -35,7 +35,7 @@ use core_foundation::{
     string::{CFString, CFStringRef},
 };
 use ctor::ctor;
-use futures::channel::oneshot;
+use futures_channel::oneshot;
 use itertools::Itertools;
 use objc::{
     class,

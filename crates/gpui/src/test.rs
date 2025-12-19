@@ -26,7 +26,7 @@
 //! }
 //! ```
 use crate::{Entity, Subscription, TestAppContext, TestDispatcher};
-use futures::StreamExt as _;
+use futures_util::StreamExt as _;
 use rand::prelude::*;
 use smol::channel;
 use std::{
@@ -34,6 +34,7 @@ use std::{
     panic::{self, RefUnwindSafe},
     pin::Pin,
 };
+use tokio::runtime::Runtime;
 
 /// Run the given test function with the configured parameters.
 /// This is intended for use with the `gpui::test` macro
@@ -128,34 +129,4 @@ fn calculate_seeds(
     };
     let is_multiple_runs = iter.clone().nth(1).is_some();
     (iter, is_multiple_runs)
-}
-
-/// A test struct for converting an observation callback into a stream.
-pub struct Observation<T> {
-    rx: Pin<Box<channel::Receiver<T>>>,
-    _subscription: Subscription,
-}
-
-impl<T: 'static> futures::Stream for Observation<T> {
-    type Item = T;
-
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        self.rx.poll_next_unpin(cx)
-    }
-}
-
-/// observe returns a stream of the change events from the given `Entity`
-pub fn observe<T: 'static>(entity: &Entity<T>, cx: &mut TestAppContext) -> Observation<()> {
-    let (tx, rx) = smol::channel::unbounded();
-    let _subscription = cx.update(|cx| {
-        cx.observe(entity, move |_, _| {
-            let _ = smol::block_on(tx.send(()));
-        })
-    });
-    let rx = Box::pin(rx);
-
-    Observation { rx, _subscription }
 }

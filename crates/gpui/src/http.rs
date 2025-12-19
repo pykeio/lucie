@@ -11,8 +11,8 @@ use std::{
 
 use bytes::Bytes;
 use derive_more::Deref;
-use futures::AsyncRead;
-use futures::future::BoxFuture;
+use futures_io::AsyncRead;
+use futures_util::future::BoxFuture;
 use http::HeaderValue;
 pub use http::{self, Method, Request, Response, StatusCode, Uri, request::Builder};
 use http_body::{Body, Frame};
@@ -31,7 +31,7 @@ pub enum AsyncBodyInner {
     Bytes(std::io::Cursor<Bytes>),
 
     /// An asynchronous reader.
-    AsyncReader(Pin<Box<dyn futures::AsyncRead + Send + Sync>>),
+    AsyncReader(Pin<Box<dyn AsyncRead + Send + Sync>>),
 }
 
 impl AsyncBody {
@@ -109,7 +109,7 @@ impl<T: Into<Self>> From<Option<T>> for AsyncBody {
     }
 }
 
-impl futures::AsyncRead for AsyncBody {
+impl AsyncRead for AsyncBody {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
@@ -454,7 +454,7 @@ pub(crate) struct FakeHttpClient {
 impl FakeHttpClient {
     pub(crate) fn create<Fut, F>(handler: F) -> Arc<HttpClientWithUrl>
     where
-        Fut: futures::Future<Output = anyhow::Result<Response<AsyncBody>>> + Send + 'static,
+        Fut: Future<Output = anyhow::Result<Response<AsyncBody>>> + Send + 'static,
         F: Fn(Request<AsyncBody>) -> Fut + Send + Sync + 'static,
     {
         Arc::new(HttpClientWithUrl {

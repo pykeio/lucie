@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::{Context as _, Result};
 
-use futures::{AsyncReadExt, Future};
+use futures_util::AsyncReadExt;
 use image::{
     AnimationDecoder, DynamicImage, Frame, ImageError, ImageFormat, Rgba,
     codecs::{gif::GifDecoder, webp::WebPDecoder},
@@ -14,6 +14,7 @@ use image::{
 use smallvec::SmallVec;
 use std::{
     fs,
+    future::Future,
     io::{self, Cursor},
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},

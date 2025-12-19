@@ -5,7 +5,7 @@ use crate::{
 };
 use anyhow::{Context as _, anyhow};
 use derive_more::{Deref, DerefMut};
-use futures::channel::oneshot;
+use futures_channel::oneshot;
 use std::{future::Future, rc::Weak};
 
 use super::{Context, WeakEntity};

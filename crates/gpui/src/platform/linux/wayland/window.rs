@@ -7,7 +7,7 @@ use std::{
 };
 
 use blade_graphics as gpu;
-use futures::channel::oneshot::Receiver;
+use futures_channel::oneshot::Receiver;
 use rapidhash::fast::RapidHashMap;
 
 use raw_window_handle as rwh;
@@ -1083,16 +1083,6 @@ impl PlatformWindow for WaylandWindow {
 
     fn take_input_handler(&mut self) -> Option<PlatformInputHandler> {
         self.borrow_mut().input_handler.take()
-    }
-
-    fn prompt(
-        &self,
-        _level: PromptLevel,
-        _msg: &str,
-        _detail: Option<&str>,
-        _answers: &[PromptButton],
-    ) -> Option<Receiver<usize>> {
-        None
     }
 
     fn activate(&self) {

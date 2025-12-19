@@ -61,7 +61,11 @@ crossbeam = "0.8.4"
 ctor = "0.4.0"
 derive_more = "0.99.17"
 env_logger = "0.11"
-futures = "0.3"
+futures-core = { version = "0.3", default-features = false, features = [ "std" ] }
+futures-util = { version = "0.3", default-features = false, features = [ "std", "io" ] }
+futures-channel = { version = "0.3", default-features = false, features = [ "std" ] }
+futures-io = { version = "0.3", default-features = false, features = [ "std" ] }
+futures-lite = "2.6"
 heck = "0.5"
 hex = "0.4.3"
 inventory = "0.3.19"
@@ -135,7 +139,7 @@ smol = "2.0"
 stacksafe = "0.1"
 syn = { version = "2.0.101", features = ["full", "extra-traits", "visit-mut"] }
 thiserror = "2.0.12"
-tokio = { version = "1" }
+tokio = { version = "1.48", default-features = false }
 tracing = "0.1.40"
 unicode-segmentation = "1.10"
 windows-core = "0.61"
@@ -163,7 +167,6 @@ features = [
     "Win32_Graphics_Hlsl",
     "Win32_Networking_WinSock",
     "Win32_Security",
-    "Win32_Security_Credentials",
     "Win32_Security_Cryptography",
     "Win32_Storage_FileSystem",
     "Win32_System_Com",

@@ -4,7 +4,7 @@ use crate::{
     SubscriberSet, Subscription, Task, WeakEntity, WeakFocusHandle, Window, WindowHandle,
 };
 use anyhow::Result;
-use futures::FutureExt;
+use futures_util::FutureExt;
 use std::{
     any::{Any, TypeId},
     borrow::{Borrow, BorrowMut},

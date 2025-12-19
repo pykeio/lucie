@@ -1,8 +1,9 @@
 use crate::{App, PlatformDispatcher, RunnableMeta, RunnableVariant, TaskTiming, profiler};
 use async_task::Runnable;
-use futures::channel::mpsc;
+use futures_channel::mpsc;
+use futures_lite::FutureExt as _;
+use futures_util::StreamExt as _;
 use parking_lot::{Condvar, Mutex};
-use smol::prelude::*;
 use std::{
     fmt::Debug,
     marker::PhantomData,

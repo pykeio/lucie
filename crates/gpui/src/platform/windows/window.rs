@@ -12,7 +12,7 @@ use std::{
 
 use ::util::ResultExt;
 use anyhow::{Context as _, Result};
-use futures::channel::oneshot::{self, Receiver};
+use futures_channel::oneshot::{self, Receiver};
 use raw_window_handle as rwh;
 use smallvec::SmallVec;
 use windows::{

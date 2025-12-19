@@ -8,7 +8,8 @@ use crate::{
     http::FakeHttpClient,
 };
 use anyhow::{anyhow, bail};
-use futures::{Stream, StreamExt, channel::oneshot};
+use futures_channel::{mpsc, oneshot};
+use futures_util::{Stream, StreamExt};
 use rand::{SeedableRng, rngs::StdRng};
 use std::{
     cell::RefCell, future::Future, ops::Deref, path::PathBuf, rc::Rc, sync::Arc, time::Duration,
@@ -307,14 +308,6 @@ impl TestAppContext {
         self.test_platform.read_from_clipboard()
     }
 
-    /// Simulates choosing a File in the platform's "Open" dialog.
-    pub fn simulate_new_path_selection(
-        &self,
-        select_path: impl FnOnce(&std::path::Path) -> Option<std::path::PathBuf>,
-    ) {
-        self.test_platform.simulate_new_path_selection(select_path);
-    }
-
     /// Simulates clicking a button in an platform-level alert dialog.
     #[track_caller]
     pub fn simulate_prompt_answer(&self, button: &str) {
@@ -467,7 +460,7 @@ impl TestAppContext {
         &mut self,
         entity: &Entity<T>,
     ) -> impl Stream<Item = ()> + use<T> {
-        let (tx, rx) = futures::channel::mpsc::unbounded();
+        let (tx, rx) = mpsc::unbounded();
         self.update(|cx| {
             cx.observe(entity, {
                 let tx = tx.clone();
@@ -486,11 +479,11 @@ impl TestAppContext {
     pub fn events<Evt, T: 'static + EventEmitter<Evt>>(
         &mut self,
         entity: &Entity<T>,
-    ) -> futures::channel::mpsc::UnboundedReceiver<Evt>
+    ) -> mpsc::UnboundedReceiver<Evt>
     where
         Evt: 'static + Clone,
     {
-        let (tx, rx) = futures::channel::mpsc::unbounded();
+        let (tx, rx) = mpsc::unbounded();
         entity
             .update(self, |_, cx: &mut Context<T>| {
                 cx.subscribe(entity, move |_entity, _handle, event, _cx| {
@@ -511,8 +504,8 @@ impl TestAppContext {
         let timer = self.executor().timer(Duration::from_secs(3));
         let mut notifications = self.notifications(entity);
 
-        use futures::FutureExt as _;
-        use smol::future::FutureExt as _;
+        use futures_lite::FutureExt as _;
+        use futures_util::FutureExt as _;
 
         async {
             loop {
@@ -569,7 +562,7 @@ impl<V: 'static> Entity<V> {
         advance_clock_by: Duration,
         cx: &TestAppContext,
     ) -> impl Future<Output = ()> {
-        let (mut tx, mut rx) = futures::channel::mpsc::channel(1);
+        let (mut tx, mut rx) = mpsc::channel(1);
         let subscription = cx.app.borrow_mut().observe(self, move |_, _| {
             tx.try_send(()).ok();
         });
@@ -603,7 +596,7 @@ impl<V> Entity<V> {
         Evt: 'static,
         V: EventEmitter<Evt>,
     {
-        let (tx, mut rx) = futures::channel::mpsc::channel(1024);
+        let (tx, mut rx) = mpsc::channel(1024);
 
         let mut cx = cx.app.borrow_mut();
         let subscriptions = (
