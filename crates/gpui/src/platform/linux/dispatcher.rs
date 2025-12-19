@@ -9,6 +9,7 @@ use calloop::{
     timer::TimeoutAction,
 };
 use std::{
+    mem::MaybeUninit,
     thread,
     time::{Duration, Instant},
 };
@@ -228,7 +229,10 @@ impl PlatformDispatcher for LinuxDispatcher {
                 RealtimePriority::Other => 45,
             };
 
-            let sched_param = libc::sched_param { sched_priority };
+            // SAFETY: all sched_param members are valid when initialized to zero.
+            let mut sched_param =
+                unsafe { MaybeUninit::<libc::sched_param>::zeroed().assume_init() };
+            sched_param.sched_priority = sched_priority;
             // SAFETY: sched_param is a valid initialized structure
             let result = unsafe { libc::pthread_setschedparam(thread_id, policy, &sched_param) };
             if result != 0 {
