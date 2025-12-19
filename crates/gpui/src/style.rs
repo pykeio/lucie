@@ -11,7 +11,6 @@ use crate::{
     PointRefinement, Rgba, SharedString, Size, SizeRefinement, Styled, TextRun, Window, black, phi,
     point, quad, rems, size,
 };
-use rapidhash::fast::RapidHashSet;
 use refineable::Refineable;
 
 /// Use this struct for interfacing with the 'debug_below' styling from your own elements.
@@ -958,25 +957,23 @@ pub fn combine_highlights(
     endpoints.sort_unstable_by_key(|(position, _, _)| *position);
     let mut endpoints = endpoints.into_iter().peekable();
 
-    let mut active_styles = RapidHashSet::default();
+    let mut styles_active = vec![false; highlights.len()];
     let mut ix = 0;
     iter::from_fn(move || {
         while let Some((endpoint_ix, highlight_id, is_start)) = endpoints.peek() {
             let prev_index = mem::replace(&mut ix, *endpoint_ix);
-            if ix > prev_index && !active_styles.is_empty() {
-                let current_style = active_styles
+            if ix > prev_index && styles_active.iter().any(|x| *x) {
+                let current_style = styles_active
                     .iter()
+                    .enumerate()
+                    .filter_map(|(i, active)| active.then_some(i))
                     .fold(HighlightStyle::default(), |acc, highlight_id| {
-                        acc.highlight(highlights[*highlight_id])
+                        acc.highlight(highlights[highlight_id])
                     });
                 return Some((prev_index..ix, current_style));
             }
 
-            if *is_start {
-                active_styles.insert(*highlight_id);
-            } else {
-                active_styles.remove(highlight_id);
-            }
+            styles_active[*highlight_id] = *is_start;
             endpoints.next();
         }
         None
