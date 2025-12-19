@@ -29,7 +29,7 @@ use crate::{
     ForegroundExecutor, GlyphId, GpuSpecs, ImageSource, Keymap, LineLayout, Pixels, PlatformInput,
     Point, Priority, RealtimePriority, RenderGlyphParams, RenderImage, RenderImageParams,
     RenderSvgParams, Scene, ShapedGlyph, ShapedRun, SharedString, Size, SvgRenderer,
-    SystemWindowTab, Task, TaskLabel, TaskTiming, ThreadTaskTimings, Window, WindowControlArea,
+    SystemWindowTab, TaskLabel, TaskTiming, ThreadTaskTimings, Window, WindowControlArea,
     hash, point, px, size,
 };
 use anyhow::Result;
@@ -1831,7 +1831,7 @@ impl ClipboardString {
     }
 
     /// Get the metadata of the clipboard string, formatted as JSON
-    pub fn metadata<T>(&self) -> Option<&str> {
+    pub fn metadata(&self) -> Option<&str> {
         self.metadata.as_deref()
     }
 

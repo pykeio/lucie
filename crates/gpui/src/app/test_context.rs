@@ -11,9 +11,7 @@ use anyhow::{anyhow, bail};
 use futures_channel::{mpsc, oneshot};
 use futures_util::{Stream, StreamExt};
 use rand::{SeedableRng, rngs::StdRng};
-use std::{
-    cell::RefCell, future::Future, ops::Deref, path::PathBuf, rc::Rc, sync::Arc, time::Duration,
-};
+use std::{cell::RefCell, future::Future, ops::Deref, rc::Rc, sync::Arc, time::Duration};
 
 /// A TestAppContext is provided to tests created with `#[gpui::test]`, it provides
 /// an implementation of `Context` with additional methods that are useful in tests.
@@ -162,11 +160,6 @@ impl TestAppContext {
     /// The name of the test function that created this `TestAppContext`
     pub fn test_function_name(&self) -> Option<&'static str> {
         self.fn_name
-    }
-
-    /// Checks whether there have been any new path prompts received by the platform.
-    pub fn did_prompt_for_new_path(&self) -> bool {
-        self.test_platform.did_prompt_for_new_path()
     }
 
     /// returns a new `TestAppContext` re-using the same executors to interleave tasks.

@@ -1,8 +1,7 @@
 use crate::{
     AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, Bounds, Element, ElementId, Entity,
-    GlobalElementId, ImageAssetLoader, ImageCacheError, IntoElement, LayoutId,
-    ParentElement, Pixels, RenderImage, Resource, Style, StyleRefinement, Styled, Task, Window,
-    hash,
+    GlobalElementId, ImageAssetLoader, ImageCacheError, IntoElement, LayoutId, ParentElement,
+    Pixels, RenderImage, Resource, Style, StyleRefinement, Styled, Task, Window, hash,
 };
 
 use futures_util::{FutureExt, future::Shared};
@@ -55,7 +54,7 @@ impl AnyImageCache {
 }
 
 mod any_image_cache {
-    use super::*;
+    use super::{AnyEntity, App, Arc, ImageCache, ImageCacheError, RenderImage, Resource, Window};
 
     pub(crate) fn load<I: 'static + ImageCache>(
         image_cache: &AnyEntity,

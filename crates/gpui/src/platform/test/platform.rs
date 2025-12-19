@@ -1,7 +1,7 @@
 use crate::{
     AnyWindowHandle, BackgroundExecutor, ClipboardItem, CursorStyle, DummyKeyboardMapper,
     ForegroundExecutor, Keymap, NoopTextSystem, Platform, PlatformDisplay, PlatformKeyboardLayout,
-    PlatformKeyboardMapper, PlatformTextSystem, PromptButton, Task, TestDisplay, TestWindow,
+    PlatformKeyboardMapper, PlatformTextSystem, PromptButton, TestDisplay, TestWindow,
     WindowAppearance, WindowParams,
 };
 use anyhow::Result;
@@ -10,7 +10,7 @@ use parking_lot::Mutex;
 use std::{
     cell::RefCell,
     collections::VecDeque,
-    path::{Path, PathBuf},
+    path::Path,
     rc::{Rc, Weak},
     sync::Arc,
 };
@@ -31,8 +31,7 @@ pub(crate) struct TestPlatform {
     current_clipboard_item: Mutex<Option<ClipboardItem>>,
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     current_primary_item: Mutex<Option<ClipboardItem>>,
-    pub(crate) prompts: RefCell<TestPrompts>,
-    pub opened_url: RefCell<Option<String>>,
+    prompts: RefCell<VecDeque<TestPrompt>>,
     pub text_system: Arc<dyn PlatformTextSystem>,
     #[cfg(target_os = "windows")]
     bitmap_factory: std::mem::ManuallyDrop<IWICImagingFactory>,
@@ -44,12 +43,6 @@ struct TestPrompt {
     detail: Option<String>,
     answers: Vec<String>,
     tx: oneshot::Sender<usize>,
-}
-
-#[derive(Default)]
-pub(crate) struct TestPrompts {
-    multiple_choice: VecDeque<TestPrompt>,
-    new_path: VecDeque<(PathBuf, oneshot::Sender<Result<Option<PathBuf>>>)>,
 }
 
 impl TestPlatform {
@@ -77,7 +70,6 @@ impl TestPlatform {
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             current_primary_item: Mutex::new(None),
             weak: weak.clone(),
-            opened_url: Default::default(),
             #[cfg(target_os = "windows")]
             bitmap_factory,
             text_system,
@@ -89,7 +81,6 @@ impl TestPlatform {
         let prompt = self
             .prompts
             .borrow_mut()
-            .multiple_choice
             .pop_front()
             .expect("no pending multiple choice prompt");
         self.background_executor().set_waiting_hint(None);
@@ -103,12 +94,12 @@ impl TestPlatform {
     }
 
     pub(crate) fn has_pending_prompt(&self) -> bool {
-        !self.prompts.borrow().multiple_choice.is_empty()
+        !self.prompts.borrow().is_empty()
     }
 
     pub(crate) fn pending_prompt(&self) -> Option<(String, String)> {
         let prompts = self.prompts.borrow();
-        let prompt = prompts.multiple_choice.front()?;
+        let prompt = prompts.front()?;
         Some((
             prompt.msg.clone(),
             prompt.detail.clone().unwrap_or_default(),
@@ -125,15 +116,12 @@ impl TestPlatform {
         let answers: Vec<String> = answers.iter().map(|s| s.label().to_string()).collect();
         self.background_executor()
             .set_waiting_hint(Some(format!("PROMPT: {:?} {:?}", msg, detail)));
-        self.prompts
-            .borrow_mut()
-            .multiple_choice
-            .push_back(TestPrompt {
-                msg: msg.to_string(),
-                detail: detail.map(|s| s.to_string()),
-                answers,
-                tx,
-            });
+        self.prompts.borrow_mut().push_back(TestPrompt {
+            msg: msg.to_string(),
+            detail: detail.map(|s| s.to_string()),
+            answers,
+            tx,
+        });
         rx
     }
 
@@ -157,10 +145,6 @@ impl TestPlatform {
                 }
             })
             .detach();
-    }
-
-    pub(crate) fn did_prompt_for_new_path(&self) -> bool {
-        !self.prompts.borrow().new_path.is_empty()
     }
 }
 

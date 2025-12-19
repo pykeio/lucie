@@ -20,8 +20,8 @@ use anyhow::{Context as _, Result, anyhow};
 #[cfg(target_os = "macos")]
 use core_video::pixel_buffer::CVPixelBuffer;
 use derive_more::{Deref, DerefMut};
-use futures::FutureExt;
-use futures::channel::oneshot;
+use futures_channel::oneshot;
+use futures_util::FutureExt;
 use itertools::FoldWhile::{Continue, Done};
 use itertools::Itertools;
 use parking_lot::RwLock;

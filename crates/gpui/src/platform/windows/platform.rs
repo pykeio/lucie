@@ -1,7 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
-    ffi::OsStr,
-    path::{Path, PathBuf},
+    path::PathBuf,
     rc::{Rc, Weak},
     sync::{
         Arc,
@@ -11,8 +10,6 @@ use std::{
 
 use ::util::ResultExt;
 use anyhow::{Context as _, Result, anyhow};
-use futures_channel::oneshot::{self, Receiver};
-use itertools::Itertools;
 use parking_lot::RwLock;
 use smallvec::SmallVec;
 use windows::{
@@ -230,18 +227,6 @@ impl WindowsPlatform {
         jump_list.dock_menus = actions;
         jump_list.recent_workspaces = entries;
         update_jump_list(&jump_list).log_err().unwrap_or_default()
-    }
-
-    fn find_current_active_window(&self) -> Option<HWND> {
-        let active_window_hwnd = unsafe { GetActiveWindow() };
-        if active_window_hwnd.is_invalid() {
-            return None;
-        }
-        self.raw_window_handles
-            .read()
-            .iter()
-            .find(|hwnd| hwnd.as_raw() == active_window_hwnd)
-            .map(|hwnd| hwnd.as_raw())
     }
 
     fn begin_vsync_thread(&self) {
@@ -729,167 +714,6 @@ struct PlatformWindowCreateContext {
     main_receiver: Option<PriorityQueueReceiver<RunnableVariant>>,
     directx_devices: Option<DirectXDevices>,
     dispatcher: Option<Arc<WindowsDispatcher>>,
-}
-
-fn open_target(target: impl AsRef<OsStr>) -> Result<()> {
-    let target = target.as_ref();
-    let ret = unsafe {
-        ShellExecuteW(
-            None,
-            windows::core::w!("open"),
-            &HSTRING::from(target),
-            None,
-            None,
-            SW_SHOWDEFAULT,
-        )
-    };
-    if ret.0 as isize <= 32 {
-        Err(anyhow::anyhow!(
-            "Unable to open target: {}",
-            std::io::Error::last_os_error()
-        ))
-    } else {
-        Ok(())
-    }
-}
-
-fn open_target_in_explorer(target: &Path) -> Result<()> {
-    let dir = target.parent().context("No parent folder found")?;
-    let desktop = unsafe { SHGetDesktopFolder()? };
-
-    let mut dir_item = std::ptr::null_mut();
-    unsafe {
-        desktop.ParseDisplayName(
-            HWND::default(),
-            None,
-            &HSTRING::from(dir),
-            None,
-            &mut dir_item,
-            std::ptr::null_mut(),
-        )?;
-    }
-
-    let mut file_item = std::ptr::null_mut();
-    unsafe {
-        desktop.ParseDisplayName(
-            HWND::default(),
-            None,
-            &HSTRING::from(target),
-            None,
-            &mut file_item,
-            std::ptr::null_mut(),
-        )?;
-    }
-
-    let highlight = [file_item as *const _];
-    unsafe { SHOpenFolderAndSelectItems(dir_item as _, Some(&highlight), 0) }.or_else(|err| {
-        if err.code().0 == ERROR_FILE_NOT_FOUND.0 as i32 {
-            // On some systems, the above call mysteriously fails with "file not
-            // found" even though the file is there.  In these cases, ShellExecute()
-            // seems to work as a fallback (although it won't select the file).
-            open_target(dir).context("Opening target parent folder")
-        } else {
-            Err(anyhow::anyhow!("Can not open target path: {}", err))
-        }
-    })
-}
-
-fn file_open_dialog(
-    options: PathPromptOptions,
-    window: Option<HWND>,
-) -> Result<Option<Vec<PathBuf>>> {
-    let folder_dialog: IFileOpenDialog =
-        unsafe { CoCreateInstance(&FileOpenDialog, None, CLSCTX_ALL)? };
-
-    let mut dialog_options = FOS_FILEMUSTEXIST;
-    if options.multiple {
-        dialog_options |= FOS_ALLOWMULTISELECT;
-    }
-    if options.directories {
-        dialog_options |= FOS_PICKFOLDERS;
-    }
-
-    unsafe {
-        folder_dialog.SetOptions(dialog_options)?;
-
-        if let Some(prompt) = options.prompt {
-            let prompt: &str = &prompt;
-            folder_dialog.SetOkButtonLabel(&HSTRING::from(prompt))?;
-        }
-
-        if folder_dialog.Show(window).is_err() {
-            // User cancelled
-            return Ok(None);
-        }
-    }
-
-    let results = unsafe { folder_dialog.GetResults()? };
-    let file_count = unsafe { results.GetCount()? };
-    if file_count == 0 {
-        return Ok(None);
-    }
-
-    let mut paths = Vec::with_capacity(file_count as usize);
-    for i in 0..file_count {
-        let item = unsafe { results.GetItemAt(i)? };
-        let path = unsafe { item.GetDisplayName(SIGDN_FILESYSPATH)?.to_string()? };
-        paths.push(PathBuf::from(path));
-    }
-
-    Ok(Some(paths))
-}
-
-fn file_save_dialog(
-    directory: PathBuf,
-    suggested_name: Option<String>,
-    window: Option<HWND>,
-) -> Result<Option<PathBuf>> {
-    let dialog: IFileSaveDialog = unsafe { CoCreateInstance(&FileSaveDialog, None, CLSCTX_ALL)? };
-    if !directory.to_string_lossy().is_empty()
-        && let Some(full_path) = directory
-            .canonicalize()
-            .context("failed to canonicalize directory")
-            .log_err()
-    {
-        let full_path = dunce::simplified(&full_path);
-        let full_path_string = full_path.display().to_string();
-        let path_item: IShellItem =
-            unsafe { SHCreateItemFromParsingName(&HSTRING::from(full_path_string), None)? };
-        unsafe {
-            dialog
-                .SetFolder(&path_item)
-                .context("failed to set dialog folder")
-                .log_err()
-        };
-    }
-
-    if let Some(suggested_name) = suggested_name {
-        unsafe {
-            dialog
-                .SetFileName(&HSTRING::from(suggested_name))
-                .context("failed to set file name")
-                .log_err()
-        };
-    }
-
-    unsafe {
-        dialog.SetFileTypes(&[Common::COMDLG_FILTERSPEC {
-            pszName: windows::core::w!("All files"),
-            pszSpec: windows::core::w!("*.*"),
-        }])?;
-        if dialog.Show(window).is_err() {
-            // User cancelled
-            return Ok(None);
-        }
-    }
-    let shell_item = unsafe { dialog.GetResult()? };
-    let file_path_string = unsafe {
-        let pwstr = shell_item.GetDisplayName(SIGDN_FILESYSPATH)?;
-        let string = pwstr.to_string()?;
-        CoTaskMemFree(Some(pwstr.0 as _));
-        string
-    };
-    Ok(Some(PathBuf::from(file_path_string)))
 }
 
 fn load_icon() -> Result<HICON> {

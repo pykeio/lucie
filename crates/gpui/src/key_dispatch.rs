@@ -609,10 +609,8 @@ impl DispatchTree {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        self as gpui, DispatchResult, Element, ElementId, GlobalElementId, Keystroke, LayoutId,
-        Style,
-    };
+    use super::DispatchResult;
+    use crate::{self as gpui, Element, ElementId, GlobalElementId, Keystroke, LayoutId, Style};
     use smallvec::SmallVec;
     use std::{cell::RefCell, ops::Range, rc::Rc};
 

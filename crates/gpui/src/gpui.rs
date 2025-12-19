@@ -67,7 +67,7 @@ mod seal {
 pub use action::*;
 pub use anyhow::Result;
 pub use app::*;
-pub(crate) use arena::*;
+pub(crate) use arena::{ArenaBox, Arena};
 pub use asset_cache::*;
 pub use assets::*;
 pub use color::*;
@@ -80,7 +80,7 @@ pub use global::*;
 pub use gpui_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};
 pub use input::*;
 pub use interactive::*;
-use key_dispatch::*;
+use key_dispatch::{DispatchNodeId, DispatchActionListener, DispatchTree, Replay};
 pub use keymap::*;
 pub use path_builder::*;
 pub use platform::*;
@@ -97,7 +97,7 @@ pub use style::*;
 pub use styled::*;
 pub use subscription::*;
 pub use svg_renderer::*;
-pub(crate) use tab_stop::*;
+pub(crate) use tab_stop::TabStopMap;
 use taffy::TaffyLayoutEngine;
 pub use taffy::{AvailableSpace, LayoutId};
 #[cfg(any(test, feature = "test-support"))]

@@ -25,16 +25,12 @@
 //!   assert!(true)
 //! }
 //! ```
-use crate::{Entity, Subscription, TestAppContext, TestDispatcher};
-use futures_util::StreamExt as _;
+use crate::TestDispatcher;
 use rand::prelude::*;
-use smol::channel;
 use std::{
     env,
     panic::{self, RefUnwindSafe},
-    pin::Pin,
 };
-use tokio::runtime::Runtime;
 
 /// Run the given test function with the configured parameters.
 /// This is intended for use with the `gpui::test` macro
