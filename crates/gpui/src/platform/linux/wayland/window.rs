@@ -1085,6 +1085,16 @@ impl PlatformWindow for WaylandWindow {
         self.borrow_mut().input_handler.take()
     }
 
+    fn prompt(
+        &self,
+        _level: PromptLevel,
+        _msg: &str,
+        _detail: Option<&str>,
+        _answers: &[PromptButton],
+    ) -> Option<Receiver<usize>> {
+        None
+    }
+
     fn activate(&self) {
         // Try to request an activation token. Even though the activation is likely going to be rejected,
         // KWin and Mutter can use the app_id to visually indicate we're requesting attention.
