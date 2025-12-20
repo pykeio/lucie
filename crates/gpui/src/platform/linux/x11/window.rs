@@ -7,10 +7,10 @@ use crate::{
     Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow,
     Point, PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, ScaledPixels, Scene, Size,
     Tiling, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-    WindowDecorations, WindowKind, WindowParams, X11ClientStatePtr, px, size,
+    WindowDecorations, WindowKind, WindowParams, X11ClientStatePtr, maybe, px, size,
 };
 
-use crate::util::{ResultExt, maybe};
+use crate::util::ResultExt as _;
 use blade_graphics as gpu;
 use raw_window_handle as rwh;
 use x11rb::{
