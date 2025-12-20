@@ -7,19 +7,19 @@ use crate::SharedString;
 pub struct SharedUri(SharedString);
 
 impl std::fmt::Debug for SharedUri {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.0.fmt(f)
+	}
 }
 
 impl std::fmt::Display for SharedUri {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.as_ref())
-    }
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0.as_ref())
+	}
 }
 
 impl<T: Into<SharedString>> From<T> for SharedUri {
-    fn from(value: T) -> Self {
-        Self(value.into())
-    }
+	fn from(value: T) -> Self {
+		Self(value.into())
+	}
 }

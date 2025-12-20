@@ -30,6 +30,5 @@ pub(crate) use system_settings::*;
 pub(crate) use util::*;
 pub(crate) use vsync::*;
 pub(crate) use window::*;
-pub(crate) use wrapper::*;
-
 pub(crate) use windows::Win32::Foundation::HWND;
+pub(crate) use wrapper::*;

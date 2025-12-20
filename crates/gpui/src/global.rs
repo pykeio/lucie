@@ -20,56 +20,56 @@ use crate::{App, BorrowAppContext};
 /// the global type and create custom accessor methods to expose the desired subset
 /// of operations.
 pub trait Global: 'static {
-    // This trait is intentionally left empty, by virtue of being a marker trait.
-    //
-    // Use additional traits with blanket implementations to attach functionality
-    // to types that implement `Global`.
+	// This trait is intentionally left empty, by virtue of being a marker trait.
+	//
+	// Use additional traits with blanket implementations to attach functionality
+	// to types that implement `Global`.
 }
 
 /// A trait for reading a global value from the context.
 pub trait ReadGlobal {
-    /// Returns the global instance of the implementing type.
-    ///
-    /// Panics if a global for that type has not been assigned.
-    fn global(cx: &App) -> &Self;
+	/// Returns the global instance of the implementing type.
+	///
+	/// Panics if a global for that type has not been assigned.
+	fn global(cx: &App) -> &Self;
 }
 
 impl<T: Global> ReadGlobal for T {
-    fn global(cx: &App) -> &Self {
-        cx.global::<T>()
-    }
+	fn global(cx: &App) -> &Self {
+		cx.global::<T>()
+	}
 }
 
 /// A trait for updating a global value in the context.
 pub trait UpdateGlobal {
-    /// Updates the global instance of the implementing type using the provided closure.
-    ///
-    /// This method provides the closure with mutable access to the context and the global simultaneously.
-    fn update_global<C, F, R>(cx: &mut C, update: F) -> R
-    where
-        C: BorrowAppContext,
-        F: FnOnce(&mut Self, &mut C) -> R;
+	/// Updates the global instance of the implementing type using the provided closure.
+	///
+	/// This method provides the closure with mutable access to the context and the global simultaneously.
+	fn update_global<C, F, R>(cx: &mut C, update: F) -> R
+	where
+		C: BorrowAppContext,
+		F: FnOnce(&mut Self, &mut C) -> R;
 
-    /// Set the global instance of the implementing type.
-    fn set_global<C>(cx: &mut C, global: Self)
-    where
-        C: BorrowAppContext;
+	/// Set the global instance of the implementing type.
+	fn set_global<C>(cx: &mut C, global: Self)
+	where
+		C: BorrowAppContext;
 }
 
 impl<T: Global> UpdateGlobal for T {
-    #[track_caller]
-    fn update_global<C, F, R>(cx: &mut C, update: F) -> R
-    where
-        C: BorrowAppContext,
-        F: FnOnce(&mut Self, &mut C) -> R,
-    {
-        cx.update_global(update)
-    }
+	#[track_caller]
+	fn update_global<C, F, R>(cx: &mut C, update: F) -> R
+	where
+		C: BorrowAppContext,
+		F: FnOnce(&mut Self, &mut C) -> R
+	{
+		cx.update_global(update)
+	}
 
-    fn set_global<C>(cx: &mut C, global: Self)
-    where
-        C: BorrowAppContext,
-    {
-        cx.set_global(global)
-    }
+	fn set_global<C>(cx: &mut C, global: Self)
+	where
+		C: BorrowAppContext
+	{
+		cx.set_global(global)
+	}
 }

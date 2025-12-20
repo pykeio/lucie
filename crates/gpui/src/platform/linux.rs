@@ -19,9 +19,8 @@ pub(crate) use platform::*;
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub(crate) use text_system::*;
 #[cfg(feature = "wayland")]
+pub use wayland::layer_shell;
+#[cfg(feature = "wayland")]
 pub(crate) use wayland::*;
 #[cfg(feature = "x11")]
 pub(crate) use x11::*;
-
-#[cfg(feature = "wayland")]
-pub use wayland::layer_shell;
