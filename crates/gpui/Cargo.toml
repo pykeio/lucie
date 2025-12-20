@@ -20,7 +20,6 @@ workspace = true
 default = ["font-kit", "wayland", "x11", "windows-manifest"]
 test-support = [
     "leak-detection",
-    "util/test-support",
     "tokio/test-util",
     # "http_client/test-support",
     "wayland",
@@ -80,6 +79,7 @@ doctest = false
 
 [dependencies]
 anyhow.workspace = true
+arrayvec.workspace = true
 async-task = "4.7"
 backtrace = { workspace = true, optional = true }
 bitflags = { workspace = true, optional = true }
@@ -107,23 +107,20 @@ parking_lot.workspace = true
 profiling.workspace = true
 rand.workspace = true
 raw-window-handle = "0.6"
-refineable.workspace = true
+derive_refineable.workspace = true
 resvg = { version = "0.45.0", default-features = false, features = [
     "text",
     "system-fonts",
     "memmap-fonts",
 ] }
 usvg = { version = "0.45.0", default-features = false }
-util_macros.workspace = true
 rapidhash.workspace = true
 slotmap.workspace = true
 smallvec.workspace = true
 smol.workspace = true
 stacksafe.workspace = true
-sum_tree.workspace = true
 taffy = "=0.9.0"
 thiserror.workspace = true
-util.workspace = true
 waker-fn = "1.2.0"
 lyon = "1.0"
 libc.workspace = true
@@ -244,7 +241,6 @@ lyon = { version = "1.0", features = ["extra"] }
 rand.workspace = true
 reqwest_client = { workspace = true, features = ["test-support"] }
 unicode-segmentation.workspace = true
-util = { workspace = true, features = ["test-support"] }
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
 embed-resource = "3.0"

@@ -1,9 +1,11 @@
 use std::fmt::Debug;
 
 use rapidhash::fast::RapidHashMap;
-use sum_tree::{Bias, SumTree};
 
-use crate::{FocusHandle, FocusId};
+use crate::{
+    FocusHandle, FocusId,
+    util::sum_tree::{Bias, SumTree},
+};
 
 /// Represents a collection of focus handles using the tab-index APIs.
 #[derive(Debug)]
@@ -213,9 +215,9 @@ impl TabStopMap {
 }
 
 mod sum_tree_impl {
-    use sum_tree::SeekTarget;
+    use crate::util::sum_tree::{self, SeekTarget};
 
-    use crate::tab_stop::{TabStopNode, TabStopPath};
+    use super::{TabStopNode, TabStopPath};
 
     #[derive(Clone, Debug)]
     pub struct TabStopOrderNodeSummary {

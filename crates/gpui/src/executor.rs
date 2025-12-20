@@ -1,4 +1,7 @@
-use crate::{App, PlatformDispatcher, RunnableMeta, RunnableVariant, TaskTiming, profiler};
+use crate::{
+    App, PlatformDispatcher, RunnableMeta, RunnableVariant, TaskTiming, profiler,
+    util::TryFutureExt,
+};
 use async_task::Runnable;
 use futures_channel::mpsc;
 use futures_lite::FutureExt as _;
@@ -20,7 +23,6 @@ use std::{
     thread::{self, ThreadId},
     time::{Duration, Instant},
 };
-use util::TryFutureExt;
 use waker_fn::waker_fn;
 
 #[cfg(any(test, feature = "test-support"))]

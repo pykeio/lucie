@@ -3,8 +3,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::util::ResultExt;
 use anyhow::{Context, Result};
-use util::ResultExt;
 use windows::Win32::{
     Foundation::HWND,
     Graphics::Dwm::{DWM_TIMING_INFO, DwmFlush, DwmGetCompositionTimingInfo},

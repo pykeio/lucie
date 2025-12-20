@@ -1,3 +1,4 @@
+use crate::util::ResultExt as _;
 use crate::{Capslock, RunnableVariant, TaskTiming, profiler, xcb_flush};
 use anyhow::{Context as _, anyhow};
 use calloop::{
@@ -16,7 +17,6 @@ use std::{
     rc::{Rc, Weak},
     time::{Duration, Instant},
 };
-use util::ResultExt as _;
 
 use x11rb::{
     connection::{Connection, RequestConnection},

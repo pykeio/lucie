@@ -1,7 +1,7 @@
+use crate::util::ResultExt;
 use anyhow::Context as _;
 use blade_graphics as gpu;
 use std::sync::Arc;
-use util::ResultExt;
 
 #[cfg_attr(target_os = "macos", derive(Clone))]
 pub struct BladeContext {

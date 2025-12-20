@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use ::util::ResultExt;
+use crate::util::ResultExt;
 use anyhow::Context as _;
 use windows::{
     Win32::{

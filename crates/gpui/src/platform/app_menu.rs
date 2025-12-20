@@ -1,5 +1,5 @@
+use crate::util::ResultExt;
 use crate::{Action, App, Platform, SharedString};
-use util::ResultExt;
 
 /// A menu of the application, either a main menu or a submenu
 pub struct Menu {

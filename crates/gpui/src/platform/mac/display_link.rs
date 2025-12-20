@@ -1,3 +1,4 @@
+use crate::util::ResultExt;
 use crate::{
     dispatch_get_main_queue,
     dispatch_sys::{
@@ -9,7 +10,6 @@ use crate::{
 use anyhow::Result;
 use core_graphics::display::CGDirectDisplayID;
 use std::ffi::c_void;
-use util::ResultExt;
 
 pub struct DisplayLink {
     display_link: Option<sys::DisplayLink>,

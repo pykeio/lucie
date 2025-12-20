@@ -82,17 +82,6 @@ where
         &self.position
     }
 
-    #[track_caller]
-    pub fn end(&self) -> D {
-        if let Some(item_summary) = self.item_summary() {
-            let mut end = self.start().clone();
-            end.add_summary(item_summary, self.cx);
-            end
-        } else {
-            self.start().clone()
-        }
-    }
-
     /// Item is None, when the list is empty, or this cursor is at the end of the list.
     #[track_caller]
     pub fn item(&self) -> Option<&'a T> {
@@ -134,6 +123,7 @@ where
         }
     }
 
+    #[cfg(test)]
     #[track_caller]
     pub fn next_item(&self) -> Option<&'a T> {
         self.assert_did_seek();
@@ -157,6 +147,7 @@ where
         }
     }
 
+    #[cfg(test)]
     #[track_caller]
     fn next_leaf(&self) -> Option<&'a SumTree<T>> {
         for entry in self.stack.iter().rev().skip(1) {
@@ -172,6 +163,7 @@ where
         None
     }
 
+    #[cfg(test)]
     #[track_caller]
     pub fn prev_item(&self) -> Option<&'a T> {
         self.assert_did_seek();
@@ -195,6 +187,7 @@ where
         }
     }
 
+    #[cfg(test)]
     #[track_caller]
     fn prev_leaf(&self) -> Option<&'a SumTree<T>> {
         for entry in self.stack.iter().rev().skip(1) {
@@ -380,10 +373,6 @@ where
             self.did_seek,
             "Must call `seek`, `next` or `prev` before calling this method"
         );
-    }
-
-    pub fn did_seek(&self) -> bool {
-        self.did_seek
     }
 }
 
@@ -669,22 +658,15 @@ where
         self.cursor.start()
     }
 
-    pub fn end(&self) -> D {
-        self.cursor.end()
-    }
-
     pub fn item(&self) -> Option<&'a T> {
         self.cursor.item()
-    }
-
-    pub fn item_summary(&self) -> Option<&'a T::Summary> {
-        self.cursor.item_summary()
     }
 
     pub fn next(&mut self) {
         self.cursor.search_forward(&mut self.filter_node);
     }
 
+    #[cfg(test)]
     pub fn prev(&mut self) {
         self.cursor.search_backward(&mut self.filter_node);
     }

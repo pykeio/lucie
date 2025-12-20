@@ -1,11 +1,10 @@
 use crate::{
     AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, Bounds, Element, ElementId, Entity,
     GlobalElementId, ImageAssetLoader, ImageCacheError, IntoElement, LayoutId, ParentElement,
-    Pixels, RenderImage, Resource, Style, StyleRefinement, Styled, Task, Window, hash,
+    Pixels, Refineable, RenderImage, Resource, Style, StyleRefinement, Styled, Task, Window, hash,
 };
 
 use futures_util::{FutureExt, future::Shared};
-use refineable::Refineable;
 use smallvec::SmallVec;
 use std::{collections::HashMap, fmt, sync::Arc};
 

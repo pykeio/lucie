@@ -1,3 +1,4 @@
+use crate::util::ResultExt;
 use crate::{
     GLOBAL_THREAD_TIMINGS, PlatformDispatcher, Priority, PriorityQueueReceiver,
     PriorityQueueSender, RealtimePriority, RunnableVariant, THREAD_TIMINGS, TaskLabel, TaskTiming,
@@ -13,7 +14,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use util::ResultExt;
 
 struct TimerAfter {
     duration: Duration,

@@ -56,7 +56,7 @@ pub fn derive_refineable(input: TokenStream) -> TokenStream {
         .map(|f| {
             if derives_serialize {
                 if is_refineable_field(f) {
-                    quote! { #[serde(default, skip_serializing_if = "::refineable::IsEmpty::is_empty")] }
+                    quote! { #[serde(default, skip_serializing_if = "::gpui::refineable::IsEmpty::is_empty")] }
                 } else {
                     quote! { #[serde(skip_serializing_if = "::std::option::Option::is_none")] }
                 }
@@ -456,7 +456,7 @@ pub fn derive_refineable(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #impl_generics ::refineable::IsEmpty for #refinement_ident #ty_generics
+        impl #impl_generics ::gpui::refineable::IsEmpty for #refinement_ident #ty_generics
             #where_clause
         {
             fn is_empty(&self) -> bool {

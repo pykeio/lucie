@@ -8,10 +8,9 @@ use crate::{
     AbsoluteLength, App, Background, BackgroundTag, BorderStyle, Bounds, ContentMask, Corners,
     CornersRefinement, CursorStyle, DefiniteLength, DevicePixels, Edges, EdgesRefinement, Font,
     FontFallbacks, FontFeatures, FontStyle, FontWeight, GridLocation, Hsla, Length, Pixels, Point,
-    PointRefinement, Rgba, SharedString, Size, SizeRefinement, Styled, TextRun, Window, black, phi,
-    point, quad, rems, size,
+    PointRefinement, Refineable, Rgba, SharedString, Size, SizeRefinement, Styled, TextRun, Window,
+    black, phi, point, quad, rems, size,
 };
-use refineable::Refineable;
 
 /// Use this struct for interfacing with the 'debug_below' styling from your own elements.
 /// If a parent element has this style set on it, then this struct will be set as a global in
@@ -1280,9 +1279,7 @@ mod tests {
 
     use super::*;
 
-    use util_macros::perf;
-
-    #[perf]
+    #[test]
     fn test_basic_highlight_style_combination() {
         let style_a = HighlightStyle::default();
         let style_b = HighlightStyle::default();
@@ -1367,7 +1364,7 @@ mod tests {
         );
     }
 
-    #[perf]
+    #[test]
     fn test_combine_highlights() {
         assert_eq!(
             combine_highlights(
@@ -1456,7 +1453,7 @@ mod tests {
         );
     }
 
-    #[perf]
+    #[test]
     fn test_text_style_refinement() {
         let mut style = Style::default();
         style.refine(&StyleRefinement::default().text_size(px(20.0)));

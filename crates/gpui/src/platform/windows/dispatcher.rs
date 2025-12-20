@@ -4,8 +4,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::util::ResultExt;
 use anyhow::Context;
-use util::ResultExt;
 use windows::{
     System::Threading::{
         ThreadPool, ThreadPoolTimer, TimerElapsedHandler, WorkItemHandler, WorkItemPriority,

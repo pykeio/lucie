@@ -1,12 +1,11 @@
 use crate::{
     AnyElement, AnyEntity, AnyWeakEntity, App, Bounds, ContentMask, Context, Element, ElementId,
     Entity, EntityId, GlobalElementId, IntoElement, LayoutId, PaintIndex, Pixels,
-    PrepaintStateIndex, Render, Style, StyleRefinement, TextStyle, WeakEntity,
+    PrepaintStateIndex, Refineable, Render, Style, StyleRefinement, TextStyle, WeakEntity,
 };
 use crate::{Empty, Window};
 use anyhow::Result;
 use rapidhash::fast::RapidHashSet;
-use refineable::Refineable;
 use std::mem;
 use std::rc::Rc;
 use std::{any::TypeId, fmt, ops::Range};

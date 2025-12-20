@@ -1,9 +1,9 @@
 use crate::{
     ActiveTooltip, AnyView, App, Bounds, DispatchPhase, Element, ElementId, GlobalElementId,
-    HighlightStyle, Hitbox, HitboxBehavior, IntoElement, LayoutId,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, SharedString, Size, TextOverflow,
-    TextRun, TextStyle, TooltipId, WhiteSpace, Window, WrappedLine, WrappedLineLayout,
-    register_tooltip_mouse_handlers, set_tooltip_on_window,
+    HighlightStyle, Hitbox, HitboxBehavior, IntoElement, LayoutId, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, Pixels, Point, SharedString, Size, TextOverflow, TextRun, TextStyle, TooltipId,
+    WhiteSpace, Window, WrappedLine, WrappedLineLayout, register_tooltip_mouse_handlers,
+    set_tooltip_on_window, util::ResultExt,
 };
 use anyhow::Context as _;
 use smallvec::SmallVec;
@@ -15,7 +15,6 @@ use std::{
     rc::Rc,
     sync::Arc,
 };
-use util::ResultExt;
 
 impl Element for &'static str {
     type RequestLayoutState = TextLayout;
@@ -721,8 +720,7 @@ impl Element for InteractiveText {
                     }
                 }
 
-                self.text
-                    .prepaint(None, bounds, state, window, cx);
+                self.text.prepaint(None, bounds, state, window, cx);
                 let hitbox = window.insert_hitbox(bounds, HitboxBehavior::Normal);
                 (hitbox, interactive_state)
             },
@@ -868,8 +866,7 @@ impl Element for InteractiveText {
                     );
                 }
 
-                self.text
-                    .paint(None, bounds, &mut (), &mut (), window, cx);
+                self.text.paint(None, bounds, &mut (), &mut (), window, cx);
 
                 ((), interactive_state)
             },

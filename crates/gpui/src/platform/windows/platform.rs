@@ -8,7 +8,7 @@ use std::{
     },
 };
 
-use ::util::ResultExt;
+use crate::util::ResultExt;
 use anyhow::{Context as _, Result, anyhow};
 use parking_lot::RwLock;
 use smallvec::SmallVec;

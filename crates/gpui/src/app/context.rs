@@ -2,6 +2,7 @@ use crate::{
     AnyView, AnyWindowHandle, AppContext, AsyncApp, DispatchPhase, Effect, EntityId, EventEmitter,
     FocusHandle, FocusOutEvent, Focusable, Global, KeystrokeObserver, Priority, Reservation,
     SubscriberSet, Subscription, Task, WeakEntity, WeakFocusHandle, Window, WindowHandle,
+    util::{self, Deferred},
 };
 use anyhow::Result;
 use futures_util::FutureExt;
@@ -12,7 +13,6 @@ use std::{
     ops,
     sync::Arc,
 };
-use util::Deferred;
 
 use super::{App, AsyncWindowContext, Entity, KeystrokeEvent};
 

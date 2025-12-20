@@ -10,9 +10,9 @@ use crate::{
     WindowDecorations, WindowKind, WindowParams, X11ClientStatePtr, px, size,
 };
 
+use crate::util::{ResultExt, maybe};
 use blade_graphics as gpu;
 use raw_window_handle as rwh;
-use util::{ResultExt, maybe};
 use x11rb::{
     connection::Connection,
     cookie::{Cookie, VoidCookie},

@@ -13,10 +13,10 @@ use std::{
     time::Duration,
 };
 
+use crate::util::ResultExt as _;
 use anyhow::{Context as _, anyhow};
 use calloop::LoopSignal;
 use futures_channel::oneshot;
-use util::ResultExt as _;
 #[cfg(any(feature = "wayland", feature = "x11"))]
 use xkbcommon::xkb::{self, Keycode, Keysym, State};
 

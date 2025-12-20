@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-use ::util::ResultExt;
+use crate::util::ResultExt;
 use anyhow::{Context, Result};
 use windows::{
     Win32::{

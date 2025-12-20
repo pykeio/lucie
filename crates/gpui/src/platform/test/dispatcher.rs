@@ -1,3 +1,4 @@
+use crate::util::post_inc;
 use crate::{PlatformDispatcher, Priority, RunnableVariant, TaskLabel};
 use backtrace::Backtrace;
 use parking::Unparker;
@@ -13,7 +14,6 @@ use std::{
     task::{Context, Poll},
     time::{Duration, Instant},
 };
-use util::post_inc;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TestDispatcherId(usize);

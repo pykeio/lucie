@@ -5,13 +5,8 @@ members = [
     "crates/gpui_macros",
     "crates/gpui_tokio",
     "crates/media",
-    "crates/refineable",
-    "crates/refineable/derive_refineable",
+    "crates/derive_refineable",
     "crates/reqwest_client",
-    "crates/sum_tree",
-    "crates/util",
-    "crates/util_macros",
-    "tooling/perf",
 ]
 
 [workspace.package]
@@ -24,17 +19,12 @@ edition = "2024"
 # Workspace member crates
 #
 
-derive_refineable = { path = "crates/refineable/derive_refineable" }
+derive_refineable = { path = "crates/derive_refineable" }
 gpui = { path = "crates/gpui", default-features = false }
 gpui_macros = { path = "crates/gpui_macros" }
 gpui_tokio = { path = "crates/gpui_tokio" }
 media = { path = "crates/media" }
-refineable = { path = "crates/refineable" }
 reqwest_client = { path = "crates/reqwest_client" }
-sum_tree = { path = "crates/sum_tree" }
-util = { path = "crates/util" }
-util_macros = { path = "crates/util_macros" }
-perf = { path = "tooling/perf" }
 
 #
 # External crates
@@ -212,7 +202,6 @@ split-debuginfo = "unpacked"
 # taffy = { opt-level = 3 }
 # resvg = { opt-level = 3 }
 
-# refineable = { codegen-units = 1 }
 # reqwest_client = { codegen-units = 1 }
 
 [profile.release]

@@ -26,6 +26,7 @@ use cocoa::{
     },
 };
 
+use crate::util::ResultExt;
 use core_graphics::display::{CGDirectDisplayID, CGPoint, CGRect};
 use ctor::ctor;
 use futures_channel::oneshot;
@@ -50,7 +51,6 @@ use std::{
     sync::{Arc, Weak},
     time::Duration,
 };
-use util::ResultExt;
 
 const WINDOW_STATE_IVAR: &str = "windowState";
 

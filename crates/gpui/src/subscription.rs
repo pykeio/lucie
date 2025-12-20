@@ -1,3 +1,4 @@
+use crate::util::post_inc;
 use std::{
     cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
@@ -5,7 +6,6 @@ use std::{
     mem,
     rc::Rc,
 };
-use util::post_inc;
 
 pub(crate) struct SubscriberSet<EmitterKey, Callback>(
     Rc<RefCell<SubscriberSetState<EmitterKey, Callback>>>,

@@ -1,10 +1,9 @@
 use crate::{
-    App, Bounds, Element, ElementId, GlobalElementId, IntoElement, LayoutId,
-    ObjectFit, Pixels, Style, StyleRefinement, Styled, Window,
+    App, Bounds, Element, ElementId, GlobalElementId, IntoElement, LayoutId, ObjectFit, Pixels,
+    Refineable, Style, StyleRefinement, Styled, Window,
 };
 #[cfg(target_os = "macos")]
 use core_video::pixel_buffer::CVPixelBuffer;
-use refineable::Refineable;
 
 /// A source of a surface's content.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -30,7 +30,6 @@ pub use entity_map::*;
 use smallvec::SmallVec;
 #[cfg(any(test, feature = "test-support"))]
 pub use test_context::*;
-use util::{ResultExt, debug_panic};
 
 use crate::{
     Action, ActionBuildError, ActionRegistry, Any, AnyView, AnyWindowHandle, AppContext, Asset,
@@ -42,9 +41,10 @@ use crate::{
     SharedString, SubscriberSet, Subscription, SvgRenderer, Task, TextSystem, Window,
     WindowAppearance, WindowHandle, WindowId, WindowInvalidator,
     colors::{Colors, GlobalColors},
-    current_platform, hash,
+    current_platform, debug_panic, hash,
     http::{AsyncBody, HttpClient, Uri},
     init_app_menus,
+    util::ResultExt,
 };
 
 mod async_context;

@@ -1,10 +1,10 @@
+use crate::util::ResultExt;
 use itertools::Itertools;
 use smallvec::SmallVec;
 use std::{
     hash::{Hash, Hasher},
     rc::Rc,
 };
-use util::ResultExt;
 use windows::{
     Win32::{
         Foundation::*,

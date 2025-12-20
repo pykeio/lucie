@@ -1,8 +1,8 @@
 use crate::{
     AnyElement, AnyImageCache, App, Asset, AssetLogger, Bounds, DefiniteLength, Element, ElementId,
-    Entity, GlobalElementId, Hitbox, Image, ImageCache, InteractiveElement,
-    Interactivity, IntoElement, LayoutId, Length, ObjectFit, Pixels, RenderImage, Resource,
-    SharedString, SharedUri, StyleRefinement, Styled, Task, Window, px,
+    Entity, GlobalElementId, Hitbox, Image, ImageCache, InteractiveElement, Interactivity,
+    IntoElement, LayoutId, Length, ObjectFit, Pixels, RenderImage, Resource, SharedString,
+    SharedUri, StyleRefinement, Styled, Task, Window, px, util::ResultExt,
 };
 use anyhow::{Context as _, Result};
 
@@ -23,7 +23,6 @@ use std::{
     time::{Duration, Instant},
 };
 use thiserror::Error;
-use util::ResultExt;
 
 use super::{Stateful, StatefulInteractiveElement};
 

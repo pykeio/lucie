@@ -32,6 +32,7 @@ pub mod prelude;
 mod profiler;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod queue;
+mod refineable;
 mod scene;
 mod shared_string;
 mod shared_uri;
@@ -67,7 +68,7 @@ mod seal {
 pub use action::*;
 pub use anyhow::Result;
 pub use app::*;
-pub(crate) use arena::{ArenaBox, Arena};
+pub(crate) use arena::{Arena, ArenaBox};
 pub use asset_cache::*;
 pub use assets::*;
 pub use color::*;
@@ -80,7 +81,7 @@ pub use global::*;
 pub use gpui_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};
 pub use input::*;
 pub use interactive::*;
-use key_dispatch::{DispatchNodeId, DispatchActionListener, DispatchTree, Replay};
+use key_dispatch::{DispatchActionListener, DispatchNodeId, DispatchTree, Replay};
 pub use keymap::*;
 pub use path_builder::*;
 pub use platform::*;
@@ -103,7 +104,7 @@ pub use taffy::{AvailableSpace, LayoutId};
 #[cfg(any(test, feature = "test-support"))]
 pub use test::*;
 pub use text_system::*;
-pub use util::arc_cow::ArcCow;
+pub use util::{ArcCow, Deferred, defer};
 pub use view::*;
 pub use window::*;
 

@@ -7,6 +7,7 @@ use crate::{
     RunnableVariant, THREAD_TIMINGS, TaskLabel, TaskTiming, ThreadTaskTimings,
 };
 
+use crate::util::ResultExt;
 use anyhow::Context;
 use async_task::Runnable;
 use mach2::{
@@ -30,7 +31,6 @@ use std::{
     ptr::{NonNull, addr_of},
     time::{Duration, Instant},
 };
-use util::ResultExt;
 
 /// All items in the generated file are marked as pub, so we're gonna wrap it in a separate mod to prevent
 /// these pub items from leaking into public API.

@@ -3,7 +3,7 @@ use std::{
     ffi::{c_uint, c_void},
 };
 
-use ::util::ResultExt;
+use crate::util::ResultExt;
 use windows::Win32::UI::{
     Shell::{ABM_GETSTATE, ABM_GETTASKBARPOS, ABS_AUTOHIDE, APPBARDATA, SHAppBarMessage},
     WindowsAndMessaging::{

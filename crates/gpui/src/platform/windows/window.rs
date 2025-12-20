@@ -10,7 +10,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use ::util::ResultExt;
+use crate::util::ResultExt;
 use anyhow::{Context as _, Result};
 use futures_channel::oneshot::{self, Receiver};
 use raw_window_handle as rwh;

@@ -4,6 +4,7 @@ use super::{
     events::key_to_native,
     renderer,
 };
+use crate::util::ResultExt;
 use crate::{
     Action, AnyWindowHandle, BackgroundExecutor, ClipboardEntry, ClipboardItem, ClipboardString,
     CursorStyle, ForegroundExecutor, Image, ImageFormat, KeyContext, Keymap, MacDispatcher,
@@ -58,7 +59,6 @@ use std::{
     slice, str,
     sync::{Arc, OnceLock},
 };
-use util::ResultExt;
 
 #[allow(non_upper_case_globals)]
 const NSUTF8StringEncoding: NSUInteger = 4;

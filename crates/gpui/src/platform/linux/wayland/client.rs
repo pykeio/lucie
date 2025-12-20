@@ -7,6 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::util::ResultExt as _;
 use calloop::{
     EventLoop, LoopHandle,
     timer::{TimeoutAction, Timer},
@@ -15,7 +16,6 @@ use calloop_wayland_source::WaylandSource;
 use filedescriptor::Pipe;
 use rapidhash::fast::RapidHashMap;
 use smallvec::SmallVec;
-use util::ResultExt as _;
 use wayland_backend::client::ObjectId;
 use wayland_backend::protocol::WEnum;
 use wayland_client::event_created_child;

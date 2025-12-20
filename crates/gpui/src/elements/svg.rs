@@ -1,12 +1,10 @@
 use std::{fs, path::Path, sync::Arc};
 
 use crate::{
-    App, Asset, Bounds, Element, GlobalElementId, Hitbox, InteractiveElement,
-    Interactivity, IntoElement, LayoutId, Pixels, Point, Radians, SharedString, Size,
-    StyleRefinement, Styled, TransformationMatrix, Window, geometry::Negate as _, point, px,
-    radians, size,
+    App, Asset, Bounds, Element, GlobalElementId, Hitbox, InteractiveElement, Interactivity,
+    IntoElement, LayoutId, Pixels, Point, Radians, SharedString, Size, StyleRefinement, Styled,
+    TransformationMatrix, Window, geometry::Negate as _, point, px, radians, size, util::ResultExt,
 };
-use util::ResultExt;
 
 /// An SVG element.
 pub struct Svg {
@@ -62,12 +60,11 @@ impl Element for Svg {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
-        let layout_id = self.interactivity.request_layout(
-            global_id,
-            window,
-            cx,
-            |style, window, cx| window.request_layout(style, None, cx),
-        );
+        let layout_id =
+            self.interactivity
+                .request_layout(global_id, window, cx, |style, window, cx| {
+                    window.request_layout(style, None, cx)
+                });
         (layout_id, ())
     }
 

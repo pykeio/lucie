@@ -21,11 +21,11 @@ use crate::{
     Hitbox, HitboxBehavior, HitboxId, IntoElement, IsZero, KeyContext, KeyDownEvent, KeyUpEvent,
     KeyboardButton, KeyboardClickEvent, LayoutId, ModifiersChangedEvent, MouseButton,
     MouseClickEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Overflow, ParentElement, Pixels,
-    Point, Render, ScrollWheelEvent, SharedString, Size, Style, StyleRefinement, Styled, Task,
-    TooltipId, Visibility, Window, WindowControlArea, point, px, size,
+    Point, Refineable, Render, ScrollWheelEvent, SharedString, Size, Style, StyleRefinement,
+    Styled, Task, TooltipId, Visibility, Window, WindowControlArea, point, px, size,
+    util::ResultExt as _,
 };
 use rapidhash::fast::RapidHashMap;
-use refineable::Refineable;
 use smallvec::SmallVec;
 use stacksafe::{StackSafe, stacksafe};
 use std::{
@@ -39,7 +39,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use util::ResultExt;
 
 use super::ImageCacheProvider;
 
