@@ -10,8 +10,8 @@ members = [
 ]
 
 [workspace.package]
-publish = false
 edition = "2024"
+rust-version = "1.88"
 
 [workspace.dependencies]
 
@@ -219,6 +219,7 @@ codegen-units = 16
 unexpected_cfgs = { level = "allow" }
 
 [workspace.lints.clippy]
+incompatible_msrv = "deny"
 dbg_macro = "deny"
 todo = "deny"
 

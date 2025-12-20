@@ -1,2 +1,3 @@
+msrv = "1.88"
 allow-private-module-inception = false
 avoid-breaking-exported-api = false
