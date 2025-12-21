@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use anyhow::Context as _;
+use lucie_common::ResultExt;
 use windows::{
 	Win32::{
 		Foundation::*,
@@ -16,7 +17,7 @@ use windows::{
 	core::PCWSTR
 };
 
-use crate::{util::ResultExt, *};
+use crate::*;
 
 pub(crate) const WM_GPUI_CURSOR_STYLE_CHANGED: u32 = WM_USER + 1;
 pub(crate) const WM_GPUI_CLOSE_ONE_WINDOW: u32 = WM_USER + 2;

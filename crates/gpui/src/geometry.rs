@@ -12,9 +12,10 @@ use std::{
 
 use anyhow::{Context as _, anyhow};
 use derive_more::{Add, AddAssign, Div, DivAssign, Mul, Neg, Sub, SubAssign};
+use lucie_common::refineable::Refineable;
 use taffy::prelude::{TaffyGridLine, TaffyGridSpan};
 
-use crate::{App, DisplayId, Refineable};
+use crate::{App, DisplayId};
 
 /// Axis in a 2D cartesian space.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]

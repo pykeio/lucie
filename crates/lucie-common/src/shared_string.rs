@@ -1,12 +1,14 @@
-use std::{borrow::Borrow, sync::Arc};
+use std::{
+	borrow::Borrow,
+	ops::{Deref, DerefMut},
+	sync::Arc
+};
 
-use derive_more::{Deref, DerefMut};
-
-use crate::util::ArcCow;
+use crate::ArcCow;
 
 /// A shared string is an immutable string that can be cheaply cloned in GPUI
 /// tasks. Essentially an abstraction over an `Arc<str>` and `&'static str`,
-#[derive(Deref, DerefMut, Eq, PartialEq, PartialOrd, Ord, Hash, Clone)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Hash, Clone)]
 pub struct SharedString(ArcCow<'static, str>);
 
 impl SharedString {
@@ -23,6 +25,20 @@ impl SharedString {
 	/// Get a &str from the underlying string.
 	pub fn as_str(&self) -> &str {
 		&self.0
+	}
+}
+
+impl Deref for SharedString {
+	type Target = ArcCow<'static, str>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl DerefMut for SharedString {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.0
 	}
 }
 

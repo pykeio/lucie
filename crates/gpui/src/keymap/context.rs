@@ -1,8 +1,7 @@
 use std::fmt;
 
 use anyhow::{Context as _, Result};
-
-use crate::SharedString;
+use lucie_common::SharedString;
 
 /// A datastructure for resolving whether an action should be dispatched
 /// at this point in the element tree. Contains a set of identifiers

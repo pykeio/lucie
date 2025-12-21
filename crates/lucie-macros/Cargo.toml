@@ -1,21 +1,21 @@
 [package]
-name = "gpui_macros"
-version = "0.1.0"
+name = "lucie-macros"
+version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license = "Apache-2.0"
-description = "Macros used by gpui"
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
 
 [lints]
 workspace = true
 
 [lib]
-path = "src/gpui_macros.rs"
 proc-macro = true
 doctest = true
 
 [dependencies]
-heck.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
 syn.workspace = true

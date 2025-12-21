@@ -1,8 +1,9 @@
 use std::{borrow::Cow, iter, sync::Arc};
 
+use lucie_common::SharedString;
 use rapidhash::fast::RapidHashMap;
 
-use crate::{FontId, FontRun, Pixels, PlatformTextSystem, SharedString, TextRun, px};
+use crate::{FontId, FontRun, Pixels, PlatformTextSystem, TextRun, px};
 
 /// The GPUI line wrapper, used to wrap lines of text to a given width.
 pub struct LineWrapper {

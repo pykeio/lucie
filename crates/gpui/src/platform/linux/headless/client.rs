@@ -1,11 +1,11 @@
 use std::{cell::RefCell, rc::Rc};
 
 use calloop::{EventLoop, LoopHandle};
+use lucie_common::ResultExt as _;
 
 use crate::{
 	AnyWindowHandle, CursorStyle, DisplayId, LinuxKeyboardLayout, PlatformDisplay, PlatformKeyboardLayout, WindowParams,
-	platform::{LinuxCommon, PlatformWindow, linux::LinuxClient},
-	util::ResultExt
+	platform::{LinuxCommon, PlatformWindow, linux::LinuxClient}
 };
 
 pub struct HeadlessClientState {

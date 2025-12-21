@@ -24,7 +24,7 @@ use parking_lot::{Condvar, Mutex};
 use rand::rngs::StdRng;
 use waker_fn::waker_fn;
 
-use crate::{App, PlatformDispatcher, RunnableMeta, RunnableVariant, TaskTiming, profiler, util::TryFutureExt};
+use crate::{PlatformDispatcher, RunnableMeta, RunnableVariant, TaskTiming, profiler};
 
 /// A pointer to the executor that is currently running,
 /// for spawning background tasks.
@@ -125,20 +125,6 @@ impl<T> Task<T> {
 			Task(TaskState::Ready(_)) => {}
 			Task(TaskState::Spawned(task)) => task.detach()
 		}
-	}
-}
-
-impl<E, T> Task<Result<T, E>>
-where
-	T: 'static,
-	E: 'static + Debug
-{
-	/// Run the task to completion in the background and log any
-	/// errors that occur.
-	#[track_caller]
-	pub fn detach_and_log_err(self, cx: &App) {
-		let location = core::panic::Location::caller();
-		cx.foreground_executor().spawn(self.log_tracked_err(*location)).detach();
 	}
 }
 

@@ -1,17 +1,22 @@
 [workspace]
 resolver = "2"
 members = [
+	"crates/lucie-common",
+    "crates/lucie-macros",
     "crates/gpui",
-    "crates/gpui_macros",
     "crates/gpui_tokio",
     "crates/media",
-    "crates/derive_refineable",
     "crates/reqwest_client",
 ]
 
 [workspace.package]
+version = "0.0.0"
 edition = "2024"
 rust-version = "1.88"
+license = "Apache-2.0"
+homepage = "https://lucie.pyke.io/"
+repository = "https://github.com/pykeio/lucie"
+authors = ["Carson M. <carson@pyke.io>"]
 
 [workspace.dependencies]
 
@@ -19,9 +24,9 @@ rust-version = "1.88"
 # Workspace member crates
 #
 
-derive_refineable = { path = "crates/derive_refineable" }
+lucie-common = { path = "crates/lucie-common" }
+lucie-macros = { path = "crates/lucie-macros" }
 gpui = { path = "crates/gpui", default-features = false }
-gpui_macros = { path = "crates/gpui_macros" }
 gpui_tokio = { path = "crates/gpui_tokio" }
 media = { path = "crates/media" }
 reqwest_client = { path = "crates/reqwest_client" }
@@ -121,7 +126,7 @@ stacksafe = "0.1"
 syn = { version = "2.0.101", features = ["full", "extra-traits", "visit-mut"] }
 thiserror = "2.0.12"
 tokio = { version = "1.48", default-features = false }
-tracing = "0.1.40"
+tracing = { version = "0.1", default-features = false, features = [ "std" ] }
 unicode-segmentation = "1.10"
 windows-core = "0.61"
 
@@ -191,9 +196,7 @@ split-debuginfo = "unpacked"
 
 # [profile.dev.package]
 # # proc-macros start
-# gpui_macros = { opt-level = 3 }
-# derive_refineable = { opt-level = 3 }
-# util_macros = { opt-level = 3 }
+# lucie-macros = { opt-level = 3 }
 # quote = { opt-level = 3 }
 # syn = { opt-level = 3 }
 # proc-macro2 = { opt-level = 3 }

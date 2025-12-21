@@ -12,6 +12,7 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use futures_channel::oneshot::{self, Receiver};
+use lucie_common::ResultExt;
 use raw_window_handle as rwh;
 use smallvec::SmallVec;
 use windows::{
@@ -24,7 +25,7 @@ use windows::{
 	core::*
 };
 
-use crate::{util::ResultExt, *};
+use crate::*;
 
 pub(crate) struct WindowsWindow(pub Rc<WindowsWindowInner>);
 

@@ -11,6 +11,7 @@ use std::{
 
 use anyhow::Context;
 use async_task::Runnable;
+use lucie_common::ResultExt as _;
 use mach2::{
 	kern_return::KERN_SUCCESS,
 	mach_time::mach_timebase_info_data_t,
@@ -27,7 +28,7 @@ use objc::{
 
 use crate::{
 	GLOBAL_THREAD_TIMINGS, PlatformDispatcher, Priority, RealtimePriority, RunnableMeta, RunnableVariant, THREAD_TIMINGS, TaskLabel, TaskTiming,
-	ThreadTaskTimings, util::ResultExt
+	ThreadTaskTimings
 };
 
 /// All items in the generated file are marked as pub, so we're gonna wrap it in a separate mod to prevent

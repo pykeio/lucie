@@ -9,6 +9,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result, anyhow};
+use lucie_common::ResultExt;
 use parking_lot::RwLock;
 use smallvec::SmallVec;
 use windows::{
@@ -22,7 +23,7 @@ use windows::{
 	core::*
 };
 
-use crate::{util::ResultExt, *};
+use crate::*;
 
 pub(crate) struct WindowsPlatform {
 	inner: Rc<WindowsPlatformInner>,

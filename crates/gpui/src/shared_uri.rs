@@ -1,6 +1,5 @@
 use derive_more::{Deref, DerefMut};
-
-use crate::SharedString;
+use lucie_common::SharedString;
 
 /// A [`SharedString`] containing a URI.
 #[derive(Deref, DerefMut, Default, PartialEq, Eq, Hash, Clone)]

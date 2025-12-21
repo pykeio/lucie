@@ -355,8 +355,7 @@ impl<T: Item> SumTree<T> {
 		self.rightmost_leaf().0.items().last()
 	}
 
-	#[cfg(test)]
-	pub(crate) fn extent<'a, D: Dimension<'a, T::Summary>>(&'a self, cx: <T::Summary as Summary>::Context<'_>) -> D {
+	pub fn extent<'a, D: Dimension<'a, T::Summary>>(&'a self, cx: <T::Summary as Summary>::Context<'_>) -> D {
 		let mut extent = D::zero(cx);
 		match self.0.as_ref() {
 			Node::Internal { summary, .. } | Node::Leaf { summary, .. } => {
@@ -909,7 +908,7 @@ mod tests {
 				assert_eq!(tree.items(()), reference_items);
 				assert_eq!(tree.iter().collect::<Vec<_>>(), tree.cursor::<()>(()).collect::<Vec<_>>());
 
-				log::info!("tree items: {:?}", tree.items(()));
+				println!("tree items: {:?}", tree.items(()));
 
 				let mut filter_cursor = tree.filter::<_, Count>((), |summary| summary.contains_even);
 				let expected_filtered_items = tree
@@ -927,17 +926,17 @@ mod tests {
 					expected_filtered_items.len().saturating_sub(1)
 				};
 				while item_ix < expected_filtered_items.len() {
-					log::info!("filter_cursor, item_ix: {}", item_ix);
+					println!("filter_cursor, item_ix: {}", item_ix);
 					let actual_item = filter_cursor.item().unwrap();
 					let (reference_index, reference_item) = expected_filtered_items[item_ix];
 					assert_eq!(actual_item, &reference_item);
 					assert_eq!(filter_cursor.start().0, reference_index);
-					log::info!("next");
+					println!("next");
 					filter_cursor.next();
 					item_ix += 1;
 
 					while item_ix > 0 && rng.random_bool(0.2) {
-						log::info!("prev");
+						println!("prev");
 						filter_cursor.prev();
 						item_ix -= 1;
 

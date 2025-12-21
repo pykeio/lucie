@@ -1,6 +1,7 @@
 use std::sync::OnceLock;
 
 use anyhow::Context;
+use lucie_common::ResultExt;
 use windows::{
 	UI::{
 		Color,
@@ -11,7 +12,7 @@ use windows::{
 	core::{BOOL, HSTRING, PCSTR}
 };
 
-use crate::{util::ResultExt, *};
+use crate::*;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum WindowsVersion {

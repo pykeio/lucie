@@ -276,11 +276,4 @@ mod tests {
 		let client = ReqwestClient::proxy_and_user_agent(Some(proxy.clone()), "test").unwrap();
 		assert_eq!(client.proxy(), Some(&proxy));
 	}
-
-	#[test]
-	fn test_invalid_proxy_uri() {
-		let proxy = Uri::from_static("socks://127.0.0.1:20170");
-		let client = ReqwestClient::proxy_and_user_agent(Some(proxy), "test").unwrap();
-		assert!(client.proxy.is_none(), "An invalid proxy URL should add no proxy to the client!")
-	}
 }

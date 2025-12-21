@@ -7,7 +7,7 @@ use futures_channel::oneshot;
 use super::{Context, WeakEntity};
 use crate::{
 	AnyView, AnyWindowHandle, App, AppCell, AppContext, BackgroundExecutor, BorrowAppContext, Entity, EventEmitter, Focusable, ForegroundExecutor, Global,
-	PromptButton, PromptLevel, Render, Reservation, Result, Subscription, Task, VisualContext, Window, WindowHandle, util
+	PromptButton, PromptLevel, Render, Reservation, Result, Subscription, Task, VisualContext, Window, WindowHandle
 };
 
 /// An async-friendly version of [App] with a static lifetime so it can be held across `await` points in async code.
@@ -216,10 +216,10 @@ impl AsyncApp {
 		&self,
 		entity: &WeakEntity<T>,
 		f: Callback
-	) -> util::Deferred<impl FnOnce() + use<T, Callback>> {
+	) -> lucie_common::Deferred<impl FnOnce() + use<T, Callback>> {
 		let entity = entity.clone();
 		let mut cx = self.clone();
-		util::defer(move || {
+		lucie_common::defer(move || {
 			entity.update(&mut cx, f).ok();
 		})
 	}

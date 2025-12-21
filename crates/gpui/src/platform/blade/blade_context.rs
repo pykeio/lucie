@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use anyhow::Context as _;
 use blade_graphics as gpu;
-
-use crate::util::ResultExt;
+use lucie_common::ResultExt as _;
 
 #[cfg_attr(target_os = "macos", derive(Clone))]
 pub struct BladeContext {

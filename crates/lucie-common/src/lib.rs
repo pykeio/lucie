@@ -1,0 +1,81 @@
+use std::{
+	env,
+	ops::AddAssign,
+	sync::{
+		OnceLock,
+		atomic::{AtomicUsize, Ordering}
+	},
+	time::Instant
+};
+
+mod arc_cow;
+mod defer;
+pub mod refineable;
+mod result_ext;
+mod shared_string;
+pub mod sum_tree;
+mod trys;
+
+pub use self::{
+	arc_cow::ArcCow,
+	defer::{Deferred, defer},
+	result_ext::{Flatten, ResultExt},
+	shared_string::SharedString
+};
+
+pub mod __private {
+	pub use std;
+	pub extern crate tracing;
+}
+
+pub fn post_inc<T: From<u8> + AddAssign<T> + Copy>(value: &mut T) -> T {
+	let prev = *value;
+	*value += T::from(1);
+	prev
+}
+
+/// Increment the given atomic counter if it is not zero.
+/// Return the new value of the counter.
+pub fn atomic_incr_if_not_zero(counter: &AtomicUsize) -> usize {
+	let mut loaded = counter.load(Ordering::SeqCst);
+	loop {
+		if loaded == 0 {
+			return 0;
+		}
+		match counter.compare_exchange_weak(loaded, loaded + 1, Ordering::SeqCst, Ordering::SeqCst) {
+			Ok(x) => return x + 1,
+			Err(actual) => loaded = actual
+		}
+	}
+}
+
+#[macro_export]
+macro_rules! debug_panic {
+    ($($fmt_arg:tt)*) => {
+        if cfg!(debug_assertions) {
+            panic!($($fmt_arg)*);
+        } else {
+            let backtrace = $crate::__private::std::backtrace::Backtrace::capture();
+            $crate::__private::tracing::error!("{}\n{}", format_args!($($fmt_arg)*), backtrace);
+        }
+    };
+}
+
+pub fn measure<R>(label: &str, f: impl FnOnce() -> R) -> R {
+	static SHOULD_MEASURE: OnceLock<bool> = OnceLock::new();
+	let should_measure = SHOULD_MEASURE.get_or_init(|| {
+		env::var("LUCIE_MEASURE")
+			.map(|measure| measure == "1" || measure == "true" || measure == "yes" || measure == "y")
+			.unwrap_or(false)
+	});
+
+	if *should_measure {
+		let start = Instant::now();
+		let result = f();
+		let elapsed = start.elapsed();
+		tracing::info!(target: "lucie_measure", "{label} took {elapsed:?}");
+		result
+	} else {
+		f()
+	}
+}

@@ -5,6 +5,7 @@ use cosmic_text::{
 	Attrs, AttrsList, CacheKey, Family, Font as CosmicTextFont, FontFeatures as CosmicFontFeatures, FontSystem, ShapeBuffer, ShapeLine, SwashCache
 };
 use itertools::Itertools;
+use lucie_common::SharedString;
 use parking_lot::RwLock;
 use pathfinder_geometry::{
 	rect::{RectF, RectI},
@@ -15,7 +16,7 @@ use smallvec::SmallVec;
 
 use crate::{
 	Bounds, DevicePixels, Font, FontFeatures, FontId, FontMetrics, FontRun, FontStyle, FontWeight, GlyphId, LineLayout, Pixels, PlatformTextSystem, Point,
-	RenderGlyphParams, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ShapedGlyph, ShapedRun, SharedString, Size, point, size
+	RenderGlyphParams, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ShapedGlyph, ShapedRun, Size, point, size
 };
 
 pub(crate) struct CosmicTextSystem(RwLock<CosmicTextSystemState>);

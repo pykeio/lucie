@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-pub use gpui_macros::Action;
+pub use lucie_macros::Action;
 pub use no_action::{NoAction, is_no_action};
 use rapidhash::fast::RapidHashMap;
 

@@ -1,4 +1,4 @@
-pub use derive_refineable::Refineable;
+pub use lucie_macros::Refineable;
 
 /// A trait for types that can be refined with partial updates.
 ///

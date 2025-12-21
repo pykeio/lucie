@@ -1,12 +1,13 @@
-pub use gpui_macros::{
+use lucie_common::SharedString;
+pub use lucie_macros::{
 	border_style_methods, box_shadow_style_methods, cursor_style_methods, margin_style_methods, overflow_style_methods, padding_style_methods,
 	position_style_methods, visibility_style_methods
 };
 
 use crate::{
 	self as gpui, AbsoluteLength, AlignContent, AlignItems, BorderStyle, CursorStyle, DefiniteLength, Display, Fill, FlexDirection, FlexWrap, Font,
-	FontFeatures, FontStyle, FontWeight, GridPlacement, Hsla, JustifyContent, Length, SharedString, StrikethroughStyle, StyleRefinement, TextAlign,
-	TextOverflow, TextStyleRefinement, UnderlineStyle, WhiteSpace, px, relative, rems
+	FontFeatures, FontStyle, FontWeight, GridPlacement, Hsla, JustifyContent, Length, StrikethroughStyle, StyleRefinement, TextAlign, TextOverflow,
+	TextStyleRefinement, UnderlineStyle, WhiteSpace, px, relative, rems
 };
 const ELLIPSIS: SharedString = SharedString::new_static("…");
 
@@ -16,15 +17,15 @@ pub trait Styled: Sized {
 	/// Returns a reference to the style memory of this element.
 	fn style(&mut self) -> &mut StyleRefinement;
 
-	gpui_macros::style_helpers!();
-	gpui_macros::visibility_style_methods!();
-	gpui_macros::margin_style_methods!();
-	gpui_macros::padding_style_methods!();
-	gpui_macros::position_style_methods!();
-	gpui_macros::overflow_style_methods!();
-	gpui_macros::cursor_style_methods!();
-	gpui_macros::border_style_methods!();
-	gpui_macros::box_shadow_style_methods!();
+	lucie_macros::style_helpers!();
+	visibility_style_methods!();
+	margin_style_methods!();
+	padding_style_methods!();
+	position_style_methods!();
+	overflow_style_methods!();
+	cursor_style_methods!();
+	border_style_methods!();
+	box_shadow_style_methods!();
 
 	/// Sets the display type of the element to `block`.
 	/// [Docs](https://tailwindcss.com/docs/display)

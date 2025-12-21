@@ -4,13 +4,12 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use lucie_common::ResultExt;
 use windows::Win32::{
 	Foundation::HWND,
 	Graphics::Dwm::{DWM_TIMING_INFO, DwmFlush, DwmGetCompositionTimingInfo},
 	System::Performance::QueryPerformanceFrequency
 };
-
-use crate::util::ResultExt;
 
 static QPC_TICKS_PER_SECOND: LazyLock<u64> = LazyLock::new(|| {
 	let mut frequency = 0;

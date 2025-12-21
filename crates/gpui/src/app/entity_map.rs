@@ -16,6 +16,7 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use derive_more::{Deref, DerefMut};
+use lucie_common::{Flatten, atomic_incr_if_not_zero};
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 #[cfg(any(test, feature = "leak-detection"))]
 use rapidhash::fast::RapidHashMap;
@@ -23,7 +24,7 @@ use rapidhash::fast::RapidHashSet;
 use slotmap::{KeyData, SecondaryMap, SlotMap};
 
 use super::Context;
-use crate::{App, AppContext, GpuiBorrow, VisualContext, Window, seal::Sealed, util::atomic_incr_if_not_zero};
+use crate::{App, AppContext, GpuiBorrow, VisualContext, Window, seal::Sealed};
 
 slotmap::new_key_type! {
 	/// A unique identifier for a entity across the application.
@@ -696,9 +697,9 @@ impl<T: 'static> WeakEntity<T> {
 	pub fn update<C, R>(&self, cx: &mut C, update: impl FnOnce(&mut T, &mut Context<T>) -> R) -> Result<R>
 	where
 		C: AppContext,
-		Result<C::Result<R>>: crate::Flatten<R>
+		Result<C::Result<R>>: Flatten<R, anyhow::Error>
 	{
-		crate::Flatten::flatten(self.upgrade().context("entity released").map(|this| cx.update_entity(&this, update)))
+		Flatten::flatten(self.upgrade().context("entity released").map(|this| cx.update_entity(&this, update)))
 	}
 
 	/// Updates the entity referenced by this handle with the given function if
@@ -707,12 +708,12 @@ impl<T: 'static> WeakEntity<T> {
 	pub fn update_in<C, R>(&self, cx: &mut C, update: impl FnOnce(&mut T, &mut Window, &mut Context<T>) -> R) -> Result<R>
 	where
 		C: VisualContext,
-		Result<C::Result<R>>: crate::Flatten<R>
+		Result<C::Result<R>>: Flatten<R, anyhow::Error>
 	{
 		let window = cx.window_handle();
 		let this = self.upgrade().context("entity released")?;
 
-		crate::Flatten::flatten(window.update(cx, |_, window, cx| this.update(cx, |entity, cx| update(entity, window, cx))))
+		Flatten::flatten(window.update(cx, |_, window, cx| this.update(cx, |entity, cx| update(entity, window, cx))))
 	}
 
 	/// Reads the entity referenced by this handle with the given function if
@@ -721,9 +722,9 @@ impl<T: 'static> WeakEntity<T> {
 	pub fn read_with<C, R>(&self, cx: &C, read: impl FnOnce(&T, &App) -> R) -> Result<R>
 	where
 		C: AppContext,
-		Result<C::Result<R>>: crate::Flatten<R>
+		Result<C::Result<R>>: Flatten<R, anyhow::Error>
 	{
-		crate::Flatten::flatten(self.upgrade().context("entity released").map(|this| cx.read_entity(&this, read)))
+		Flatten::flatten(self.upgrade().context("entity released").map(|this| cx.read_entity(&this, read)))
 	}
 
 	/// Create a new weak entity that can never be upgraded.
@@ -851,7 +852,9 @@ impl LeakDetector {
 	/// at the allocation site.
 	#[track_caller]
 	pub fn handle_created(&mut self, entity_id: EntityId) -> HandleId {
-		let id = crate::util::post_inc(&mut self.next_handle_id);
+		use lucie_common::post_inc;
+
+		let id = post_inc(&mut self.next_handle_id);
 		let handle_id = HandleId { id };
 		let handles = self.entity_handles.entry(entity_id).or_default();
 		handles.insert(handle_id, LEAK_BACKTRACE.then(backtrace::Backtrace::new_unresolved));

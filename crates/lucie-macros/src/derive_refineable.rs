@@ -3,7 +3,6 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
 use syn::{DeriveInput, Field, FieldsNamed, PredicateType, TraitBound, Type, TypeParamBound, WhereClause, WherePredicate, parse_macro_input, parse_quote};
 
-#[proc_macro_derive(Refineable, attributes(refineable))]
 pub fn derive_refineable(input: TokenStream) -> TokenStream {
 	let DeriveInput { ident, data, generics, attrs, .. } = parse_macro_input!(input);
 
@@ -47,7 +46,7 @@ pub fn derive_refineable(input: TokenStream) -> TokenStream {
 		.map(|f| {
 			if derives_serialize {
 				if is_refineable_field(f) {
-					quote! { #[serde(default, skip_serializing_if = "::gpui::refineable::IsEmpty::is_empty")] }
+					quote! { #[serde(default, skip_serializing_if = "::lucie_common::refineable::IsEmpty::is_empty")] }
 				} else {
 					quote! { #[serde(skip_serializing_if = "::std::option::Option::is_none")] }
 				}

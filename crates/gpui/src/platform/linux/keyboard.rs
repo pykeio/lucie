@@ -1,4 +1,6 @@
-use crate::{PlatformKeyboardLayout, SharedString};
+use lucie_common::SharedString;
+
+use crate::PlatformKeyboardLayout;
 
 #[derive(Clone)]
 pub(crate) struct LinuxKeyboardLayout {

@@ -26,6 +26,7 @@ use itertools::{
 	FoldWhile::{Continue, Done},
 	Itertools
 };
+use lucie_common::{ResultExt as _, SharedString, atomic_incr_if_not_zero, measure, post_inc, refineable::Refineable};
 use parking_lot::RwLock;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle};
@@ -38,21 +39,15 @@ use crate::{
 	DisplayId, Edges, Effect, Entity, EntityId, EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId, GpuSpecs, Hsla, InputHandler, IsZero,
 	KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite,
 	MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow,
-	Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Refineable, Render, RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams,
-	Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, SharedString, Size, StrikethroughStyle,
-	Style, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextStyle, TextStyleRefinement,
-	TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations,
-	WindowOptions, WindowParams, WindowTextSystem, point,
-	prelude::*,
-	px, size, transparent_black,
-	util::{ResultExt, measure, post_inc}
+	Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Replay,
+	ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, Size, StrikethroughStyle, Style, SubscriberSet,
+	Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextStyle, TextStyleRefinement, TransformationMatrix,
+	Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams,
+	WindowTextSystem, point, prelude::*, px, size, transparent_black
 };
 
 mod prompts;
-
-pub use prompts::*;
-
-use crate::util::atomic_incr_if_not_zero;
+pub use self::prompts::*;
 
 pub(crate) const DEFAULT_WINDOW_SIZE: Size<Pixels> = size(px(1536.), px(864.));
 
@@ -4061,7 +4056,7 @@ impl<V: 'static + Render> WindowHandle<V> {
 	where
 		C: AppContext
 	{
-		crate::Flatten::flatten(cx.update_window(self.any_handle, |root_view, _, _| {
+		lucie_common::Flatten::flatten(cx.update_window(self.any_handle, |root_view, _, _| {
 			root_view
 				.downcast::<V>()
 				.map_err(|_| anyhow!("the type of the window's root view has changed"))
@@ -4251,6 +4246,10 @@ impl ElementId {
 	pub fn named_usize(name: impl Into<SharedString>, integer: usize) -> ElementId {
 		Self::NamedInteger(name.into(), integer as u64)
 	}
+
+	pub fn into_shared_string(self) -> Option<SharedString> {
+		if let ElementId::Name(name) = self { Some(name) } else { None }
+	}
 }
 
 impl Display for ElementId {
@@ -4267,18 +4266,6 @@ impl Display for ElementId {
 		}
 
 		Ok(())
-	}
-}
-
-impl TryInto<SharedString> for ElementId {
-	type Error = anyhow::Error;
-
-	fn try_into(self) -> anyhow::Result<SharedString> {
-		if let ElementId::Name(name) = self {
-			Ok(name)
-		} else {
-			anyhow::bail!("element id is not string")
-		}
 	}
 }
 

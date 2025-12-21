@@ -1,6 +1,7 @@
 use std::future::Future;
 
-use gpui::{App, AppContext, Global, ReadGlobal, Task, defer};
+use gpui::{App, AppContext, Global, ReadGlobal, Task};
+use lucie_common::defer;
 pub use tokio::task::JoinError;
 
 pub fn init(cx: &mut App) {

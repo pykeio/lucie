@@ -2,6 +2,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
+use lucie_common::{ResultExt, SharedString};
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use rapidhash::fast::RapidHashMap;
 use windows::{
@@ -16,7 +17,7 @@ use windows::{
 };
 use windows_numerics::Vector2;
 
-use crate::{util::ResultExt, *};
+use crate::*;
 
 #[derive(Debug)]
 struct FontInfo {

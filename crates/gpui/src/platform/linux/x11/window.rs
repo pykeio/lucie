@@ -2,6 +2,7 @@ use std::{cell::RefCell, ffi::c_void, fmt::Display, num::NonZeroU32, ops::Div, p
 
 use anyhow::{Context as _, anyhow};
 use blade_graphics as gpu;
+use lucie_common::ResultExt as _;
 use raw_window_handle as rwh;
 use x11rb::{
 	connection::{Connection, RequestConnection},
@@ -23,8 +24,7 @@ use crate::{
 	PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, ScaledPixels, Scene, Size, Tiling,
 	WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations, WindowKind, WindowParams, X11ClientStatePtr, maybe,
 	platform::blade::{BladeContext, BladeRenderer, BladeSurfaceConfig},
-	px, size,
-	util::ResultExt as _
+	px, size
 };
 
 x11rb::atom_manager! {

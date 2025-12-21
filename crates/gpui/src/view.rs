@@ -1,11 +1,12 @@
 use std::{any::TypeId, fmt, mem, ops::Range, rc::Rc};
 
 use anyhow::Result;
+use lucie_common::refineable::Refineable;
 use rapidhash::fast::RapidHashSet;
 
 use crate::{
 	AnyElement, AnyEntity, AnyWeakEntity, App, Bounds, ContentMask, Context, Element, ElementId, Empty, Entity, EntityId, GlobalElementId, IntoElement,
-	LayoutId, PaintIndex, Pixels, PrepaintStateIndex, Refineable, Render, Style, StyleRefinement, TextStyle, WeakEntity, Window
+	LayoutId, PaintIndex, Pixels, PrepaintStateIndex, Render, Style, StyleRefinement, TextStyle, WeakEntity, Window
 };
 
 struct AnyViewState {

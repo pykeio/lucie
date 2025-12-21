@@ -16,17 +16,14 @@ use std::{
 
 use anyhow::{Context as _, anyhow};
 use derive_more::{Add, Deref, FromStr, Sub};
-pub use font_fallbacks::*;
-pub use font_features::*;
 use itertools::Itertools;
-pub use line::*;
-pub use line_layout::*;
-pub use line_wrapper::*;
+use lucie_common::SharedString;
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use rapidhash::fast::RapidHashMap;
 use smallvec::{SmallVec, smallvec};
 
-use crate::{Bounds, DevicePixels, Hsla, Pixels, PlatformTextSystem, Point, Result, SharedString, Size, StrikethroughStyle, UnderlineStyle, px};
+pub use self::{font_fallbacks::*, font_features::*, line::*, line_layout::*, line_wrapper::*};
+use crate::{Bounds, DevicePixels, Hsla, Pixels, PlatformTextSystem, Point, Result, Size, StrikethroughStyle, UnderlineStyle, px};
 
 /// An opaque identifier for a specific font.
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]

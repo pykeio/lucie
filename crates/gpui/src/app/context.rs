@@ -12,8 +12,7 @@ use futures_util::FutureExt;
 use super::{App, AsyncWindowContext, Entity, KeystrokeEvent};
 use crate::{
 	AnyView, AnyWindowHandle, AppContext, AsyncApp, DispatchPhase, Effect, EntityId, EventEmitter, FocusHandle, FocusOutEvent, Focusable, Global,
-	KeystrokeObserver, Priority, Reservation, SubscriberSet, Subscription, Task, WeakEntity, WeakFocusHandle, Window, WindowHandle,
-	util::{self, Deferred}
+	KeystrokeObserver, Priority, Reservation, SubscriberSet, Subscription, Task, WeakEntity, WeakFocusHandle, Window, WindowHandle
 };
 
 /// The app context, with specialized behavior for the given entity.
@@ -234,10 +233,10 @@ impl<'a, T: 'static> Context<'a, T> {
 	}
 
 	/// Run something using this entity and cx, when the returned struct is dropped
-	pub fn on_drop(&self, f: impl FnOnce(&mut T, &mut Context<T>) + 'static) -> Deferred<impl FnOnce()> {
+	pub fn on_drop(&self, f: impl FnOnce(&mut T, &mut Context<T>) + 'static) -> lucie_common::Deferred<impl FnOnce()> {
 		let this = self.weak_entity();
 		let mut cx = self.to_async();
-		util::defer(move || {
+		lucie_common::defer(move || {
 			this.update(&mut cx, f).ok();
 		})
 	}

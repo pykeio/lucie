@@ -4,10 +4,11 @@ use std::{
 };
 
 use image::Frame;
+use lucie_common::SharedString;
 use resvg::tiny_skia::Pixmap;
 use smallvec::SmallVec;
 
-use crate::{AssetSource, DevicePixels, IsZero, RenderImage, Result, SharedString, Size, swap_rgba_pa_to_bgra};
+use crate::{AssetSource, DevicePixels, IsZero, RenderImage, Result, Size, swap_rgba_pa_to_bgra};
 
 /// When rendering SVGs, we render them at twice the size to get a higher-quality result.
 pub const SMOOTH_SVG_SCALE_FACTOR: f32 = 2.;

@@ -9,12 +9,13 @@ use std::{
 };
 
 use backtrace::Backtrace;
+use lucie_common::post_inc;
 use parking::Unparker;
 use parking_lot::Mutex;
 use rand::prelude::*;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 
-use crate::{PlatformDispatcher, Priority, RunnableVariant, TaskLabel, util::post_inc};
+use crate::{PlatformDispatcher, Priority, RunnableVariant, TaskLabel};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TestDispatcherId(usize);

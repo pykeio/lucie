@@ -29,6 +29,7 @@ use font_kit::{
 	source::SystemSource,
 	sources::mem::MemSource
 };
+use lucie_common::SharedString;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use pathfinder_geometry::{
 	rect::{RectF, RectI},
@@ -41,8 +42,7 @@ use smallvec::SmallVec;
 use super::open_type::apply_features_and_fallbacks;
 use crate::{
 	Bounds, DevicePixels, Font, FontFallbacks, FontFeatures, FontId, FontMetrics, FontRun, FontStyle, FontWeight, GlyphId, LineLayout, Pixels,
-	PlatformTextSystem, Point, RenderGlyphParams, Result, SUBPIXEL_VARIANTS_X, ShapedGlyph, ShapedRun, SharedString, Size, point, px, size,
-	swap_rgba_pa_to_bgra
+	PlatformTextSystem, Point, RenderGlyphParams, Result, SUBPIXEL_VARIANTS_X, ShapedGlyph, ShapedRun, Size, point, px, size, swap_rgba_pa_to_bgra
 };
 
 #[allow(non_upper_case_globals)]

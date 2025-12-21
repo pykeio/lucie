@@ -1,10 +1,10 @@
 use std::rc::Rc;
 
+use lucie_common::SharedString;
 use smallvec::SmallVec;
 
 use crate::{
-	Action, AsKeystroke, DummyKeyboardMapper, InvalidKeystrokeError, KeyBindingContextPredicate, KeybindingKeystroke, Keystroke, PlatformKeyboardMapper,
-	SharedString
+	Action, AsKeystroke, DummyKeyboardMapper, InvalidKeystrokeError, KeyBindingContextPredicate, KeybindingKeystroke, Keystroke, PlatformKeyboardMapper
 };
 
 /// A keybinding and its associated metadata, from the keymap.

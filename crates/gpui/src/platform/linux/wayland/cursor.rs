@@ -1,4 +1,5 @@
 use anyhow::{Context as _, anyhow};
+use lucie_common::ResultExt as _;
 use wayland_client::{
 	Connection,
 	protocol::{wl_pointer::WlPointer, wl_shm::WlShm, wl_surface::WlSurface}
@@ -7,8 +8,7 @@ use wayland_cursor::{CursorImageBuffer, CursorTheme};
 
 use crate::{
 	Globals,
-	platform::linux::{DEFAULT_CURSOR_ICON_NAME, log_cursor_icon_warning},
-	util::ResultExt
+	platform::linux::{DEFAULT_CURSOR_ICON_NAME, log_cursor_icon_warning}
 };
 
 pub(crate) struct Cursor {

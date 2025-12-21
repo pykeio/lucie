@@ -1,25 +1,3 @@
-mod app_menu;
-mod keyboard;
-mod keystroke;
-
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
-mod linux;
-
-#[cfg(target_os = "macos")]
-mod mac;
-
-#[cfg(any(
-	all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
-	all(target_os = "macos", feature = "macos-blade")
-))]
-mod blade;
-
-#[cfg(any(test, feature = "test-support"))]
-mod test;
-
-#[cfg(target_os = "windows")]
-mod windows;
-
 use std::{
 	borrow::Cow,
 	fmt::{self, Debug},
@@ -34,33 +12,55 @@ use std::{
 };
 
 use anyhow::Result;
-pub use app_menu::*;
 use async_task::Runnable;
 use futures_channel::oneshot;
 use image::{AnimationDecoder as _, Frame, codecs::gif::GifDecoder};
+use lucie_common::SharedString;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+use smallvec::SmallVec;
+
+use crate::{
+	Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, Bounds, DEFAULT_WINDOW_SIZE, DevicePixels, DispatchEventResult, Font, FontId,
+	FontMetrics, FontRun, ForegroundExecutor, GlyphId, GpuSpecs, ImageSource, Keymap, LineLayout, Pixels, PlatformInput, Point, Priority, RealtimePriority,
+	RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Scene, ShapedGlyph, ShapedRun, Size, SvgRenderer, SystemWindowTab, TaskLabel,
+	TaskTiming, ThreadTaskTimings, Window, WindowControlArea, hash, point, px, size
+};
+
+mod app_menu;
+mod keyboard;
+mod keystroke;
+pub use app_menu::*;
 pub use keyboard::*;
 pub use keystroke::*;
+
+#[cfg(any(
+	all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
+	all(target_os = "macos", feature = "macos-blade")
+))]
+mod blade;
+
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+mod linux;
 #[cfg(all(target_os = "linux", feature = "wayland"))]
 pub use linux::layer_shell;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub(crate) use linux::*;
+
+#[cfg(target_os = "macos")]
+mod mac;
 #[cfg(target_os = "macos")]
 pub(crate) use mac::*;
-use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
-use smallvec::SmallVec;
+
+#[cfg(any(test, feature = "test-support"))]
+mod test;
 #[cfg(any(test, feature = "test-support"))]
 pub use test::TestDispatcher;
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) use test::*;
 #[cfg(target_os = "windows")]
+mod windows;
+#[cfg(target_os = "windows")]
 pub(crate) use windows::*;
-
-use crate::{
-	Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, Bounds, DEFAULT_WINDOW_SIZE, DevicePixels, DispatchEventResult, Font, FontId,
-	FontMetrics, FontRun, ForegroundExecutor, GlyphId, GpuSpecs, ImageSource, Keymap, LineLayout, Pixels, PlatformInput, Point, Priority, RealtimePriority,
-	RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Scene, ShapedGlyph, ShapedRun, SharedString, Size, SvgRenderer, SystemWindowTab,
-	TaskLabel, TaskTiming, ThreadTaskTimings, Window, WindowControlArea, hash, point, px, size
-};
 
 /// Returns a background executor for the current platform.
 pub fn background_executor() -> BackgroundExecutor {

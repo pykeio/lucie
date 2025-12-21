@@ -9,10 +9,11 @@ use calloop::{
 	channel::{self, Sender},
 	timer::TimeoutAction
 };
+use lucie_common::ResultExt as _;
 
 use crate::{
 	GLOBAL_THREAD_TIMINGS, PlatformDispatcher, Priority, PriorityQueueReceiver, PriorityQueueSender, RealtimePriority, RunnableVariant, THREAD_TIMINGS,
-	TaskLabel, TaskTiming, ThreadTaskTimings, profiler, util::ResultExt
+	TaskLabel, TaskTiming, ThreadTaskTimings, profiler
 };
 
 struct TimerAfter {

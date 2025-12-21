@@ -77,8 +77,10 @@ path = "src/gpui.rs"
 doctest = false
 
 [dependencies]
+lucie-common.workspace = true
+lucie-macros.workspace = true
+
 anyhow.workspace = true
-arrayvec.workspace = true
 async-task = "4.7"
 backtrace = { workspace = true, optional = true }
 bitflags = { workspace = true, optional = true }
@@ -95,7 +97,6 @@ futures-channel.workspace = true
 futures-io.workspace = true
 futures-lite.workspace = true
 tokio = { workspace = true, features = [ "rt", "rt-multi-thread", "time", "sync" ] }
-gpui_macros.workspace = true
 image.workspace = true
 inventory.workspace = true
 itertools.workspace = true
@@ -106,7 +107,6 @@ parking_lot.workspace = true
 profiling.workspace = true
 rand.workspace = true
 raw-window-handle = "0.6"
-derive_refineable.workspace = true
 resvg = { version = "0.45.0", default-features = false, features = [
     "text",
     "system-fonts",
@@ -123,12 +123,10 @@ thiserror.workspace = true
 waker-fn = "1.2.0"
 lyon = "1.0"
 libc.workspace = true
-pin-project-lite = "0.2"
 circular-buffer.workspace = true
 bytes.workspace = true
 http.workspace = true
 http-body.workspace = true
-indexmap.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block = "0.1"

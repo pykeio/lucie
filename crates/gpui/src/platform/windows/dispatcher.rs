@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Context;
+use lucie_common::ResultExt;
 use windows::{
 	System::Threading::{ThreadPool, ThreadPoolTimer, TimerElapsedHandler, WorkItemHandler, WorkItemPriority},
 	Win32::{
@@ -18,7 +19,7 @@ use windows::{
 
 use crate::{
 	GLOBAL_THREAD_TIMINGS, HWND, PlatformDispatcher, Priority, PriorityQueueSender, RealtimePriority, RunnableVariant, SafeHwnd, THREAD_TIMINGS, TaskLabel,
-	TaskTiming, ThreadTaskTimings, WM_GPUI_TASK_DISPATCHED_ON_MAIN_THREAD, profiler, util::ResultExt
+	TaskTiming, ThreadTaskTimings, WM_GPUI_TASK_DISPATCHED_ON_MAIN_THREAD, profiler
 };
 
 pub(crate) struct WindowsDispatcher {

@@ -5,12 +5,13 @@ use std::{
 	sync::Arc
 };
 
+use lucie_common::SharedString;
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use rapidhash::fast::RapidHashMap;
 use smallvec::SmallVec;
 
 use super::LineWrapper;
-use crate::{FontId, GlyphId, Pixels, PlatformTextSystem, Point, SharedString, Size, point, px};
+use crate::{FontId, GlyphId, Pixels, PlatformTextSystem, Point, Size, point, px};
 
 /// A laid out and styled line of text
 #[derive(Default, Debug)]

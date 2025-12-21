@@ -6,9 +6,10 @@ use std::{
 };
 
 use image::{Delay, Frame};
+use lucie_common::SharedString;
 use smallvec::SmallVec;
 
-use crate::{DevicePixels, Pixels, Result, SharedString, Size, size};
+use crate::{DevicePixels, Pixels, Result, Size, size};
 
 /// A source of assets for this app to use.
 pub trait AssetSource: 'static + Send + Sync {

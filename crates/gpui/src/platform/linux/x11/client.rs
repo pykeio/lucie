@@ -14,6 +14,7 @@ use calloop::{
 	generic::{FdWrapper, Generic}
 };
 use log::Level;
+use lucie_common::ResultExt as _;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use smallvec::SmallVec;
 use x11rb::{
@@ -57,7 +58,7 @@ use crate::{
 		}
 	},
 	point, profiler, px,
-	util::{ResultExt as _, file_url_to_path},
+	util::file_url_to_path,
 	xcb_flush
 };
 

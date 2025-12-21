@@ -32,9 +32,7 @@ pub mod prelude;
 mod profiler;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod queue;
-mod refineable;
 mod scene;
-mod shared_string;
 mod shared_uri;
 mod style;
 mod styled;
@@ -65,6 +63,8 @@ mod seal {
 	pub trait Sealed {}
 }
 
+pub extern crate lucie_common as common;
+pub extern crate lucie_macros as macros;
 use std::{any::Any, future::Future};
 
 pub use action::*;
@@ -80,19 +80,18 @@ pub use elements::*;
 pub use executor::*;
 pub use geometry::*;
 pub use global::*;
-pub use gpui_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};
 pub use input::*;
 pub use interactive::*;
 use key_dispatch::{DispatchActionListener, DispatchNodeId, DispatchTree, Replay};
 pub use keymap::*;
+pub use lucie_common::refineable;
+pub use lucie_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};
 pub use path_builder::*;
 pub use platform::*;
 pub use profiler::*;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub(crate) use queue::{PriorityQueueReceiver, PriorityQueueSender};
-pub use refineable::*;
 pub use scene::*;
-pub use shared_string::*;
 pub use shared_uri::*;
 pub use smol::Timer;
 pub use style::*;
@@ -105,7 +104,6 @@ pub use taffy::{AvailableSpace, LayoutId};
 #[cfg(any(test, feature = "test-support"))]
 pub use test::*;
 pub use text_system::*;
-pub use util::{ArcCow, Deferred, defer};
 pub use view::*;
 pub use window::*;
 
@@ -243,24 +241,6 @@ where
 	{
 		self.borrow_mut().default_global::<G>();
 		self.update_global(f)
-	}
-}
-
-/// A flatten equivalent for anyhow `Result`s.
-pub trait Flatten<T> {
-	/// Convert this type into a simple `Result<T>`.
-	fn flatten(self) -> Result<T>;
-}
-
-impl<T> Flatten<T> for Result<Result<T>> {
-	fn flatten(self) -> Result<T> {
-		self?
-	}
-}
-
-impl<T> Flatten<T> for Result<T> {
-	fn flatten(self) -> Result<T> {
-		self
 	}
 }
 

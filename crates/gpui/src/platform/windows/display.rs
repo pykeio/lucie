@@ -4,6 +4,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use lucie_common::ResultExt;
 use smallvec::SmallVec;
 use windows::{
 	Win32::{
@@ -17,7 +18,7 @@ use windows::{
 	core::*
 };
 
-use crate::{Bounds, DevicePixels, DisplayId, Pixels, PlatformDisplay, logical_point, point, size, util::ResultExt};
+use crate::{Bounds, DevicePixels, DisplayId, Pixels, PlatformDisplay, logical_point, point, size};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct WindowsDisplay {

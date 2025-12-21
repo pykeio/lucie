@@ -2,14 +2,14 @@ use std::ffi::c_void;
 
 use anyhow::Result;
 use core_graphics::display::CGDirectDisplayID;
+use lucie_common::ResultExt as _;
 
 use crate::{
 	dispatch_get_main_queue,
 	dispatch_sys::{
 		_dispatch_source_type_data_add, dispatch_resume, dispatch_set_context, dispatch_source_cancel, dispatch_source_create, dispatch_source_merge_data,
 		dispatch_source_set_event_handler_f, dispatch_source_t, dispatch_suspend
-	},
-	util::ResultExt
+	}
 };
 
 pub struct DisplayLink {

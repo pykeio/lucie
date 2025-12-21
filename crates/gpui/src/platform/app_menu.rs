@@ -1,4 +1,6 @@
-use crate::{Action, App, Platform, SharedString, util::ResultExt};
+use lucie_common::{ResultExt as _, SharedString};
+
+use crate::{Action, App, Platform};
 
 /// A menu of the application, either a main menu or a submenu
 pub struct Menu {

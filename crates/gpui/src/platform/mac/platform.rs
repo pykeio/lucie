@@ -4,7 +4,7 @@ use std::{
 	ffi::{CStr, OsStr, c_void},
 	os::{raw::c_char, unix::ffi::OsStrExt},
 	path::{Path, PathBuf},
-	ptr,
+	ptr::{self, null_mut},
 	rc::Rc,
 	slice, str,
 	sync::{Arc, OnceLock}
@@ -32,6 +32,7 @@ use core_foundation::{
 use ctor::ctor;
 use futures_channel::oneshot;
 use itertools::Itertools;
+use lucie_common::ResultExt as _;
 use objc::{
 	class,
 	declare::ClassDecl,
@@ -40,7 +41,6 @@ use objc::{
 	sel, sel_impl
 };
 use parking_lot::Mutex;
-use ptr::null_mut;
 use semver::Version;
 
 use super::{
@@ -52,8 +52,7 @@ use super::{
 use crate::{
 	Action, AnyWindowHandle, BackgroundExecutor, ClipboardEntry, ClipboardItem, ClipboardString, CursorStyle, ForegroundExecutor, Image, ImageFormat,
 	KeyContext, Keymap, MacDispatcher, MacDisplay, MacWindow, Menu, MenuItem, OsMenu, OwnedMenu, PathPromptOptions, Platform, PlatformDisplay,
-	PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PlatformWindow, Result, SystemMenuType, Task, WindowAppearance, WindowParams, hash,
-	util::ResultExt
+	PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PlatformWindow, Result, SystemMenuType, Task, WindowAppearance, WindowParams, hash
 };
 
 #[allow(non_upper_case_globals)]

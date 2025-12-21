@@ -1,11 +1,9 @@
 use std::fmt::Debug;
 
+use lucie_common::sum_tree::{Bias, SumTree};
 use rapidhash::fast::RapidHashMap;
 
-use crate::{
-	FocusHandle, FocusId,
-	util::sum_tree::{Bias, SumTree}
-};
+use crate::{FocusHandle, FocusId};
 
 /// Represents a collection of focus handles using the tab-index APIs.
 #[derive(Debug)]
@@ -198,8 +196,9 @@ impl TabStopMap {
 }
 
 mod sum_tree_impl {
+	use lucie_common::sum_tree::{self, SeekTarget};
+
 	use super::{TabStopNode, TabStopPath};
-	use crate::util::sum_tree::{self, SeekTarget};
 
 	#[derive(Clone, Debug)]
 	pub struct TabStopOrderNodeSummary {

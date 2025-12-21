@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use itertools::Itertools;
+use lucie_common::ResultExt;
 use windows::{
 	Win32::{
 		Foundation::HMODULE,
@@ -14,8 +15,6 @@ use windows::{
 	},
 	core::Interface
 };
-
-use crate::util::ResultExt;
 
 pub(crate) fn try_to_recover_from_device_lost<T>(mut f: impl FnMut() -> Result<T>) -> Result<T> {
 	(0..5)

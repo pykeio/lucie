@@ -26,6 +26,7 @@ use cocoa::{
 use core_graphics::display::{CGDirectDisplayID, CGPoint, CGRect};
 use ctor::ctor;
 use futures_channel::oneshot;
+use lucie_common::{ResultExt as _, SharedString};
 use objc::{
 	class,
 	declare::ClassDecl,
@@ -41,9 +42,8 @@ use super::{BoolExt, MacDisplay, NSRange, NSStringExt, ns_string, renderer};
 use crate::{
 	AnyWindowHandle, Bounds, Capslock, DisplayLink, ExternalPaths, FileDropEvent, ForegroundExecutor, KeyDownEvent, Keystroke, Modifiers,
 	ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformWindow,
-	Point, PromptButton, PromptLevel, RequestFrameOptions, SharedString, Size, SystemWindowTab, Timer, WindowAppearance, WindowBackgroundAppearance,
-	WindowBounds, WindowControlArea, WindowKind, WindowParams, dispatch_get_main_queue, dispatch_sys::dispatch_async_f, platform::PlatformInputHandler, point,
-	px, size, util::ResultExt
+	Point, PromptButton, PromptLevel, RequestFrameOptions, Size, SystemWindowTab, Timer, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
+	WindowControlArea, WindowKind, WindowParams, dispatch_get_main_queue, dispatch_sys::dispatch_async_f, platform::PlatformInputHandler, point, px, size
 };
 
 const WINDOW_STATE_IVAR: &str = "windowState";

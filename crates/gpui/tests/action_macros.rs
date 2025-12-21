@@ -1,5 +1,5 @@
 use gpui::{Action, actions};
-use gpui_macros::register_action;
+use lucie_macros::register_action;
 
 #[test]
 fn test_action_macros() {

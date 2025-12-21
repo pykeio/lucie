@@ -6,7 +6,7 @@ use std::{
 	rc::Rc
 };
 
-use crate::util::post_inc;
+use lucie_common::post_inc;
 
 pub(crate) struct SubscriberSet<EmitterKey, Callback>(Rc<RefCell<SubscriberSetState<EmitterKey, Callback>>>);
 
