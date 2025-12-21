@@ -3,6 +3,8 @@
 #![allow(unused_mut)] // False positives in platform specific code
 #![warn(clippy::wildcard_imports)]
 
+use std::{any::Any, future::Future};
+
 extern crate self as gpui;
 
 #[macro_use]
@@ -65,7 +67,6 @@ mod seal {
 
 pub extern crate lucie_common as common;
 pub extern crate lucie_macros as macros;
-use std::{any::Any, future::Future};
 
 pub use action::*;
 pub use anyhow::Result;
@@ -84,7 +85,10 @@ pub use input::*;
 pub use interactive::*;
 use key_dispatch::{DispatchActionListener, DispatchNodeId, DispatchTree, Replay};
 pub use keymap::*;
-pub use lucie_common::refineable;
+pub use lucie_common::{
+	SharedString,
+	refineable::{self, Refineable}
+};
 pub use lucie_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};
 pub use path_builder::*;
 pub use platform::*;

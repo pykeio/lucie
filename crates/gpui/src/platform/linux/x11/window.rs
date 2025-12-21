@@ -2,7 +2,7 @@ use std::{cell::RefCell, ffi::c_void, fmt::Display, num::NonZeroU32, ops::Div, p
 
 use anyhow::{Context as _, anyhow};
 use blade_graphics as gpu;
-use lucie_common::ResultExt as _;
+use lucie_common::{ResultExt as _, trys};
 use raw_window_handle as rwh;
 use x11rb::{
 	connection::{Connection, RequestConnection},
@@ -22,7 +22,7 @@ use super::{X11Display, XINPUT_ALL_DEVICE_GROUPS, XINPUT_ALL_DEVICES};
 use crate::{
 	AnyWindowHandle, Bounds, Decorations, DevicePixels, ForegroundExecutor, GpuSpecs, Modifiers, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
 	PlatformInputHandler, PlatformWindow, Point, PromptButton, PromptLevel, RequestFrameOptions, ResizeEdge, ScaledPixels, Scene, Size, Tiling,
-	WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations, WindowKind, WindowParams, X11ClientStatePtr, maybe,
+	WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowDecorations, WindowKind, WindowParams, X11ClientStatePtr,
 	platform::blade::{BladeContext, BladeRenderer, BladeSurfaceConfig},
 	px, size
 };
@@ -442,7 +442,7 @@ impl X11WindowState {
 		)?;
 
 		// Collect errors during setup, so that window can be destroyed on failure.
-		let setup_result = maybe!({
+		let setup_result = trys!({
 			let pid = std::process::id();
 			check_reply(
 				|| "X11 ChangeProperty for _NET_WM_PID failed.",
@@ -648,7 +648,7 @@ impl Drop for X11Window {
 		let mut state = self.0.state.borrow_mut();
 		state.renderer.destroy();
 
-		let destroy_x_window = maybe!({
+		let destroy_x_window = trys!({
 			check_reply(|| "X11 DestroyWindow failure.", self.0.xcb.destroy_window(self.0.x_window))?;
 			xcb_flush(&self.0.xcb);
 

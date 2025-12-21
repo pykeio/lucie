@@ -721,7 +721,7 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 
 	log::trace!("Started serve requests thread.");
 
-	let _guard = crate::util::defer(|| {
+	let _guard = lucie_common::defer(|| {
 		context.serve_stopped.store(true, Ordering::Relaxed);
 	});
 
