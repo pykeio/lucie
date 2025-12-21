@@ -13,8 +13,7 @@ use calloop::{
 	EventLoop, LoopHandle, RegistrationToken,
 	generic::{FdWrapper, Generic}
 };
-use log::Level;
-use lucie_common::ResultExt as _;
+use lucie_common::{LogLevel, ResultExt as _};
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use smallvec::SmallVec;
 use x11rb::{
@@ -1340,7 +1339,7 @@ impl LinuxClient for X11Client {
 			.clipboard
 			.set_text(std::borrow::Cow::Owned(item.text().unwrap_or_default()), clipboard::ClipboardKind::Primary, clipboard::WaitConfig::None)
 			.context("X11 Failed to write to clipboard (primary)")
-			.log_with_level(log::Level::Debug);
+			.log_with_level(LogLevel::DEBUG);
 	}
 
 	fn write_to_clipboard(&self, item: crate::ClipboardItem) {
@@ -1349,7 +1348,7 @@ impl LinuxClient for X11Client {
 			.clipboard
 			.set_text(std::borrow::Cow::Owned(item.text().unwrap_or_default()), clipboard::ClipboardKind::Clipboard, clipboard::WaitConfig::None)
 			.context("X11: Failed to write to clipboard (clipboard)")
-			.log_with_level(log::Level::Debug);
+			.log_with_level(LogLevel::DEBUG);
 		state.clipboard_item.replace(item);
 	}
 
@@ -1359,7 +1358,7 @@ impl LinuxClient for X11Client {
 			.clipboard
 			.get_any(clipboard::ClipboardKind::Primary)
 			.context("X11: Failed to read from clipboard (primary)")
-			.log_with_level(log::Level::Debug)
+			.log_with_level(LogLevel::DEBUG)
 	}
 
 	fn read_from_clipboard(&self) -> Option<crate::ClipboardItem> {
@@ -1373,7 +1372,7 @@ impl LinuxClient for X11Client {
 			.clipboard
 			.get_any(clipboard::ClipboardKind::Clipboard)
 			.context("X11: Failed to read from clipboard (clipboard)")
-			.log_with_level(log::Level::Debug)
+			.log_with_level(LogLevel::DEBUG)
 	}
 
 	fn run(&self) {
@@ -1622,12 +1621,12 @@ fn check_compositor_present(xcb_connection: &XCBConnection, root: u32) -> bool {
 	// Method 1: Check for _NET_WM_CM_S{root}
 	let atom_name = format!("_NET_WM_CM_S{}", root);
 	let atom1 = get_reply(|| format!("Failed to intern {atom_name}"), xcb_connection.intern_atom(false, atom_name.as_bytes()));
-	let method1 = match atom1.log_with_level(Level::Debug) {
+	let method1 = match atom1.log_with_level(LogLevel::DEBUG) {
 		Some(reply) if reply.atom != x11rb::NONE => {
 			let atom = reply.atom;
 			get_reply(|| format!("Failed to get {atom_name} owner"), xcb_connection.get_selection_owner(atom))
 				.map(|reply| reply.owner != 0)
-				.log_with_level(Level::Debug)
+				.log_with_level(LogLevel::DEBUG)
 				.unwrap_or(false)
 		}
 		_ => false
@@ -1636,7 +1635,7 @@ fn check_compositor_present(xcb_connection: &XCBConnection, root: u32) -> bool {
 	// Method 2: Check for _NET_WM_CM_OWNER
 	let atom_name = "_NET_WM_CM_OWNER";
 	let atom2 = get_reply(|| format!("Failed to intern {atom_name}"), xcb_connection.intern_atom(false, atom_name.as_bytes()));
-	let method2 = match atom2.log_with_level(Level::Debug) {
+	let method2 = match atom2.log_with_level(LogLevel::DEBUG) {
 		Some(reply) if reply.atom != x11rb::NONE => {
 			let atom = reply.atom;
 			get_reply(|| format!("Failed to get {atom_name}"), xcb_connection.get_property(false, root, atom, xproto::AtomEnum::WINDOW, 0, 1))
@@ -1649,7 +1648,7 @@ fn check_compositor_present(xcb_connection: &XCBConnection, root: u32) -> bool {
 	// Method 3: Check for _NET_SUPPORTING_WM_CHECK
 	let atom_name = "_NET_SUPPORTING_WM_CHECK";
 	let atom3 = get_reply(|| format!("Failed to intern {atom_name}"), xcb_connection.intern_atom(false, atom_name.as_bytes()));
-	let method3 = match atom3.log_with_level(Level::Debug) {
+	let method3 = match atom3.log_with_level(LogLevel::DEBUG) {
 		Some(reply) if reply.atom != x11rb::NONE => {
 			let atom = reply.atom;
 			get_reply(|| format!("Failed to get {atom_name}"), xcb_connection.get_property(false, root, atom, xproto::AtomEnum::WINDOW, 0, 1))
@@ -1667,7 +1666,7 @@ fn check_compositor_present(xcb_connection: &XCBConnection, root: u32) -> bool {
 fn check_gtk_frame_extents_supported(xcb_connection: &XCBConnection, atoms: &XcbAtoms, root: xproto::Window) -> bool {
 	let Some(supported_atoms) =
 		get_reply(|| "Failed to get _NET_SUPPORTED", xcb_connection.get_property(false, root, atoms._NET_SUPPORTED, xproto::AtomEnum::ATOM, 0, 1024))
-			.log_with_level(Level::Debug)
+			.log_with_level(LogLevel::DEBUG)
 	else {
 		return false;
 	};
@@ -1693,7 +1692,7 @@ fn xdnd_is_atom_supported(atom: u32, atoms: &XcbAtoms) -> bool {
 fn xdnd_get_supported_atom(xcb_connection: &XCBConnection, supported_atoms: &XcbAtoms, target: xproto::Window) -> u32 {
 	if let Some(reply) =
 		get_reply(|| "Failed to get XDnD supported atoms", xcb_connection.get_property(false, target, supported_atoms.XdndTypeList, AtomEnum::ANY, 0, 1024))
-			.log_with_level(Level::Warn)
+			.log_with_level(LogLevel::WARN)
 		&& let Some(atoms) = reply.value32()
 	{
 		for atom in atoms {

@@ -1,6 +1,6 @@
 use std::{fmt, panic::Location};
 
-use tracing::Level;
+pub use tracing::Level as LogLevel;
 
 /// `Result::flatten` for Rust 1.88.
 pub trait Flatten<T, E> {
@@ -27,7 +27,7 @@ pub trait ResultExt<E> {
 	type Ok;
 
 	fn log_err(self) -> Option<Self::Ok>;
-	fn log_with_level(self, level: Level) -> Option<Self::Ok>;
+	fn log_with_level(self, level: LogLevel) -> Option<Self::Ok>;
 }
 
 impl<T, E> ResultExt<E> for Result<T, E>
@@ -38,11 +38,11 @@ where
 
 	#[track_caller]
 	fn log_err(self) -> Option<T> {
-		self.log_with_level(Level::ERROR)
+		self.log_with_level(LogLevel::ERROR)
 	}
 
 	#[track_caller]
-	fn log_with_level(self, level: Level) -> Option<T> {
+	fn log_with_level(self, level: LogLevel) -> Option<T> {
 		match self {
 			Ok(value) => Some(value),
 			Err(error) => {
@@ -53,7 +53,7 @@ where
 	}
 }
 
-fn log_error_with_caller<E>(caller: Location<'static>, error: E, level: Level)
+fn log_error_with_caller<E>(caller: Location<'static>, error: E, level: LogLevel)
 where
 	E: fmt::Debug
 {
@@ -76,19 +76,19 @@ where
 	let file = file.map(|(_, file)| format!("crates/{file}"));
 
 	match level {
-		Level::TRACE => {
+		LogLevel::TRACE => {
 			tracing::trace!(file = caller.file(), line = caller.line(), path = file.as_deref(), target = module_path.as_deref().unwrap_or(""), "{:?}", error)
 		}
-		Level::DEBUG => {
+		LogLevel::DEBUG => {
 			tracing::debug!(file = caller.file(), line = caller.line(), path = file.as_deref(), target = module_path.as_deref().unwrap_or(""), "{:?}", error)
 		}
-		Level::INFO => {
+		LogLevel::INFO => {
 			tracing::info!(file = caller.file(), line = caller.line(), path = file.as_deref(), target = module_path.as_deref().unwrap_or(""), "{:?}", error)
 		}
-		Level::WARN => {
+		LogLevel::WARN => {
 			tracing::warn!(file = caller.file(), line = caller.line(), path = file.as_deref(), target = module_path.as_deref().unwrap_or(""), "{:?}", error)
 		}
-		Level::ERROR => {
+		LogLevel::ERROR => {
 			tracing::error!(file = caller.file(), line = caller.line(), path = file.as_deref(), target = module_path.as_deref().unwrap_or(""), "{:?}", error)
 		}
 	}

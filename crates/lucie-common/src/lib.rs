@@ -19,7 +19,7 @@ mod trys;
 pub use self::{
 	arc_cow::ArcCow,
 	defer::{Deferred, defer},
-	result_ext::{Flatten, ResultExt},
+	result_ext::{Flatten, LogLevel, ResultExt},
 	shared_string::SharedString
 };
 
