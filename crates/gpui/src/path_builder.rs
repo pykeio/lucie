@@ -1,16 +1,12 @@
 use anyhow::Error;
-use etagere::euclid::Vector2D;
 use lucie_common::geometry::{Pixels, Point, point, px};
-use lyon::{
+use lyon_tessellation::{
+	BuffersBuilder, FillTessellator, FillVertex, StrokeTessellator, StrokeVertex, VertexBuffers,
 	geom::Angle,
-	math::{Vector, vector},
-	path::{ArcFlags, Polygon, traits::SvgPathBuilder},
-	tessellation::{BuffersBuilder, FillTessellator, FillVertex, StrokeTessellator, StrokeVertex, VertexBuffers}
+	math::{Point as LyonPoint, Vector, point as lyon_point, vector},
+	path::{self, ArcFlags, Polygon, traits::SvgPathBuilder}
 };
-pub use lyon::{
-	math::Transform,
-	tessellation::{FillOptions, FillRule, StrokeOptions}
-};
+pub use lyon_tessellation::{FillOptions, FillRule, StrokeOptions, math::Transform};
 
 use crate::Path;
 
@@ -24,15 +20,15 @@ pub enum PathStyle {
 
 /// A [`Path`] builder.
 pub struct PathBuilder {
-	raw: lyon::path::builder::WithSvg<lyon::path::BuilderImpl>,
-	transform: Option<lyon::math::Transform>,
+	raw: path::builder::WithSvg<path::BuilderImpl>,
+	transform: Option<Transform>,
 	/// PathStyle of the PathBuilder
 	pub style: PathStyle,
 	dash_array: Option<Vec<Pixels>>
 }
 
-impl From<lyon::path::Builder> for PathBuilder {
-	fn from(builder: lyon::path::Builder) -> Self {
+impl From<lyon_tessellation::path::Builder> for PathBuilder {
+	fn from(builder: lyon_tessellation::path::Builder) -> Self {
 		Self {
 			raw: builder.with_svg(),
 			..Default::default()
@@ -40,18 +36,18 @@ impl From<lyon::path::Builder> for PathBuilder {
 	}
 }
 
-impl From<lyon::path::builder::WithSvg<lyon::path::BuilderImpl>> for PathBuilder {
-	fn from(raw: lyon::path::builder::WithSvg<lyon::path::BuilderImpl>) -> Self {
+impl From<path::builder::WithSvg<path::BuilderImpl>> for PathBuilder {
+	fn from(raw: path::builder::WithSvg<path::BuilderImpl>) -> Self {
 		Self { raw, ..Default::default() }
 	}
 }
 
-fn point_from_lyon(p: lyon::math::Point) -> Point<Pixels> {
+fn point_from_lyon(p: LyonPoint) -> Point<Pixels> {
 	point(px(p.x), px(p.y))
 }
 
-fn point_to_lyon(p: Point<Pixels>) -> lyon::math::Point {
-	lyon::math::point(p.x.0, p.y.0)
+fn point_to_lyon(p: Point<Pixels>) -> LyonPoint {
+	lyon_point(p.x.0, p.y.0)
 }
 
 fn point_to_vector(p: Point<Pixels>) -> Vector {
@@ -61,7 +57,7 @@ fn point_to_vector(p: Point<Pixels>) -> Vector {
 impl Default for PathBuilder {
 	fn default() -> Self {
 		Self {
-			raw: lyon::path::Path::builder().with_svg(),
+			raw: path::Path::builder().with_svg(),
 			style: PathStyle::Fill(FillOptions::default()),
 			transform: None,
 			dash_array: None
@@ -166,7 +162,7 @@ impl PathBuilder {
 	#[inline]
 	pub fn translate(&mut self, to: Point<Pixels>) {
 		if let Some(transform) = self.transform {
-			self.transform = Some(transform.then_translate(Vector2D::new(to.x.0, to.y.0)));
+			self.transform = Some(transform.then_translate(Vector::new(to.x.0, to.y.0)));
 		} else {
 			self.transform = Some(Transform::translation(to.x.0, to.y.0))
 		}
@@ -210,9 +206,9 @@ impl PathBuilder {
 		}
 	}
 
-	fn tessellate_fill(path: &lyon::path::Path, options: &FillOptions) -> Result<Path<Pixels>, Error> {
+	fn tessellate_fill(path: &path::Path, options: &FillOptions) -> Result<Path<Pixels>, Error> {
 		// Will contain the result of the tessellation.
-		let mut buf: VertexBuffers<lyon::math::Point, u16> = VertexBuffers::new();
+		let mut buf: VertexBuffers<LyonPoint, u16> = VertexBuffers::new();
 		let mut tessellator = FillTessellator::new();
 
 		// Compute the tessellation.
@@ -221,11 +217,11 @@ impl PathBuilder {
 		Ok(Self::build_path(buf))
 	}
 
-	fn tessellate_stroke(dash_array: Option<Vec<Pixels>>, path: &lyon::path::Path, options: &StrokeOptions) -> Result<Path<Pixels>, Error> {
+	fn tessellate_stroke(dash_array: Option<Vec<Pixels>>, path: &path::Path, options: &StrokeOptions) -> Result<Path<Pixels>, Error> {
 		let path = if let Some(dash_array) = dash_array {
-			let measurements = lyon::algorithms::measure::PathMeasurements::from_path(path, 0.01);
-			let mut sampler = measurements.create_sampler(path, lyon::algorithms::measure::SampleType::Normalized);
-			let mut builder = lyon::path::Path::builder();
+			let measurements = lyon_algorithms::measure::PathMeasurements::from_path(path, 0.01);
+			let mut sampler = measurements.create_sampler(path, lyon_algorithms::measure::SampleType::Normalized);
+			let mut builder = path::Path::builder();
 
 			let total_length = sampler.length();
 			let dash_array_len = dash_array.len();
@@ -249,7 +245,7 @@ impl PathBuilder {
 		};
 
 		// Will contain the result of the tessellation.
-		let mut buf: VertexBuffers<lyon::math::Point, u16> = VertexBuffers::new();
+		let mut buf: VertexBuffers<LyonPoint, u16> = VertexBuffers::new();
 		let mut tessellator = StrokeTessellator::new();
 
 		// Compute the tessellation.
@@ -259,7 +255,7 @@ impl PathBuilder {
 	}
 
 	/// Builds a [`Path`] from a [`lyon::tessellation::VertexBuffers`].
-	pub fn build_path(buf: VertexBuffers<lyon::math::Point, u16>) -> Path<Pixels> {
+	pub fn build_path(buf: VertexBuffers<LyonPoint, u16>) -> Path<Pixels> {
 		if buf.vertices.is_empty() {
 			return Path::new(Point::default());
 		}

@@ -127,7 +127,8 @@ taffy = { version = "0.9", default-features = false, features = [
 ] }
 thiserror.workspace = true
 waker-fn = "1.2.0"
-lyon = "1.0"
+lyon_tessellation = "1.0"
+lyon_algorithms = "1.0"
 libc.workspace = true
 circular-buffer.workspace = true
 bytes.workspace = true

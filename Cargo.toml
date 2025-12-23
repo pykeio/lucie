@@ -52,7 +52,6 @@ cocoa-foundation = "=0.2.0"
 core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.4.3", features = ["metal"] }
-crossbeam = "0.8.4"
 ctor = { version = "0.6", default-features = false, features = [ "proc_macro" ]}
 derive_more = "0.99.17"
 env_logger = "0.11"
