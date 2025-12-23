@@ -2,7 +2,11 @@ use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
-use lucie_common::{ResultExt, SharedString};
+use lucie_common::{
+	ResultExt, SharedString,
+	color::Rgba,
+	geometry::{Bounds, DevicePixels, Pixels, Point, Size, bounds, point, px, size}
+};
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use rapidhash::fast::RapidHashMap;
 use windows::{

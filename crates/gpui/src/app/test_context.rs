@@ -3,13 +3,14 @@ use std::{cell::RefCell, future::Future, ops::Deref, rc::Rc, sync::Arc, time::Du
 use anyhow::{anyhow, bail};
 use futures_channel::{mpsc, oneshot};
 use futures_util::{Stream, StreamExt};
+use lucie_common::geometry::{Bounds, Pixels, Point, Size};
 use rand::{SeedableRng, rngs::StdRng};
 
 use crate::{
-	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace, BackgroundExecutor, BorrowAppContext, Bounds, Capslock,
-	ClipboardItem, DrawPhase, Drawable, Element, Empty, EventEmitter, ForegroundExecutor, Global, InputEvent, Keystroke, Modifiers, ModifiersChangedEvent,
-	MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Platform, Point, Render, Result, Size, Task, TestDispatcher, TestPlatform, TestWindow,
-	TextSystem, VisualContext, Window, WindowBounds, WindowHandle, WindowOptions, app::GpuiMode, http::FakeHttpClient
+	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace, BackgroundExecutor, BorrowAppContext, Capslock, ClipboardItem,
+	DrawPhase, Drawable, Element, Empty, EventEmitter, ForegroundExecutor, Global, InputEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton,
+	MouseDownEvent, MouseMoveEvent, MouseUpEvent, Platform, Render, Result, Task, TestDispatcher, TestPlatform, TestWindow, TextSystem, VisualContext, Window,
+	WindowBounds, WindowHandle, WindowOptions, app::GpuiMode, http::FakeHttpClient
 };
 
 /// A TestAppContext is provided to tests created with `#[gpui::test]`, it provides
@@ -204,7 +205,7 @@ impl TestAppContext {
 		let mut cx = self.app.borrow_mut();
 
 		// Some tests rely on the window size matching the bounds of the test display
-		let bounds = Bounds::maximized(None, &cx);
+		let bounds = cx.primary_display().unwrap().bounds();
 		cx.open_window(
 			WindowOptions {
 				window_bounds: Some(WindowBounds::Windowed(bounds)),
@@ -218,7 +219,7 @@ impl TestAppContext {
 	/// Adds a new window with no content.
 	pub fn add_empty_window(&mut self) -> &mut VisualTestContext {
 		let mut cx = self.app.borrow_mut();
-		let bounds = Bounds::maximized(None, &cx);
+		let bounds = cx.primary_display().unwrap().bounds();
 		let window = cx
 			.open_window(
 				WindowOptions {
@@ -243,7 +244,7 @@ impl TestAppContext {
 		V: 'static + Render
 	{
 		let mut cx = self.app.borrow_mut();
-		let bounds = Bounds::maximized(None, &cx);
+		let bounds = cx.primary_display().unwrap().bounds();
 		let window = cx
 			.open_window(
 				WindowOptions {
@@ -711,7 +712,7 @@ impl VisualTestContext {
 	pub fn draw<E>(
 		&mut self,
 		origin: Point<Pixels>,
-		space: impl Into<Size<AvailableSpace>>,
+		space: Size<AvailableSpace>,
 		f: impl FnOnce(&mut Window, &mut App) -> E
 	) -> (E::RequestLayoutState, E::PrepaintState)
 	where

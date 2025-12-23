@@ -10,13 +10,14 @@
 use std::{cell::RefCell, collections::VecDeque, ops::Range, rc::Rc};
 
 use lucie_common::{
+	geometry::{Bounds, Edges, Pixels, Point, Size, point, px, size},
 	refineable::Refineable as _,
 	sum_tree::{self, Bias, Dimensions, SumTree}
 };
 
 use crate::{
-	AnyElement, App, AvailableSpace, Bounds, ContentMask, DispatchPhase, Edges, Element, EntityId, FocusHandle, GlobalElementId, Hitbox, HitboxBehavior,
-	IntoElement, Overflow, Pixels, Point, ScrollDelta, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, Window, point, px, size
+	AnyElement, App, AvailableSpace, ContentMask, DispatchPhase, Element, EntityId, FocusHandle, GlobalElementId, Hitbox, HitboxBehavior, IntoElement,
+	Overflow, ScrollDelta, ScrollWheelEvent, Style, StyleRefinement, Styled, Window
 };
 
 type RenderItemFn = dyn FnMut(usize, &mut Window, &mut App) -> AnyElement + 'static;
@@ -923,7 +924,7 @@ impl Element for List {
 	fn paint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
-		bounds: Bounds<crate::Pixels>,
+		bounds: Bounds<Pixels>,
 		_: &mut Self::RequestLayoutState,
 		prepaint: &mut Self::PrepaintState,
 		window: &mut Window,
@@ -1039,15 +1040,14 @@ impl sum_tree::SeekTarget<'_, ListItemSummary, ListItemSummary> for Height {
 
 #[cfg(test)]
 mod test {
+	use lucie_common::geometry::{point, px, size};
 
-	use gpui::{ScrollDelta, ScrollWheelEvent};
-
-	use crate::{self as gpui, TestAppContext};
+	use crate::{
+		AppContext, AvailableSpace, Context, Element, IntoElement, ListState, Render, ScrollDelta, ScrollWheelEvent, Styled, TestAppContext, Window, div, list
+	};
 
 	#[gpui::test]
 	fn test_reset_after_paint_before_scroll(cx: &mut TestAppContext) {
-		use crate::{AppContext, Context, Element, IntoElement, ListState, Render, Styled, Window, div, list, point, px, size};
-
 		let cx = cx.add_empty_window();
 
 		let state = ListState::new(5, crate::ListAlignment::Top, px(10.));
@@ -1063,7 +1063,7 @@ mod test {
 		}
 
 		// Paint
-		cx.draw(point(px(0.), px(0.)), size(px(100.), px(20.)), |_, cx| cx.new(|_| TestView(state.clone())));
+		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(20.))), |_, cx| cx.new(|_| TestView(state.clone())));
 
 		// Reset
 		state.reset(5);
@@ -1082,8 +1082,6 @@ mod test {
 
 	#[gpui::test]
 	fn test_scroll_by_positive_and_negative_distance(cx: &mut TestAppContext) {
-		use crate::{AppContext, Context, Element, IntoElement, ListState, Render, Styled, Window, div, list, point, px, size};
-
 		let cx = cx.add_empty_window();
 
 		let state = ListState::new(5, crate::ListAlignment::Top, px(10.));
@@ -1096,7 +1094,7 @@ mod test {
 		}
 
 		// Paint
-		cx.draw(point(px(0.), px(0.)), size(px(100.), px(100.)), |_, cx| cx.new(|_| TestView(state.clone())));
+		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(100.))), |_, cx| cx.new(|_| TestView(state.clone())));
 
 		// Test positive distance: start at item 1, move down 30px
 		state.scroll_by(px(30.));

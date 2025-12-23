@@ -2,8 +2,8 @@ use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use gpui::{
-	App, Application, AssetSource, Bounds, BoxShadow, ClickEvent, Context, SharedString, Task, Window, WindowBounds, WindowOptions, div, hsla, img, point,
-	prelude::*, px, rgb, size, svg
+	App, Application, AssetSource, BoxShadow, ClickEvent, Context, SharedString, Task, Window, WindowBounds, WindowOptions, div, hsla, img, point, prelude::*,
+	px, rgb, size, svg
 };
 
 struct Assets {
@@ -146,10 +146,9 @@ fn main() {
 			base: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples")
 		})
 		.run(|cx: &mut App| {
-			let bounds = Bounds::centered(None, size(px(500.0), px(500.0)), cx);
 			cx.open_window(
 				WindowOptions {
-					window_bounds: Some(WindowBounds::Windowed(bounds)),
+					window_bounds: Some(WindowBounds::centered(size(px(500.0), px(500.0)), cx)),
 					..Default::default()
 				},
 				|window, cx| cx.new(|cx| HelloWorld::new(window, cx))

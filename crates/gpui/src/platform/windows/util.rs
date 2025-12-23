@@ -1,7 +1,10 @@
 use std::sync::OnceLock;
 
 use anyhow::Context;
-use lucie_common::ResultExt;
+use lucie_common::{
+	ResultExt,
+	geometry::{Pixels, Point, px}
+};
 use windows::{
 	UI::{
 		Color,

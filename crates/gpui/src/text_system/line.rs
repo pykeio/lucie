@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use derive_more::{Deref, DerefMut};
-use lucie_common::SharedString;
+use lucie_common::{
+	SharedString,
+	color::{Hsla, black},
+	geometry::{Bounds, Half, Pixels, Point, point, px, size}
+};
 use smallvec::SmallVec;
 
-use crate::{
-	App, Bounds, Half, Hsla, LineLayout, Pixels, Point, Result, StrikethroughStyle, TextAlign, UnderlineStyle, Window, WrapBoundary, WrappedLineLayout, black,
-	fill, point, px, size
-};
+use crate::{App, LineLayout, Result, StrikethroughStyle, TextAlign, UnderlineStyle, Window, WrapBoundary, WrappedLineLayout, fill};
 
 /// Set the text decoration for a run of text.
 #[derive(Debug, Clone)]

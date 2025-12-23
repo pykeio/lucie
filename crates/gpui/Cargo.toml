@@ -118,7 +118,14 @@ slotmap.workspace = true
 smallvec.workspace = true
 smol.workspace = true
 stacksafe.workspace = true
-taffy = "=0.9.0"
+taffy = { version = "0.9", default-features = false, features = [
+	"std",
+	"taffy_tree",
+	"flexbox",
+	"grid",
+	"block_layout",
+	"content_size"
+] }
 thiserror.workspace = true
 waker-fn = "1.2.0"
 lyon = "1.0"

@@ -1,6 +1,8 @@
 use std::ops::Range;
 
-use crate::{App, Bounds, Context, Entity, InputHandler, Pixels, UTF16Selection, Window};
+use lucie_common::geometry::{Bounds, Pixels, Point};
+
+use crate::{App, Context, Entity, InputHandler, UTF16Selection, Window};
 
 /// Implement this trait to allow views to handle textual input when implementing an editor, field, etc.
 ///
@@ -45,7 +47,7 @@ pub trait EntityInputHandler: 'static + Sized {
 	) -> Option<Bounds<Pixels>>;
 
 	/// See [`InputHandler::character_index_for_point`] for details
-	fn character_index_for_point(&mut self, point: crate::Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) -> Option<usize>;
+	fn character_index_for_point(&mut self, point: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) -> Option<usize>;
 
 	/// See [`InputHandler::accepts_text_input`] for details
 	fn accepts_text_input(&self, _window: &mut Window, _cx: &mut Context<Self>) -> bool {
@@ -110,7 +112,7 @@ impl<V: EntityInputHandler> InputHandler for ElementInputHandler<V> {
 			.update(cx, |view, cx| view.bounds_for_range(range_utf16, self.element_bounds, window, cx))
 	}
 
-	fn character_index_for_point(&mut self, point: crate::Point<Pixels>, window: &mut Window, cx: &mut App) -> Option<usize> {
+	fn character_index_for_point(&mut self, point: Point<Pixels>, window: &mut Window, cx: &mut App) -> Option<usize> {
 		self.view.update(cx, |view, cx| view.character_index_for_point(point, window, cx))
 	}
 

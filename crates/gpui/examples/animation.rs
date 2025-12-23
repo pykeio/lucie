@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use anyhow::Result;
 use gpui::{
-	Animation, AnimationExt as _, App, Application, AssetSource, Bounds, Context, SharedString, Transformation, Window, WindowBounds, WindowOptions, bounce,
-	div, ease_in_out, percentage, prelude::*, px, size, svg
+	Animation, AnimationExt as _, App, Application, AssetSource, Context, SharedString, Transformation, Window, WindowBounds, WindowOptions, bounce, div,
+	ease_in_out, percentage, prelude::*, px, size, svg
 };
 
 struct Assets {}
@@ -86,7 +86,7 @@ impl Render for AnimationExample {
 fn main() {
 	Application::new().with_assets(Assets {}).run(|cx: &mut App| {
 		let options = WindowOptions {
-			window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(300.), px(300.)), cx))),
+			window_bounds: Some(WindowBounds::centered(size(px(300.), px(300.)), cx)),
 			..Default::default()
 		};
 		cx.open_window(options, |_, cx| {

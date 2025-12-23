@@ -1,5 +1,6 @@
 use std::{fmt::Debug, ops::Range};
 
+use lucie_common::geometry::{AbsoluteLength, Bounds, DefiniteLength, Edges, GridPlacement, Length, Pixels, Point, Size, point, size};
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use stacksafe::{StackSafe, stacksafe};
 use taffy::{
@@ -9,7 +10,7 @@ use taffy::{
 	tree::NodeId
 };
 
-use crate::{AbsoluteLength, App, Bounds, DefiniteLength, Edges, Length, Pixels, Point, Size, Style, Window, point, size};
+use crate::{App, Style, Window};
 
 type NodeMeasureFn = StackSafe<Box<dyn FnMut(Size<Option<Pixels>>, Size<AvailableSpace>, &mut Window, &mut App) -> Size<Pixels>>>;
 
@@ -153,7 +154,7 @@ impl TaffyLayoutEngine {
 		let available_space = size(transform(available_space.width), transform(available_space.height));
 
 		self.taffy
-			.compute_layout_with_measure(id.into(), available_space.into(), |known_dimensions, available_space, _id, node_context, _style| {
+			.compute_layout_with_measure(id.into(), size_to_taffy(available_space), |known_dimensions, available_space, _id, node_context, _style| {
 				let Some(node_context) = node_context else {
 					return taffy::geometry::Size::default();
 				};
@@ -163,7 +164,7 @@ impl TaffyLayoutEngine {
 					height: known_dimensions.height.map(|e| Pixels(e / scale_factor))
 				};
 
-				let available_space: Size<AvailableSpace> = available_space.into();
+				let available_space: Size<AvailableSpace> = size_from_taffy(available_space);
 				let untransform = |ev: AvailableSpace| match ev {
 					AvailableSpace::Definite(pixels) => AvailableSpace::Definite(Pixels(pixels.0 / scale_factor)),
 					AvailableSpace::MinContent => AvailableSpace::MinContent,
@@ -172,7 +173,7 @@ impl TaffyLayoutEngine {
 				let available_space = size(untransform(available_space.width), untransform(available_space.height));
 
 				let a: Size<Pixels> = (node_context.measure)(known_dimensions, available_space, window, cx);
-				size(a.width.0 * scale_factor, a.height.0 * scale_factor).into()
+				size_to_taffy(size(a.width.0 * scale_factor, a.height.0 * scale_factor))
 			})
 			.expect(EXPECT_MESSAGE);
 	}
@@ -236,10 +237,10 @@ impl ToTaffy<taffy::style::Style> for Style {
 	fn to_taffy(&self, rem_size: Pixels, scale_factor: f32) -> taffy::style::Style {
 		use taffy::style_helpers::{fr, length, minmax, repeat};
 
-		fn to_grid_line(placement: &Range<crate::GridPlacement>) -> taffy::Line<taffy::GridPlacement> {
+		fn to_grid_line(placement: &Range<GridPlacement>) -> taffy::Line<taffy::GridPlacement> {
 			taffy::Line {
-				start: placement.start.into(),
-				end: placement.end.into()
+				start: grid_placement_to_taffy(placement.start),
+				end: grid_placement_to_taffy(placement.end)
 			}
 		}
 
@@ -251,7 +252,7 @@ impl ToTaffy<taffy::style::Style> for Style {
 
 		taffy::style::Style {
 			display: self.display.into(),
-			overflow: self.overflow.into(),
+			overflow: point_to_taffy(self.overflow),
 			scrollbar_width: self.scrollbar_width.to_taffy(rem_size, scale_factor),
 			position: self.position.into(),
 			inset: self.inset.to_taffy(rem_size, scale_factor),
@@ -388,23 +389,11 @@ impl ToTaffy<taffy::style::LengthPercentage> for AbsoluteLength {
 	}
 }
 
-impl<T, T2> From<TaffyPoint<T>> for Point<T2>
+fn point_to_taffy<T, U>(point: Point<T>) -> TaffyPoint<U>
 where
-	T: Into<T2>,
-	T2: Clone + Debug + Default + PartialEq
+	T: Into<U> + Clone + Debug + Default + PartialEq
 {
-	fn from(point: TaffyPoint<T>) -> Point<T2> {
-		Point { x: point.x.into(), y: point.y.into() }
-	}
-}
-
-impl<T, T2> From<Point<T>> for TaffyPoint<T2>
-where
-	T: Into<T2> + Clone + Debug + Default + PartialEq
-{
-	fn from(val: Point<T>) -> Self {
-		TaffyPoint { x: val.x.into(), y: val.y.into() }
-	}
+	TaffyPoint { x: point.x.into(), y: point.y.into() }
 }
 
 impl<T, U> ToTaffy<TaffySize<U>> for Size<T>
@@ -433,28 +422,32 @@ where
 	}
 }
 
-impl<T, U> From<TaffySize<T>> for Size<U>
+fn size_from_taffy<T, U>(size: TaffySize<T>) -> Size<U>
 where
 	T: Into<U>,
 	U: Clone + Debug + Default + PartialEq
 {
-	fn from(taffy_size: TaffySize<T>) -> Self {
-		Size {
-			width: taffy_size.width.into(),
-			height: taffy_size.height.into()
-		}
+	Size {
+		width: size.width.into(),
+		height: size.height.into()
 	}
 }
 
-impl<T, U> From<Size<T>> for TaffySize<U>
+fn size_to_taffy<T, U>(size: Size<T>) -> TaffySize<U>
 where
 	T: Into<U> + Clone + Debug + Default + PartialEq
 {
-	fn from(size: Size<T>) -> Self {
-		TaffySize {
-			width: size.width.into(),
-			height: size.height.into()
-		}
+	TaffySize {
+		width: size.width.into(),
+		height: size.height.into()
+	}
+}
+
+fn grid_placement_to_taffy(placement: GridPlacement) -> taffy::GridPlacement {
+	match placement {
+		GridPlacement::Auto => taffy::GridPlacement::Auto,
+		GridPlacement::Line(l) => taffy::GridPlacement::Line(l.into()),
+		GridPlacement::Span(s) => taffy::GridPlacement::Span(s)
 	}
 }
 
@@ -490,6 +483,13 @@ impl AvailableSpace {
 			height: Self::MinContent
 		}
 	}
+
+	pub fn from_definite(size: Size<Pixels>) -> Size<AvailableSpace> {
+		Size {
+			width: AvailableSpace::Definite(size.width),
+			height: AvailableSpace::Definite(size.height)
+		}
+	}
 }
 
 impl From<AvailableSpace> for TaffyAvailableSpace {
@@ -515,14 +515,5 @@ impl From<TaffyAvailableSpace> for AvailableSpace {
 impl From<Pixels> for AvailableSpace {
 	fn from(pixels: Pixels) -> Self {
 		AvailableSpace::Definite(pixels)
-	}
-}
-
-impl From<Size<Pixels>> for Size<AvailableSpace> {
-	fn from(size: Size<Pixels>) -> Self {
-		Size {
-			width: AvailableSpace::Definite(size.width),
-			height: AvailableSpace::Definite(size.height)
-		}
 	}
 }

@@ -4,13 +4,17 @@ use std::{
 	ops::Range
 };
 
-use lucie_common::{SharedString, refineable::Refineable};
-
-use crate::{
-	AbsoluteLength, App, Background, BackgroundTag, BorderStyle, Bounds, ContentMask, Corners, CornersRefinement, CursorStyle, DefiniteLength, DevicePixels,
-	Edges, EdgesRefinement, Font, FontFallbacks, FontFeatures, FontStyle, FontWeight, GridLocation, Hsla, Length, Pixels, Point, PointRefinement, Rgba, Size,
-	SizeRefinement, Styled, TextRun, Window, black, phi, point, quad, rems, size
+use lucie_common::{
+	SharedString,
+	color::{Background, BackgroundTag, Hsla, Rgba, black},
+	geometry::{
+		AbsoluteLength, Bounds, Corners, CornersRefinement, DefiniteLength, DevicePixels, Edges, EdgesRefinement, GridLocation, Length, Pixels, Point,
+		PointRefinement, Size, SizeRefinement, phi, point, rems, size
+	},
+	refineable::Refineable
 };
+
+use crate::{App, BorderStyle, ContentMask, CursorStyle, Font, FontFallbacks, FontFeatures, FontStyle, FontWeight, Styled, TextRun, Window, quad};
 
 /// Use this struct for interfacing with the 'debug_below' styling from your own elements.
 /// If a parent element has this style set on it, then this struct will be set as a global in
@@ -559,7 +563,7 @@ impl Style {
 
 		#[cfg(debug_assertions)]
 		if self.debug || cx.has_global::<DebugBelow>() {
-			window.paint_quad(crate::outline(bounds, crate::red(), BorderStyle::default()));
+			window.paint_quad(crate::outline(bounds, lucie_common::color::red(), BorderStyle::default()));
 		}
 
 		let rem_size = window.rem_size();
@@ -1170,8 +1174,12 @@ impl From<Position> for taffy::style::Position {
 
 #[cfg(test)]
 mod tests {
+	use lucie_common::{
+		color::{blue, green, red, yellow},
+		geometry::px
+	};
+
 	use super::*;
-	use crate::{blue, green, px, red, yellow};
 
 	#[test]
 	fn test_basic_highlight_style_combination() {
@@ -1210,7 +1218,7 @@ mod tests {
 			color: Some(blue().alpha(0.7)),
 			strikethrough: Some(StrikethroughStyle {
 				thickness: px(4.),
-				color: Some(crate::red())
+				color: Some(lucie_common::color::red())
 			}),
 			fade_out: Some(0.),
 			font_style: Some(FontStyle::Oblique),

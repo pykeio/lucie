@@ -377,7 +377,7 @@ fn main() {
 		cx.open_window(
 			WindowOptions {
 				focus: true,
-				window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1280.0), px(1000.0)), cx))),
+				window_bounds: Some(WindowBounds::centered(size(px(1280.0), px(1000.0)), cx)),
 				..Default::default()
 			},
 			|_, cx| {

@@ -8,8 +8,14 @@ use std::{
 	time::Instant
 };
 
+// needed to make #[derive(Refineable)] work
+extern crate self as lucie_common;
+
 mod arc_cow;
+mod arena;
+pub mod color;
 mod defer;
+pub mod geometry;
 pub mod refineable;
 mod result_ext;
 mod shared_string;
@@ -18,6 +24,7 @@ mod trys;
 
 pub use self::{
 	arc_cow::ArcCow,
+	arena::{Arena, ArenaBox},
 	defer::{Deferred, defer},
 	result_ext::{Flatten, LogLevel, ResultExt},
 	shared_string::SharedString

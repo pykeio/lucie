@@ -39,10 +39,12 @@ use std::{
 };
 
 use derive_more::{Deref, DerefMut};
-
-use crate::{
-	App, ArenaBox, AvailableSpace, Bounds, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Pixels, Point, Size, Style, Window
+use lucie_common::{
+	ArenaBox,
+	geometry::{Bounds, Pixels, Point, Size}
 };
+
+use crate::{App, AvailableSpace, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Style, Window};
 
 /// Implemented by types that participate in laying out and painting the contents of a window.
 /// Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.

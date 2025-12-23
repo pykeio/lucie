@@ -6,12 +6,13 @@
 
 use std::{cell::RefCell, cmp, ops::Range, rc::Rc, usize};
 
+use lucie_common::geometry::{Bounds, IsZero, Pixels, Point, Size, point, size};
 use smallvec::SmallVec;
 
 use super::ListHorizontalSizingBehavior;
 use crate::{
-	AnyElement, App, AvailableSpace, Bounds, ContentMask, Element, ElementId, Entity, GlobalElementId, Hitbox, InteractiveElement, Interactivity, IntoElement,
-	IsZero, LayoutId, ListSizingBehavior, Overflow, Pixels, Point, ScrollHandle, Size, StyleRefinement, Styled, Window, point, size
+	AnyElement, App, AvailableSpace, ContentMask, Element, ElementId, Entity, GlobalElementId, Hitbox, InteractiveElement, Interactivity, IntoElement,
+	LayoutId, ListSizingBehavior, Overflow, ScrollHandle, StyleRefinement, Styled, Window
 };
 
 /// uniform_list provides lazy rendering for a set of items that are of uniform height.
@@ -445,7 +446,7 @@ impl Element for UniformList {
 	fn paint(
 		&mut self,
 		global_id: Option<&GlobalElementId>,
-		bounds: Bounds<crate::Pixels>,
+		bounds: Bounds<Pixels>,
 		request_layout: &mut Self::RequestLayoutState,
 		hitbox: &mut Option<Hitbox>,
 		window: &mut Window,
@@ -590,13 +591,13 @@ impl InteractiveElement for UniformList {
 
 #[cfg(test)]
 mod test {
-	use crate::TestAppContext;
+	use lucie_common::geometry::px;
+
+	use crate::{Context, FocusHandle, ScrollStrategy, TestAppContext, UniformListScrollHandle, Window, div, prelude::*, uniform_list};
 
 	#[gpui::test]
 	fn test_scroll_strategy_nearest(cx: &mut TestAppContext) {
 		use std::ops::Range;
-
-		use crate::{Context, FocusHandle, ScrollStrategy, UniformListScrollHandle, Window, div, prelude::*, px, uniform_list};
 
 		crate::actions!(example, [SelectNext, SelectPrev]);
 

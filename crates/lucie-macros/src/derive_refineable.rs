@@ -446,7 +446,7 @@ pub fn derive_refineable(input: TokenStream) -> TokenStream {
 			}
 		}
 
-		impl #impl_generics ::gpui::refineable::IsEmpty for #refinement_ident #ty_generics
+		impl #impl_generics ::lucie_common::refineable::IsEmpty for #refinement_ident #ty_generics
 			#where_clause
 		{
 			fn is_empty(&self) -> bool {

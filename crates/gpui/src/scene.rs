@@ -8,10 +8,12 @@ use std::{
 	slice
 };
 
-use crate::{
-	AtlasTextureId, AtlasTile, Background, Bounds, ContentMask, Corners, Edges, Hsla, Pixels, Point, Radians, ScaledPixels, Size, bounds_tree::BoundsTree,
-	point
+use lucie_common::{
+	color::{Background, Hsla},
+	geometry::{Bounds, Corners, Edges, Pixels, Point, Radians, ScaledPixels, Size, point}
 };
+
+use crate::{AtlasTextureId, AtlasTile, ContentMask, bounds_tree::BoundsTree};
 
 #[allow(non_camel_case_types, unused)]
 pub(crate) type PathVertex_ScaledPixels = PathVertex<ScaledPixels>;

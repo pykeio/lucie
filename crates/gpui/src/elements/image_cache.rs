@@ -1,12 +1,15 @@
 use std::{collections::HashMap, fmt, sync::Arc};
 
 use futures_util::{FutureExt, future::Shared};
-use lucie_common::refineable::Refineable;
+use lucie_common::{
+	geometry::{Bounds, Pixels},
+	refineable::Refineable
+};
 use smallvec::SmallVec;
 
 use crate::{
-	AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, Bounds, Element, ElementId, Entity, GlobalElementId, ImageAssetLoader, ImageCacheError,
-	IntoElement, LayoutId, ParentElement, Pixels, RenderImage, Resource, Style, StyleRefinement, Styled, Task, Window, hash
+	AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, Element, ElementId, Entity, GlobalElementId, ImageAssetLoader, ImageCacheError, IntoElement,
+	LayoutId, ParentElement, RenderImage, Resource, Style, StyleRefinement, Styled, Task, Window, hash
 };
 
 /// An image cache element, all its child img elements will use the cache specified by this element.

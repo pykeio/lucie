@@ -1,5 +1,5 @@
 use gpui::{
-	Application, Background, Bounds, ColorSpace, Context, Path, PathBuilder, Pixels, Render, TitlebarOptions, Window, WindowBounds, WindowOptions, canvas, div,
+	Application, Background, ColorSpace, Context, Path, PathBuilder, Pixels, Render, TitlebarOptions, Window, WindowBounds, WindowOptions, canvas, div,
 	linear_color_stop, linear_gradient, point, prelude::*, px, rgb, size
 };
 
@@ -71,7 +71,7 @@ fn main() {
 					..Default::default()
 				}),
 				focus: true,
-				window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT), cx))),
+				window_bounds: Some(WindowBounds::centered(size(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT), cx)),
 				..Default::default()
 			},
 			|window, cx| cx.new(|cx| PaintingViewer::new(window, cx))

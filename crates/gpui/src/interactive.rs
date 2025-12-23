@@ -1,8 +1,9 @@
 use std::{any::Any, fmt::Debug, ops::Deref, path::PathBuf};
 
+use lucie_common::geometry::{Bounds, Pixels, Point, point};
 use smallvec::SmallVec;
 
-use crate::{Bounds, Capslock, Context, Empty, IntoElement, Keystroke, Modifiers, Pixels, Point, Render, Window, point, seal::Sealed};
+use crate::{Capslock, Keystroke, Modifiers, seal::Sealed};
 
 /// An event from a platform input source.
 pub trait InputEvent: Sealed + 'static {
@@ -495,13 +496,6 @@ impl ExternalPaths {
 	/// Convert this collection of paths into a slice.
 	pub fn paths(&self) -> &[PathBuf] {
 		&self.0
-	}
-}
-
-impl Render for ExternalPaths {
-	fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-		// the platform will render icons for the dragged files
-		Empty
 	}
 }
 

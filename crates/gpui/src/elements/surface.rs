@@ -1,8 +1,11 @@
 #[cfg(target_os = "macos")]
 use core_video::pixel_buffer::CVPixelBuffer;
-use lucie_common::refineable::Refineable;
+use lucie_common::{
+	geometry::{Bounds, Pixels},
+	refineable::Refineable
+};
 
-use crate::{App, Bounds, Element, ElementId, GlobalElementId, IntoElement, LayoutId, ObjectFit, Pixels, Style, StyleRefinement, Styled, Window};
+use crate::{App, Element, ElementId, GlobalElementId, IntoElement, LayoutId, ObjectFit, Style, StyleRefinement, Styled, Window};
 
 /// A source of a surface's content.
 #[derive(Clone, Debug, PartialEq, Eq)]

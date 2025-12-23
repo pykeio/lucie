@@ -3,8 +3,6 @@ use std::{
 	hash::{Hash, Hasher}
 };
 
-use anyhow::{Context as _, bail};
-
 /// Convert an RGB hex color code number to a color type
 pub fn rgb(hex: u32) -> Rgba {
 	let [_, r, g, b] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
@@ -18,7 +16,7 @@ pub fn rgba(hex: u32) -> Rgba {
 }
 
 /// Swap from RGBA with premultiplied alpha to BGRA
-pub(crate) fn swap_rgba_pa_to_bgra(color: &mut [u8]) {
+pub fn swap_rgba_pa_to_bgra(color: &mut [u8]) {
 	color.swap(0, 2);
 	if color[3] > 0 {
 		let a = color[3] as f32 / 255.;
@@ -44,7 +42,11 @@ pub struct Rgba {
 
 impl fmt::Debug for Rgba {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "rgba({:#010x})", u32::from(*self))
+		let r = (self.r * 255.0) as u32;
+		let g = (self.g * 255.0) as u32;
+		let b = (self.b * 255.0) as u32;
+		let a = (self.a * 255.0) as u32;
+		write!(f, "rgba({r}, {g}, {b}, {a})")
 	}
 }
 
@@ -106,45 +108,50 @@ impl From<Hsla> for Rgba {
 	}
 }
 
+#[derive(Debug, Clone)]
+pub enum RgbaComponent {
+	R,
+	G,
+	B,
+	A
+}
+
+#[derive(Debug, Clone)]
+pub enum RgbaParseError {
+	InvalidFormat,
+	BadComponent(RgbaComponent)
+}
+
+impl fmt::Display for RgbaParseError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::InvalidFormat => f.write_str("invalid format; expected #RGB, #RGBA, #RRGGBB, or #RRGGBBAA"),
+			Self::BadComponent(c) => f.write_fmt(format_args!("invalid component {c:?}"))
+		}
+	}
+}
+
+impl std::error::Error for RgbaParseError {}
+
 impl TryFrom<&'_ str> for Rgba {
-	type Error = anyhow::Error;
+	type Error = RgbaParseError;
 
 	fn try_from(value: &'_ str) -> Result<Self, Self::Error> {
-		const RGB: usize = "rgb".len();
-		const RGBA: usize = "rgba".len();
-		const RRGGBB: usize = "rrggbb".len();
-		const RRGGBBAA: usize = "rrggbbaa".len();
-
-		const EXPECTED_FORMATS: &str = "Expected #rgb, #rgba, #rrggbb, or #rrggbbaa";
-		const INVALID_UNICODE: &str = "invalid unicode characters in color";
-
 		let Some(("", hex)) = value.trim().split_once('#') else {
-			bail!("invalid RGBA hex color: '{value}'. {EXPECTED_FORMATS}");
+			return Err(RgbaParseError::InvalidFormat);
 		};
 
 		let (r, g, b, a) = match hex.len() {
-			RGB | RGBA => {
-				let r = u8::from_str_radix(
-					hex.get(0..1)
-						.with_context(|| format!("{INVALID_UNICODE}: r component of #rgb/#rgba for value: '{value}'"))?,
-					16
-				)?;
-				let g = u8::from_str_radix(
-					hex.get(1..2)
-						.with_context(|| format!("{INVALID_UNICODE}: g component of #rgb/#rgba for value: '{value}'"))?,
-					16
-				)?;
-				let b = u8::from_str_radix(
-					hex.get(2..3)
-						.with_context(|| format!("{INVALID_UNICODE}: b component of #rgb/#rgba for value: '{value}'"))?,
-					16
-				)?;
-				let a = if hex.len() == RGBA {
-					u8::from_str_radix(
-						hex.get(3..4)
-							.with_context(|| format!("{INVALID_UNICODE}: a component of #rgba for value: '{value}'"))?,
-						16
-					)?
+			3 | 4 => {
+				let r = u8::from_str_radix(hex.get(0..1).ok_or(RgbaParseError::BadComponent(RgbaComponent::R))?, 16)
+					.map_err(|_| RgbaParseError::BadComponent(RgbaComponent::R))?;
+				let g = u8::from_str_radix(hex.get(1..2).ok_or(RgbaParseError::BadComponent(RgbaComponent::G))?, 16)
+					.map_err(|_| RgbaParseError::BadComponent(RgbaComponent::G))?;
+				let b = u8::from_str_radix(hex.get(2..3).ok_or(RgbaParseError::BadComponent(RgbaComponent::B))?, 16)
+					.map_err(|_| RgbaParseError::BadComponent(RgbaComponent::B))?;
+				let a = if hex.len() == 4 {
+					u8::from_str_radix(hex.get(3..4).ok_or(RgbaParseError::BadComponent(RgbaComponent::A))?, 16)
+						.map_err(|_| RgbaParseError::BadComponent(RgbaComponent::A))?
 				} else {
 					0xf
 				};
@@ -157,34 +164,22 @@ impl TryFrom<&'_ str> for Rgba {
 
 				(duplicate(r), duplicate(g), duplicate(b), duplicate(a))
 			}
-			RRGGBB | RRGGBBAA => {
-				let r = u8::from_str_radix(
-					hex.get(0..2)
-						.with_context(|| format!("{}: r component of #rrggbb/#rrggbbaa for value: '{}'", INVALID_UNICODE, value))?,
-					16
-				)?;
-				let g = u8::from_str_radix(
-					hex.get(2..4)
-						.with_context(|| format!("{INVALID_UNICODE}: g component of #rrggbb/#rrggbbaa for value: '{value}'"))?,
-					16
-				)?;
-				let b = u8::from_str_radix(
-					hex.get(4..6)
-						.with_context(|| format!("{INVALID_UNICODE}: b component of #rrggbb/#rrggbbaa for value: '{value}'"))?,
-					16
-				)?;
-				let a = if hex.len() == RRGGBBAA {
-					u8::from_str_radix(
-						hex.get(6..8)
-							.with_context(|| format!("{INVALID_UNICODE}: a component of #rrggbbaa for value: '{value}'"))?,
-						16
-					)?
+			6 | 8 => {
+				let r = u8::from_str_radix(hex.get(0..2).ok_or(RgbaParseError::BadComponent(RgbaComponent::R))?, 16)
+					.map_err(|_| RgbaParseError::BadComponent(RgbaComponent::R))?;
+				let g = u8::from_str_radix(hex.get(2..4).ok_or(RgbaParseError::BadComponent(RgbaComponent::G))?, 16)
+					.map_err(|_| RgbaParseError::BadComponent(RgbaComponent::G))?;
+				let b = u8::from_str_radix(hex.get(4..6).ok_or(RgbaParseError::BadComponent(RgbaComponent::B))?, 16)
+					.map_err(|_| RgbaParseError::BadComponent(RgbaComponent::B))?;
+				let a = if hex.len() == 8 {
+					u8::from_str_radix(hex.get(6..8).ok_or(RgbaParseError::BadComponent(RgbaComponent::A))?, 16)
+						.map_err(|_| RgbaParseError::BadComponent(RgbaComponent::A))?
 				} else {
 					0xff
 				};
 				(r, g, b, a)
 			}
-			_ => bail!("invalid RGBA hex color: '{value}'. {EXPECTED_FORMATS}")
+			_ => return Err(RgbaParseError::InvalidFormat)
 		};
 
 		Ok(Rgba {
@@ -523,7 +518,7 @@ impl From<Rgba> for Hsla {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
-pub(crate) enum BackgroundTag {
+pub enum BackgroundTag {
 	Solid = 0,
 	LinearGradient = 1,
 	PatternSlash = 2
@@ -557,11 +552,11 @@ impl Display for ColorSpace {
 #[derive(Clone, Copy, PartialEq)]
 #[repr(C)]
 pub struct Background {
-	pub(crate) tag: BackgroundTag,
-	pub(crate) color_space: ColorSpace,
-	pub(crate) solid: Hsla,
-	pub(crate) gradient_angle_or_pattern_height: f32,
-	pub(crate) colors: [LinearColorStop; 2],
+	pub tag: BackgroundTag,
+	pub color_space: ColorSpace,
+	pub solid: Hsla,
+	pub gradient_angle_or_pattern_height: f32,
+	pub colors: [LinearColorStop; 2],
 	/// Padding for alignment for repr(C) layout.
 	pad: u32
 }

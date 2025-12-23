@@ -4,6 +4,7 @@ use std::{
 };
 
 pub use easing::*;
+use lucie_common::geometry::{Bounds, Pixels};
 use smallvec::SmallVec;
 
 use crate::{AnyElement, App, Element, ElementId, GlobalElementId, IntoElement, Window};
@@ -162,7 +163,7 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
 	fn prepaint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
-		_bounds: crate::Bounds<crate::Pixels>,
+		_bounds: Bounds<Pixels>,
 		element: &mut Self::RequestLayoutState,
 		window: &mut Window,
 		cx: &mut App
@@ -173,7 +174,7 @@ impl<E: IntoElement + 'static> Element for AnimationElement<E> {
 	fn paint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
-		_bounds: crate::Bounds<crate::Pixels>,
+		_bounds: Bounds<Pixels>,
 		element: &mut Self::RequestLayoutState,
 		_: &mut Self::PrepaintState,
 		window: &mut Window,

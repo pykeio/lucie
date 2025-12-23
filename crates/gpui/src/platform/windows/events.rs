@@ -1,7 +1,10 @@
 use std::rc::Rc;
 
 use anyhow::Context as _;
-use lucie_common::ResultExt;
+use lucie_common::{
+	ResultExt,
+	geometry::{DevicePixels, Point, Size, point, size}
+};
 use windows::{
 	Win32::{
 		Foundation::*,

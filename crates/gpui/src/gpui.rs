@@ -10,18 +10,14 @@ extern crate self as gpui;
 #[macro_use]
 mod action;
 mod app;
-
-mod arena;
 mod asset_cache;
 mod assets;
 mod bounds_tree;
-mod color;
 /// The default colors used by GPUI.
 pub mod colors;
 mod element;
 mod elements;
 mod executor;
-mod geometry;
 mod global;
 pub mod http;
 mod input;
@@ -71,15 +67,12 @@ pub extern crate lucie_macros as macros;
 pub use action::*;
 pub use anyhow::Result;
 pub use app::*;
-pub(crate) use arena::{Arena, ArenaBox};
 pub use asset_cache::*;
 pub use assets::*;
-pub use color::*;
 pub use ctor::ctor;
 pub use element::*;
 pub use elements::*;
 pub use executor::*;
-pub use geometry::*;
 pub use global::*;
 pub use input::*;
 pub use interactive::*;
@@ -87,6 +80,8 @@ use key_dispatch::{DispatchActionListener, DispatchNodeId, DispatchTree, Replay}
 pub use keymap::*;
 pub use lucie_common::{
 	SharedString,
+	color::*,
+	geometry::*,
 	refineable::{self, Refineable}
 };
 pub use lucie_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};

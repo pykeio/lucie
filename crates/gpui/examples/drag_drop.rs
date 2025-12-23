@@ -1,4 +1,4 @@
-use gpui::{App, Application, Bounds, Context, Half, Hsla, Pixels, Point, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb, size};
+use gpui::{App, Application, Context, Half, Hsla, Pixels, Point, Window, WindowBounds, WindowOptions, div, prelude::*, px, rgb, size};
 
 #[derive(Clone, Copy)]
 struct DragInfo {
@@ -117,10 +117,9 @@ impl Render for DragDrop {
 
 fn main() {
 	Application::new().run(|cx: &mut App| {
-		let bounds = Bounds::centered(None, size(px(800.), px(600.0)), cx);
 		cx.open_window(
 			WindowOptions {
-				window_bounds: Some(WindowBounds::Windowed(bounds)),
+				window_bounds: Some(WindowBounds::centered(size(px(800.), px(600.0)), cx)),
 				..Default::default()
 			},
 			|_, cx| cx.new(|_| DragDrop::new())

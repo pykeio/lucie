@@ -27,17 +27,21 @@ use std::{
 	time::Duration
 };
 
-use lucie_common::{ResultExt as _, SharedString, refineable::Refineable};
+use lucie_common::{
+	ResultExt as _, SharedString, color,
+	geometry::{AbsoluteLength, Bounds, IsZero, Pixels, Point, Size, point, px, size},
+	refineable::Refineable
+};
 use rapidhash::fast::RapidHashMap;
 use smallvec::SmallVec;
 use stacksafe::{StackSafe, stacksafe};
 
 use super::ImageCacheProvider;
 use crate::{
-	AbsoluteLength, Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, Bounds, ClickEvent, DispatchPhase, Display, Element, ElementId, Entity, FocusHandle,
-	Global, GlobalElementId, Hitbox, HitboxBehavior, HitboxId, IntoElement, IsZero, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent,
-	LayoutId, ModifiersChangedEvent, MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Overflow, ParentElement, Pixels, Point,
-	Render, ScrollWheelEvent, Size, Style, StyleRefinement, Styled, Task, TooltipId, Visibility, Window, WindowControlArea, point, px, size
+	Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, ClickEvent, DispatchPhase, Display, Element, ElementId, Entity, FocusHandle, Global,
+	GlobalElementId, Hitbox, HitboxBehavior, HitboxId, IntoElement, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId,
+	ModifiersChangedEvent, MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Overflow, ParentElement, Render, ScrollWheelEvent,
+	Style, StyleRefinement, Styled, Task, TooltipId, Visibility, Window, WindowControlArea
 };
 
 const DRAG_THRESHOLD: f64 = 2.;
@@ -1516,7 +1520,7 @@ impl Interactivity {
 		use crate::TextAlign;
 
 		if global_id.is_some() && (style.debug || style.debug_below || cx.has_global::<crate::DebugBelow>()) && hitbox.is_hovered(window) {
-			const FONT_SIZE: crate::Pixels = crate::Pixels(10.);
+			const FONT_SIZE: Pixels = Pixels(10.);
 			let element_id = format!("{:?}", global_id.unwrap());
 			let str_len = element_id.len();
 
@@ -1533,9 +1537,9 @@ impl Interactivity {
 
 			window.with_text_style(
 				Some(crate::TextStyleRefinement {
-					color: Some(crate::red()),
+					color: Some(color::red()),
 					line_height: Some(FONT_SIZE.into()),
-					background_color: Some(crate::white()),
+					background_color: Some(color::white()),
 					..Default::default()
 				}),
 				render_debug_text

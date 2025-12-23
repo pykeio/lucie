@@ -1,6 +1,7 @@
 use anyhow::{Ok, Result};
+use lucie_common::geometry::{Bounds, Pixels, Point, px};
 
-use crate::{Bounds, DisplayId, Pixels, PlatformDisplay, Point, px};
+use crate::{DisplayId, PlatformDisplay};
 
 #[derive(Debug)]
 pub(crate) struct TestDisplay {
@@ -28,7 +29,7 @@ impl PlatformDisplay for TestDisplay {
 		Ok(self.uuid)
 	}
 
-	fn bounds(&self) -> crate::Bounds<crate::Pixels> {
+	fn bounds(&self) -> Bounds<Pixels> {
 		self.bounds
 	}
 }

@@ -8,13 +8,16 @@ use std::{
 };
 
 use anyhow::Context as _;
-use lucie_common::{ResultExt, SharedString};
+use lucie_common::{
+	ResultExt, SharedString,
+	geometry::{Bounds, Pixels, Point, Size}
+};
 use smallvec::SmallVec;
 
 use crate::{
-	ActiveTooltip, AnyView, App, Bounds, DispatchPhase, Element, ElementId, GlobalElementId, HighlightStyle, Hitbox, HitboxBehavior, IntoElement, LayoutId,
-	MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, Size, TextOverflow, TextRun, TextStyle, TooltipId, WhiteSpace, Window, WrappedLine,
-	WrappedLineLayout, register_tooltip_mouse_handlers, set_tooltip_on_window
+	ActiveTooltip, AnyView, App, DispatchPhase, Element, ElementId, GlobalElementId, HighlightStyle, Hitbox, HitboxBehavior, IntoElement, LayoutId,
+	MouseDownEvent, MouseMoveEvent, MouseUpEvent, TextOverflow, TextRun, TextStyle, TooltipId, WhiteSpace, Window, WrappedLine, WrappedLineLayout,
+	register_tooltip_mouse_handlers, set_tooltip_on_window
 };
 
 impl Element for &'static str {

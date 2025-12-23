@@ -4,7 +4,11 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use lucie_common::ResultExt;
+use lucie_common::{
+	ResultExt,
+	color::Background,
+	geometry::{Bounds, DevicePixels, Point, ScaledPixels, Size}
+};
 use windows::{
 	Win32::{
 		Foundation::HWND,

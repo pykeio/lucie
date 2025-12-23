@@ -1,9 +1,7 @@
+use lucie_common::geometry::{Axis, Bounds, Corner, Edges, Pixels, Point, Size, point, px};
 use smallvec::SmallVec;
 
-use crate::{
-	AnyElement, App, Axis, Bounds, Corner, Display, Edges, Element, GlobalElementId, IntoElement, LayoutId, ParentElement, Pixels, Point, Position, Size,
-	Style, Window, point, px
-};
+use crate::{AnyElement, App, Display, Element, GlobalElementId, IntoElement, LayoutId, ParentElement, Position, Style, Window};
 
 /// The state that the anchored element element uses to track its children.
 pub struct AnchoredState {
@@ -195,7 +193,7 @@ impl Element for Anchored {
 	fn paint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
-		_bounds: crate::Bounds<crate::Pixels>,
+		_bounds: Bounds<Pixels>,
 		_request_layout: &mut Self::RequestLayoutState,
 		_prepaint: &mut Self::PrepaintState,
 		window: &mut Window,

@@ -1,4 +1,5 @@
 use etagere::BucketedAtlasAllocator;
+use lucie_common::geometry::{Bounds, DevicePixels, Point, Size};
 use parking_lot::Mutex;
 use rapidhash::fast::RapidHashMap;
 use windows::Win32::Graphics::{
@@ -9,7 +10,7 @@ use windows::Win32::Graphics::{
 	Dxgi::Common::*
 };
 
-use crate::{AtlasKey, AtlasTextureId, AtlasTextureKind, AtlasTile, Bounds, DevicePixels, PlatformAtlas, Point, Size, platform::AtlasTextureList};
+use crate::{AtlasKey, AtlasTextureId, AtlasTextureKind, AtlasTile, PlatformAtlas, platform::AtlasTextureList};
 
 pub(crate) struct DirectXAtlas(Mutex<DirectXAtlasState>);
 
@@ -188,7 +189,7 @@ impl DirectXAtlasState {
 				kind
 			},
 			bytes_per_pixel,
-			allocator: etagere::BucketedAtlasAllocator::new(size.into()),
+			allocator: etagere::BucketedAtlasAllocator::new(size_to_etagere(size)),
 			texture,
 			view,
 			live_atlas_keys: 0
@@ -212,12 +213,12 @@ impl DirectXAtlasState {
 
 impl DirectXAtlasTexture {
 	fn allocate(&mut self, size: Size<DevicePixels>) -> Option<AtlasTile> {
-		let allocation = self.allocator.allocate(size.into())?;
+		let allocation = self.allocator.allocate(size_to_etagere(size))?;
 		let tile = AtlasTile {
 			texture_id: self.id,
 			tile_id: allocation.id.into(),
 			bounds: Bounds {
-				origin: allocation.rectangle.min.into(),
+				origin: point_from_etagere(allocation.rectangle.min),
 				size
 			},
 			padding: 0
@@ -255,17 +256,13 @@ impl DirectXAtlasTexture {
 	}
 }
 
-impl From<Size<DevicePixels>> for etagere::Size {
-	fn from(size: Size<DevicePixels>) -> Self {
-		etagere::Size::new(size.width.into(), size.height.into())
-	}
+fn size_to_etagere(size: Size<DevicePixels>) -> etagere::Size {
+	etagere::Size::new(size.width.into(), size.height.into())
 }
 
-impl From<etagere::Point> for Point<DevicePixels> {
-	fn from(value: etagere::Point) -> Self {
-		Point {
-			x: DevicePixels::from(value.x),
-			y: DevicePixels::from(value.y)
-		}
+fn point_from_etagere(value: etagere::Point) -> Point<DevicePixels> {
+	Point {
+		x: DevicePixels::from(value.x),
+		y: DevicePixels::from(value.y)
 	}
 }

@@ -17,13 +17,17 @@ use std::{
 use anyhow::{Context as _, anyhow};
 use derive_more::{Add, Deref, FromStr, Sub};
 use itertools::Itertools;
-use lucie_common::SharedString;
+use lucie_common::{
+	SharedString,
+	color::Hsla,
+	geometry::{Bounds, DevicePixels, Pixels, Point, Size, px}
+};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use rapidhash::fast::RapidHashMap;
 use smallvec::{SmallVec, smallvec};
 
 pub use self::{font_fallbacks::*, font_features::*, line::*, line_layout::*, line_wrapper::*};
-use crate::{Bounds, DevicePixels, Hsla, Pixels, PlatformTextSystem, Point, Result, Size, StrikethroughStyle, UnderlineStyle, px};
+use crate::{PlatformTextSystem, Result, StrikethroughStyle, UnderlineStyle};
 
 /// An opaque identifier for a specific font.
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]

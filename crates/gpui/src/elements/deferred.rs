@@ -1,4 +1,6 @@
-use crate::{AnyElement, App, Bounds, Element, GlobalElementId, IntoElement, LayoutId, Pixels, Window};
+use lucie_common::geometry::{Bounds, Pixels};
+
+use crate::{AnyElement, App, Element, GlobalElementId, IntoElement, LayoutId, Window};
 
 /// Builds a `Deferred` element, which delays the layout and paint of its child.
 pub fn deferred(child: impl IntoElement) -> Deferred {

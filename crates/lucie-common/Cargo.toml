@@ -18,6 +18,7 @@ test-support = []
 arrayvec.workspace = true
 tracing.workspace = true
 lucie-macros.workspace = true
+derive_more.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

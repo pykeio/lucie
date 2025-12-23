@@ -1,6 +1,6 @@
 use gpui::{
-	App, Application, Bounds, Context, Div, ElementId, FocusHandle, KeyBinding, SharedString, Stateful, Window, WindowBounds, WindowOptions, actions, div,
-	prelude::*, px, size
+	App, Application, Context, Div, ElementId, FocusHandle, KeyBinding, SharedString, Stateful, Window, WindowBounds, WindowOptions, actions, div, prelude::*,
+	px, size
 };
 
 actions!(example, [Tab, TabPrev, Quit]);
@@ -170,10 +170,9 @@ fn main() {
 	Application::new().run(|cx: &mut App| {
 		cx.bind_keys([KeyBinding::new("tab", Tab, None), KeyBinding::new("shift-tab", TabPrev, None), KeyBinding::new("cmd-q", Quit, None)]);
 
-		let bounds = Bounds::centered(None, size(px(800.), px(600.0)), cx);
 		cx.open_window(
 			WindowOptions {
-				window_bounds: Some(WindowBounds::Windowed(bounds)),
+				window_bounds: Some(WindowBounds::centered(size(px(800.), px(600.0)), cx)),
 				..Default::default()
 			},
 			|window, cx| cx.new(|cx| Example::new(window, cx))

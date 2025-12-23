@@ -3,14 +3,16 @@ use std::{
 	ffi::{c_uint, c_void}
 };
 
-use lucie_common::ResultExt;
+use lucie_common::{
+	ResultExt,
+	geometry::{Bounds, DevicePixels, point, size}
+};
 use windows::Win32::UI::{
 	Shell::{ABM_GETSTATE, ABM_GETTASKBARPOS, ABS_AUTOHIDE, APPBARDATA, SHAppBarMessage},
 	WindowsAndMessaging::{SPI_GETWHEELSCROLLCHARS, SPI_GETWHEELSCROLLLINES, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, SystemParametersInfoW}
 };
 
 use super::WindowsDisplay;
-use crate::*;
 
 /// Windows settings pulled from SystemParametersInfo
 /// https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-systemparametersinfow

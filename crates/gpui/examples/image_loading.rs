@@ -1,7 +1,7 @@
 use std::{path::Path, sync::Arc, time::Duration};
 
 use gpui::{
-	Animation, AnimationExt, App, Application, Asset, AssetLogger, AssetSource, Bounds, Context, Hsla, ImageAssetLoader, ImageCacheError, ImgResourceLoader,
+	Animation, AnimationExt, App, Application, Asset, AssetLogger, AssetSource, Context, Hsla, ImageAssetLoader, ImageCacheError, ImgResourceLoader,
 	LOADING_DELAY, Length, RenderImage, Resource, SharedString, Window, WindowBounds, WindowOptions, black, div, img, prelude::*, pulsating_between, px, red,
 	size
 };
@@ -168,7 +168,7 @@ fn main() {
 	env_logger::init();
 	Application::new().with_assets(Assets {}).run(|cx: &mut App| {
 		let options = WindowOptions {
-			window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(300.), px(300.)), cx))),
+			window_bounds: Some(WindowBounds::centered(size(px(300.), px(300.)), cx)),
 			..Default::default()
 		};
 		cx.open_window(options, |_, cx| {

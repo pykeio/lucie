@@ -4,7 +4,10 @@ use std::{
 };
 
 use itertools::Itertools;
-use lucie_common::ResultExt;
+use lucie_common::{
+	ResultExt,
+	geometry::{Bounds, DevicePixels, Pixels, point, px, size}
+};
 use smallvec::SmallVec;
 use windows::{
 	Win32::{
@@ -18,7 +21,7 @@ use windows::{
 	core::*
 };
 
-use crate::{Bounds, DevicePixels, DisplayId, Pixels, PlatformDisplay, logical_point, point, size};
+use crate::{DisplayId, PlatformDisplay, logical_point};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct WindowsDisplay {
@@ -55,7 +58,7 @@ impl WindowsDisplay {
 			},
 			visible_bounds: Bounds {
 				origin: logical_point(work_area.left as f32, work_area.top as f32, scale_factor),
-				size: size((work_area.right - work_area.left) as f32 / scale_factor, (work_area.bottom - work_area.top) as f32 / scale_factor).map(crate::px)
+				size: size((work_area.right - work_area.left) as f32 / scale_factor, (work_area.bottom - work_area.top) as f32 / scale_factor).map(px)
 			},
 			physical_bounds: Bounds {
 				origin: point(monitor_size.left.into(), monitor_size.top.into()),
@@ -84,7 +87,7 @@ impl WindowsDisplay {
 			},
 			visible_bounds: Bounds {
 				origin: logical_point(work_area.left as f32, work_area.top as f32, scale_factor),
-				size: size((work_area.right - work_area.left) as f32 / scale_factor, (work_area.bottom - work_area.top) as f32 / scale_factor).map(crate::px)
+				size: size((work_area.right - work_area.left) as f32 / scale_factor, (work_area.bottom - work_area.top) as f32 / scale_factor).map(px)
 			},
 			physical_bounds: Bounds {
 				origin: point(monitor_size.left.into(), monitor_size.top.into()),
@@ -112,7 +115,7 @@ impl WindowsDisplay {
 			},
 			visible_bounds: Bounds {
 				origin: logical_point(work_area.left as f32, work_area.top as f32, scale_factor),
-				size: size((work_area.right - work_area.left) as f32 / scale_factor, (work_area.bottom - work_area.top) as f32 / scale_factor).map(crate::px)
+				size: size((work_area.right - work_area.left) as f32 / scale_factor, (work_area.bottom - work_area.top) as f32 / scale_factor).map(px)
 			},
 			physical_bounds: Bounds {
 				origin: point(monitor_size.left.into(), monitor_size.top.into()),

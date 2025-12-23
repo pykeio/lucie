@@ -1,12 +1,15 @@
 use std::{any::TypeId, fmt, mem, ops::Range, rc::Rc};
 
 use anyhow::Result;
-use lucie_common::refineable::Refineable;
+use lucie_common::{
+	geometry::{Bounds, Pixels},
+	refineable::Refineable
+};
 use rapidhash::fast::RapidHashSet;
 
 use crate::{
-	AnyElement, AnyEntity, AnyWeakEntity, App, Bounds, ContentMask, Context, Element, ElementId, Empty, Entity, EntityId, GlobalElementId, IntoElement,
-	LayoutId, PaintIndex, Pixels, PrepaintStateIndex, Render, Style, StyleRefinement, TextStyle, WeakEntity, Window
+	AnyElement, AnyEntity, AnyWeakEntity, App, AvailableSpace, ContentMask, Context, Element, ElementId, Empty, Entity, EntityId, GlobalElementId, IntoElement,
+	LayoutId, PaintIndex, PrepaintStateIndex, Render, Style, StyleRefinement, TextStyle, WeakEntity, Window
 };
 
 struct AnyViewState {
@@ -186,7 +189,7 @@ impl Element for AnyView {
 				let prepaint_start = window.prepaint_index();
 				let (mut element, accessed_entities) = cx.detect_accessed_entities(|cx| {
 					let mut element = (self.render)(self, window, cx);
-					element.layout_as_root(bounds.size.into(), window, cx);
+					element.layout_as_root(AvailableSpace::from_definite(bounds.size), window, cx);
 					element.prepaint_at(bounds.origin, window, cx);
 					element
 				});

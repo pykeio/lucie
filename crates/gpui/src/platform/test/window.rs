@@ -3,14 +3,15 @@ use std::{
 	sync::{self, Arc}
 };
 
+use lucie_common::geometry::{Bounds, DevicePixels, Pixels, Point, Size};
 use parking_lot::Mutex;
 use rapidhash::fast::RapidHashMap;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::{
-	AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTile, Bounds, DispatchEventResult, GpuSpecs, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput,
-	PlatformInputHandler, PlatformWindow, Point, PromptButton, RequestFrameOptions, Size, TestPlatform, TileId, WindowAppearance, WindowBackgroundAppearance,
-	WindowBounds, WindowControlArea, WindowParams
+	AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTile, DispatchEventResult, GpuSpecs, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler,
+	PlatformWindow, PromptButton, RequestFrameOptions, TestPlatform, TileId, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
+	WindowParams
 };
 
 pub(crate) struct TestWindowState {
@@ -296,7 +297,7 @@ impl PlatformAtlas for TestAtlas {
 	fn get_or_insert_with<'a>(
 		&self,
 		key: &crate::AtlasKey,
-		build: &mut dyn FnMut() -> anyhow::Result<Option<(Size<crate::DevicePixels>, std::borrow::Cow<'a, [u8]>)>>
+		build: &mut dyn FnMut() -> anyhow::Result<Option<(Size<DevicePixels>, std::borrow::Cow<'a, [u8]>)>>
 	) -> anyhow::Result<Option<crate::AtlasTile>> {
 		let mut state = self.0.lock();
 		if let Some(tile) = state.tiles.get(key) {
@@ -323,7 +324,7 @@ impl PlatformAtlas for TestAtlas {
 				},
 				tile_id: TileId(tile_id),
 				padding: 0,
-				bounds: crate::Bounds { origin: Point::default(), size }
+				bounds: Bounds { origin: Point::default(), size }
 			}
 		);
 

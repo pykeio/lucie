@@ -358,7 +358,7 @@ pub fn border_style_methods(input: TokenStream) -> TokenStream {
 		/// Sets the border color of the element.
 		#visibility fn border_color<C>(mut self, border_color: C) -> Self
 		where
-			C: Into<gpui::Hsla>,
+			C: Into<lucie_common::color::Hsla>,
 			Self: Sized,
 		{
 			self.style().border_color = Some(border_color.into());
@@ -392,7 +392,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		/// Sets the box shadow of the element.
 		/// [Docs](https://tailwindcss.com/docs/box-shadow)
 		#visibility fn shadow_2xs(mut self) -> Self {
-			use gpui::{BoxShadow, hsla, point, px};
+			use lucie_common::{color::hsla, geometry::{point, px}};
+			use gpui::BoxShadow;
 			use std::vec;
 
 			self.style().box_shadow = Some(vec![BoxShadow {
@@ -407,7 +408,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		/// Sets the box shadow of the element.
 		/// [Docs](https://tailwindcss.com/docs/box-shadow)
 		#visibility fn shadow_xs(mut self) -> Self {
-			use gpui::{BoxShadow, hsla, point, px};
+			use lucie_common::{color::hsla, geometry::{point, px}};
+			use gpui::BoxShadow;
 			use std::vec;
 
 			self.style().box_shadow = Some(vec![BoxShadow {
@@ -422,7 +424,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		/// Sets the box shadow of the element.
 		/// [Docs](https://tailwindcss.com/docs/box-shadow)
 		#visibility fn shadow_sm(mut self) -> Self {
-			use gpui::{BoxShadow, hsla, point, px};
+			use lucie_common::{color::hsla, geometry::{point, px}};
+			use gpui::BoxShadow;
 			use std::vec;
 
 			self.style().box_shadow = Some(vec![
@@ -445,7 +448,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		/// Sets the box shadow of the element.
 		/// [Docs](https://tailwindcss.com/docs/box-shadow)
 		#visibility fn shadow_md(mut self) -> Self {
-			use gpui::{BoxShadow, hsla, point, px};
+			use lucie_common::{color::hsla, geometry::{point, px}};
+			use gpui::BoxShadow;
 			use std::vec;
 
 			self.style().box_shadow = Some(vec![
@@ -468,7 +472,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		/// Sets the box shadow of the element.
 		/// [Docs](https://tailwindcss.com/docs/box-shadow)
 		#visibility fn shadow_lg(mut self) -> Self {
-			use gpui::{BoxShadow, hsla, point, px};
+			use lucie_common::{color::hsla, geometry::{point, px}};
+			use gpui::BoxShadow;
 			use std::vec;
 
 			self.style().box_shadow = Some(vec![
@@ -491,7 +496,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		/// Sets the box shadow of the element.
 		/// [Docs](https://tailwindcss.com/docs/box-shadow)
 		#visibility fn shadow_xl(mut self) -> Self {
-			use gpui::{BoxShadow, hsla, point, px};
+			use lucie_common::{color::hsla, geometry::{point, px}};
+			use gpui::BoxShadow;
 			use std::vec;
 
 			self.style().box_shadow = Some(vec![
@@ -514,7 +520,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		/// Sets the box shadow of the element.
 		/// [Docs](https://tailwindcss.com/docs/box-shadow)
 		#visibility fn shadow_2xl(mut self) -> Self {
-			use gpui::{BoxShadow, hsla, point, px};
+			use lucie_common::{color::hsla, geometry::{point, px}};
+			use gpui::BoxShadow;
 			use std::vec;
 
 			self.style().box_shadow = Some(vec![BoxShadow {
@@ -663,7 +670,7 @@ fn generate_predefined_setter(
 		.iter()
 		.map(|field_tokens| {
 			quote! {
-				style.#field_tokens = Some((#negation_token gpui::#length_tokens).into());
+				style.#field_tokens = Some((#negation_token lucie_common::geometry::#length_tokens).into());
 			}
 		})
 		.collect::<Vec<_>>();
@@ -698,7 +705,7 @@ fn generate_custom_value_setter(visibility: Visibility, prefix: &str, length_typ
 
 	let method = quote! {
 		#[doc = #doc_string]
-		#visibility fn #method_name(mut self, length: impl std::clone::Clone + Into<gpui::#length_type>) -> Self {
+		#visibility fn #method_name(mut self, length: impl std::clone::Clone + Into<lucie_common::geometry::#length_type>) -> Self {
 			let style = self.style();
 			#(#field_assignments)*
 			self

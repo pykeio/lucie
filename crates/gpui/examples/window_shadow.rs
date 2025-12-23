@@ -171,10 +171,9 @@ fn resize_edge(pos: Point<Pixels>, shadow_size: Pixels, size: Size<Pixels>) -> O
 
 fn main() {
 	Application::new().run(|cx: &mut App| {
-		let bounds = Bounds::centered(None, size(px(600.0), px(600.0)), cx);
 		cx.open_window(
 			WindowOptions {
-				window_bounds: Some(WindowBounds::Windowed(bounds)),
+				window_bounds: Some(WindowBounds::centered(size(px(600.0), px(600.0)), cx)),
 				window_background: WindowBackgroundAppearance::Opaque,
 				window_decorations: Some(WindowDecorations::Client),
 				..Default::default()

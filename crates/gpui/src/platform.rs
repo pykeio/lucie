@@ -15,15 +15,18 @@ use anyhow::Result;
 use async_task::Runnable;
 use futures_channel::oneshot;
 use image::{AnimationDecoder as _, Frame, codecs::gif::GifDecoder};
-use lucie_common::SharedString;
+use lucie_common::{
+	SharedString,
+	geometry::{Bounds, DevicePixels, Pixels, Point, Size, point, px, size}
+};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use smallvec::SmallVec;
 
 use crate::{
-	Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, Bounds, DEFAULT_WINDOW_SIZE, DevicePixels, DispatchEventResult, Font, FontId,
-	FontMetrics, FontRun, ForegroundExecutor, GlyphId, GpuSpecs, ImageSource, Keymap, LineLayout, Pixels, PlatformInput, Point, Priority, RealtimePriority,
-	RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Scene, ShapedGlyph, ShapedRun, Size, SvgRenderer, SystemWindowTab, TaskLabel,
-	TaskTiming, ThreadTaskTimings, Window, WindowControlArea, hash, point, px, size
+	Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, DEFAULT_WINDOW_SIZE, DispatchEventResult, Font, FontId, FontMetrics, FontRun,
+	ForegroundExecutor, GlyphId, GpuSpecs, ImageSource, Keymap, LineLayout, PlatformInput, Priority, RealtimePriority, RenderGlyphParams, RenderImage,
+	RenderImageParams, RenderSvgParams, Scene, ShapedGlyph, ShapedRun, SvgRenderer, SystemWindowTab, TaskLabel, TaskTiming, ThreadTaskTimings, Window,
+	WindowControlArea, hash
 };
 
 mod app_menu;
@@ -1067,7 +1070,19 @@ impl WindowBounds {
 
 	/// Creates a new window bounds that centers the window on the screen.
 	pub fn centered(size: Size<Pixels>, cx: &App) -> Self {
-		WindowBounds::Windowed(Bounds::centered(None, size, cx))
+		Self::centered_inner(cx.primary_display(), size)
+	}
+
+	pub fn centered_in(display_id: DisplayId, size: Size<Pixels>, cx: &App) -> Self {
+		Self::centered_inner(cx.find_display(display_id), size)
+	}
+
+	fn centered_inner(display: Option<Rc<dyn PlatformDisplay>>, size: Size<Pixels>) -> Self {
+		WindowBounds::Windowed(
+			display
+				.map(|display| Bounds::centered_at(display.bounds().center(), size))
+				.unwrap_or_else(|| Bounds { origin: point(px(0.), px(0.)), size })
+		)
 	}
 }
 

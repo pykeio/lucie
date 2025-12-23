@@ -26,7 +26,13 @@ use itertools::{
 	FoldWhile::{Continue, Done},
 	Itertools
 };
-use lucie_common::{ResultExt as _, SharedString, atomic_incr_if_not_zero, measure, post_inc, refineable::Refineable};
+use lucie_common::{
+	Arena, ResultExt as _, SharedString, atomic_incr_if_not_zero,
+	color::{Background, Hsla, transparent_black},
+	geometry::{Bounds, Corners, DevicePixels, Edges, IsZero, Pixels, Point, ScaledPixels, Size, point, px, size},
+	measure, post_inc,
+	refineable::Refineable
+};
 use parking_lot::RwLock;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle};
@@ -34,16 +40,15 @@ use slotmap::SlotMap;
 use smallvec::SmallVec;
 
 use crate::{
-	Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Arena, Asset, AsyncWindowContext, AvailableSpace, Background,
-	BorderStyle, Bounds, BoxShadow, Capslock, Context, Corners, CursorStyle, Decorations, DevicePixels, DispatchActionListener, DispatchNodeId, DispatchTree,
-	DisplayId, Edges, Effect, Entity, EntityId, EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId, GpuSpecs, Hsla, InputHandler, IsZero,
-	KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite,
-	MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, Pixels, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow,
-	Point, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Replay,
-	ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ScaledPixels, Scene, Shadow, Size, StrikethroughStyle, Style, SubscriberSet,
-	Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TextStyle, TextStyleRefinement, TransformationMatrix,
-	Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams,
-	WindowTextSystem, point, prelude::*, px, size, transparent_black
+	Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Asset, AsyncWindowContext, AvailableSpace, BorderStyle, BoxShadow,
+	Capslock, Context, CursorStyle, Decorations, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Effect, Empty, Entity, EntityId,
+	EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke,
+	KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path,
+	PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render,
+	RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y,
+	Scene, Shadow, StrikethroughStyle, Style, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task,
+	TextStyle, TextStyleRefinement, TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
+	WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, prelude::*
 };
 
 mod prompts;
@@ -1929,7 +1934,7 @@ impl Window {
 
 		// Layout all root elements.
 		let mut root_element = self.root.as_ref().unwrap().clone().into_any();
-		root_element.prepaint_as_root(Point::default(), root_size.into(), self, cx);
+		root_element.prepaint_as_root(Point::default(), AvailableSpace::from_definite(root_size), self, cx);
 
 		let mut sorted_deferred_draws = (0..self.next_frame.deferred_draws.len()).collect::<SmallVec<[_; 8]>>();
 		sorted_deferred_draws.sort_by_key(|ix| self.next_frame.deferred_draws[*ix].priority);
@@ -1940,7 +1945,7 @@ impl Window {
 		let mut tooltip_element = None;
 		if let Some(prompt) = self.prompt.take() {
 			let mut element = prompt.view.any_view().into_any();
-			element.prepaint_as_root(Point::default(), root_size.into(), self, cx);
+			element.prepaint_as_root(Point::default(), AvailableSpace::from_definite(root_size), self, cx);
 			prompt_element = Some(element);
 			self.prompt = Some(prompt);
 		} else if let Some(active_drag) = cx.active_drag.take() {
@@ -3292,7 +3297,7 @@ impl Window {
 					if cx.active_drag.is_none() {
 						cx.active_drag = Some(AnyDrag {
 							value: Arc::new(paths.clone()),
-							view: cx.new(|_| paths).into(),
+							view: cx.new(|_| Empty).into(),
 							cursor_offset: position,
 							cursor_style: None
 						});

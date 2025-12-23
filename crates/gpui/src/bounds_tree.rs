@@ -4,7 +4,7 @@ use std::{
 	ops::{Add, Sub}
 };
 
-use crate::{Bounds, Half};
+use lucie_common::geometry::{Bounds, Half};
 
 /// Maximum children per internal node (R-tree style branching factor).
 /// Higher values = shorter tree = fewer cache misses, but more work per node.
@@ -353,10 +353,10 @@ where
 
 #[cfg(test)]
 mod tests {
+	use lucie_common::geometry::{Bounds, Point, Size};
 	use rand::{Rng, SeedableRng};
 
 	use super::*;
-	use crate::{Bounds, Point, Size};
 
 	#[test]
 	fn test_insert() {

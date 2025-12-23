@@ -1,6 +1,8 @@
 use std::{ops::Deref, sync::Arc};
 
-use crate::{App, Global, Rgba, Window, WindowAppearance, rgb};
+use lucie_common::color::{Rgba, rgb};
+
+use crate::{App, Global, Window, WindowAppearance};
 
 /// The default set of colors for gpui.
 ///

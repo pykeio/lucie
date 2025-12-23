@@ -12,7 +12,10 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use futures_channel::oneshot::{self, Receiver};
-use lucie_common::ResultExt;
+use lucie_common::{
+	ResultExt,
+	geometry::{Bounds, DevicePixels, Pixels, Point, Size, bounds, size}
+};
 use raw_window_handle as rwh;
 use smallvec::SmallVec;
 use windows::{
@@ -496,7 +499,7 @@ impl PlatformWindow for WindowsWindow {
 
 	fn resize(&mut self, size: Size<Pixels>) {
 		let hwnd = self.0.hwnd;
-		let bounds = crate::bounds(self.bounds().origin, size).to_device_pixels(self.scale_factor());
+		let bounds = bounds(self.bounds().origin, size).to_device_pixels(self.scale_factor());
 		let rect = calculate_window_rect(bounds, &self.state.border_offset);
 
 		self.0
@@ -1278,8 +1281,10 @@ fn set_window_composition_attribute(hwnd: HWND, color: Option<Color>, state: u32
 mod tests {
 	use std::time::Duration;
 
+	use lucie_common::geometry::{DevicePixels, point};
+
 	use super::ClickState;
-	use crate::{DevicePixels, MouseButton, point};
+	use crate::MouseButton;
 
 	#[test]
 	fn test_double_click_interval() {

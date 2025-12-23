@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use futures_util::FutureExt;
 use gpui::{
-	App, AppContext, Application, Asset as _, AssetLogger, Bounds, ClickEvent, Context, ElementId, Entity, ImageAssetLoader, ImageCache, ImageCacheProvider,
+	App, AppContext, Application, Asset as _, AssetLogger, ClickEvent, Context, ElementId, Entity, ImageAssetLoader, ImageCache, ImageCacheProvider,
 	KeyBinding, Menu, MenuItem, RetainAllImageCache, SharedString, TitlebarOptions, Window, WindowBounds, WindowOptions, actions, div, hash, image_cache, img,
 	prelude::*, px, rgb, size
 };
@@ -235,7 +235,7 @@ fn main() {
 				..Default::default()
 			}),
 
-			window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1100.), px(860.)), cx))),
+			window_bounds: Some(WindowBounds::centered(size(px(1100.), px(860.)), cx)),
 
 			..Default::default()
 		};

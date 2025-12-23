@@ -1,6 +1,9 @@
-use lucie_common::refineable::Refineable as _;
+use lucie_common::{
+	geometry::{Bounds, Pixels},
+	refineable::Refineable as _
+};
 
-use crate::{App, Bounds, Element, ElementId, GlobalElementId, IntoElement, Pixels, Style, StyleRefinement, Styled, Window};
+use crate::{App, Element, ElementId, GlobalElementId, IntoElement, Style, StyleRefinement, Styled, Window};
 
 /// Construct a canvas element with the given paint callback.
 /// Useful for adding short term custom drawing to a view.
