@@ -9,8 +9,8 @@ use core_graphics::event::CGKeyCode;
 use objc::{msg_send, sel, sel_impl};
 
 use crate::{
-	Capslock, KeyDownEvent, KeyUpEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent,
-	NavigationDirection, Pixels, PlatformInput, ScrollDelta, ScrollWheelEvent, TouchPhase,
+	Capslock, KeyDownEvent, KeyUpEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseExitEvent, MouseMoveEvent,
+	MousePressureEvent, MouseUpEvent, NavigationDirection, Pixels, PlatformInput, PressureStage, ScrollDelta, ScrollWheelEvent, TouchPhase,
 	platform::mac::{
 		LMGetKbdType, NSStringExt, TISCopyCurrentKeyboardLayoutInputSource, TISGetInputSourceProperty, UCKeyTranslate, kTISPropertyUnicodeKeyLayoutData
 	},
@@ -170,6 +170,23 @@ impl PlatformInput {
 							position: point(px(native_event.locationInWindow().x as f32), window_height - px(native_event.locationInWindow().y as f32)),
 							modifiers: read_modifiers(native_event),
 							click_count: native_event.clickCount() as usize
+						})
+					})
+				}
+				NSEventType::NSEventTypePressure => {
+					let stage = native_event.stage();
+					let pressure = native_event.pressure();
+
+					window_height.map(|window_height| {
+						Self::MousePressure(MousePressureEvent {
+							stage: match stage {
+								1 => PressureStage::Normal,
+								2 => PressureStage::Force,
+								_ => PressureStage::Zero
+							},
+							pressure,
+							modifiers: read_modifiers(native_event),
+							position: point(px(native_event.locationInWindow().x as f32), window_height - px(native_event.locationInWindow().y as f32))
 						})
 					})
 				}

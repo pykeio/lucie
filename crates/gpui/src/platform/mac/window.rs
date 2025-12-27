@@ -112,6 +112,7 @@ unsafe fn build_classes() {
 				decl.add_method(sel!(otherMouseDown:), handle_view_event as extern "C" fn(&Object, Sel, id));
 				decl.add_method(sel!(otherMouseUp:), handle_view_event as extern "C" fn(&Object, Sel, id));
 				decl.add_method(sel!(mouseMoved:), handle_view_event as extern "C" fn(&Object, Sel, id));
+				decl.add_method(sel!(pressureChangeWithEvent:), handle_view_event as extern "C" fn(&Object, Sel, id));
 				decl.add_method(sel!(mouseExited:), handle_view_event as extern "C" fn(&Object, Sel, id));
 				decl.add_method(sel!(mouseDragged:), handle_view_event as extern "C" fn(&Object, Sel, id));
 				decl.add_method(sel!(scrollWheel:), handle_view_event as extern "C" fn(&Object, Sel, id));
