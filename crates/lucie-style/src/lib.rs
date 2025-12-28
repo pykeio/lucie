@@ -288,7 +288,7 @@ pub struct BoxShadow {
 
 /// The style of a border.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(C)]
+#[repr(u32)]
 pub enum BorderStyle {
 	/// A solid border.
 	#[default]

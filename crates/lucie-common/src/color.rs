@@ -4,19 +4,29 @@ use std::{
 };
 
 /// Convert an RGB hex color code number to a color type
-pub fn rgb(hex: u32) -> Rgba {
-	let [_, r, g, b] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
-	Rgba { r, g, b, a: 1.0 }
+pub const fn rgb(hex: u32) -> Rgba {
+	let [_, r, g, b] = hex.to_be_bytes();
+	Rgba {
+		r: (r as f32) / 255.0,
+		g: (g as f32) / 255.0,
+		b: (b as f32) / 255.0,
+		a: 1.0
+	}
 }
 
 /// Convert an RGBA hex color code number to [`Rgba`]
-pub fn rgba(hex: u32) -> Rgba {
-	let [r, g, b, a] = hex.to_be_bytes().map(|b| (b as f32) / 255.0);
-	Rgba { r, g, b, a }
+pub const fn rgba(hex: u32) -> Rgba {
+	let [r, g, b, a] = hex.to_be_bytes();
+	Rgba {
+		r: (r as f32) / 255.0,
+		g: (g as f32) / 255.0,
+		b: (b as f32) / 255.0,
+		a: (a as f32) / 255.0
+	}
 }
 
 /// Swap from RGBA with premultiplied alpha to BGRA
-pub fn swap_rgba_pa_to_bgra(color: &mut [u8]) {
+pub const fn swap_rgba_pa_to_bgra(color: &mut [u8]) {
 	color.swap(0, 2);
 	if color[3] > 0 {
 		let a = color[3] as f32 / 255.;
@@ -52,7 +62,7 @@ impl fmt::Debug for Rgba {
 
 impl Rgba {
 	/// Create a new [`Rgba`] color by blending this and another color together
-	pub fn blend(&self, other: Rgba) -> Self {
+	pub const fn blend(&self, other: Rgba) -> Self {
 		if other.a >= 1.0 {
 			other
 		} else if other.a <= 0.0 {
@@ -80,31 +90,7 @@ impl From<Rgba> for u32 {
 
 impl From<Hsla> for Rgba {
 	fn from(color: Hsla) -> Self {
-		let h = color.h;
-		let s = color.s;
-		let l = color.l;
-
-		let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
-		let x = c * (1.0 - ((h * 6.0) % 2.0 - 1.0).abs());
-		let m = l - c / 2.0;
-		let cm = c + m;
-		let xm = x + m;
-
-		let (r, g, b) = match (h * 6.0).floor() as i32 {
-			0 | 6 => (cm, xm, m),
-			1 => (xm, cm, m),
-			2 => (m, cm, xm),
-			3 => (m, xm, cm),
-			4 => (xm, m, cm),
-			_ => (cm, m, xm)
-		};
-
-		Rgba {
-			r: r.clamp(0., 1.),
-			g: g.clamp(0., 1.),
-			b: b.clamp(0., 1.),
-			a: color.a
-		}
+		color.to_rgb()
 	}
 }
 
@@ -251,7 +237,7 @@ impl Display for Hsla {
 }
 
 /// Construct an [`Hsla`] object from plain values
-pub fn hsla(h: f32, s: f32, l: f32, a: f32) -> Hsla {
+pub const fn hsla(h: f32, s: f32, l: f32, a: f32) -> Hsla {
 	Hsla {
 		h: h.clamp(0., 1.),
 		s: s.clamp(0., 1.),
@@ -276,7 +262,7 @@ pub const fn transparent_white() -> Hsla {
 }
 
 /// Opaque grey in [`Hsla`], values will be clamped to the range [0, 1]
-pub fn opaque_grey(lightness: f32, opacity: f32) -> Hsla {
+pub const fn opaque_grey(lightness: f32, opacity: f32) -> Hsla {
 	Hsla {
 		h: 0.,
 		s: 0.,
@@ -327,8 +313,32 @@ pub const fn yellow() -> Hsla {
 
 impl Hsla {
 	/// Converts this HSLA color to an RGBA color.
-	pub fn to_rgb(self) -> Rgba {
-		self.into()
+	pub const fn to_rgb(self) -> Rgba {
+		let h = self.h;
+		let s = self.s;
+		let l = self.l;
+
+		let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+		let x = c * (1.0 - ((h * 6.0) % 2.0 - 1.0).abs());
+		let m = l - c / 2.0;
+		let cm = c + m;
+		let xm = x + m;
+
+		let (r, g, b) = match (h * 6.0).floor() as i32 {
+			0 | 6 => (cm, xm, m),
+			1 => (xm, cm, m),
+			2 => (m, cm, xm),
+			3 => (m, xm, cm),
+			4 => (xm, m, cm),
+			_ => (cm, m, xm)
+		};
+
+		Rgba {
+			r: r.clamp(0., 1.),
+			g: g.clamp(0., 1.),
+			b: b.clamp(0., 1.),
+			a: self.a
+		}
 	}
 
 	/// The color red
@@ -362,12 +372,12 @@ impl Hsla {
 	}
 
 	/// Returns true if the HSLA color is fully transparent, false otherwise.
-	pub fn is_transparent(&self) -> bool {
+	pub const fn is_transparent(&self) -> bool {
 		self.a == 0.0
 	}
 
 	/// Returns true if the HSLA color is fully opaque, false otherwise.
-	pub fn is_opaque(&self) -> bool {
+	pub const fn is_opaque(&self) -> bool {
 		self.a == 1.0
 	}
 
@@ -395,15 +405,15 @@ impl Hsla {
 		} else if alpha <= 0.0 {
 			self
 		} else {
-			let converted_self = Rgba::from(self);
-			let converted_other = Rgba::from(other);
+			let converted_self = self.to_rgb();
+			let converted_other = other.to_rgb();
 			let blended_rgb = converted_self.blend(converted_other);
 			Hsla::from(blended_rgb)
 		}
 	}
 
 	/// Returns a new HSLA color with the same hue, and lightness, but with no saturation.
-	pub fn grayscale(&self) -> Self {
+	pub const fn grayscale(&self) -> Self {
 		Hsla {
 			h: self.h,
 			s: 0.,
@@ -414,7 +424,7 @@ impl Hsla {
 
 	/// Fade out the color by a given factor. This factor should be between 0.0 and 1.0.
 	/// Where 0.0 will leave the color unchanged, and 1.0 will completely fade out the color.
-	pub fn fade_out(&mut self, factor: f32) {
+	pub const fn fade_out(&mut self, factor: f32) {
 		self.a *= 1.0 - factor.clamp(0., 1.);
 	}
 
@@ -443,7 +453,7 @@ impl Hsla {
 	///
 	/// This will return a blue color with around ~10% opacity,
 	/// suitable for an element's hover or selected state.
-	pub fn opacity(&self, factor: f32) -> Self {
+	pub const fn opacity(&self, factor: f32) -> Self {
 		Hsla {
 			h: self.h,
 			s: self.s,
@@ -473,7 +483,7 @@ impl Hsla {
 	/// ```
 	///
 	/// This will return a blue color with 25% opacity.
-	pub fn alpha(&self, a: f32) -> Self {
+	pub const fn alpha(&self, a: f32) -> Self {
 		Hsla {
 			h: self.h,
 			s: self.s,
@@ -649,7 +659,7 @@ pub fn linear_color_stop(color: impl Into<Hsla>, percentage: f32) -> LinearColor
 
 impl LinearColorStop {
 	/// Returns a new color stop with the same color, but with a modified alpha value.
-	pub fn opacity(&self, factor: f32) -> Self {
+	pub const fn opacity(&self, factor: f32) -> Self {
 		Self {
 			percentage: self.percentage,
 			color: self.color.opacity(factor)
@@ -661,13 +671,13 @@ impl Background {
 	/// Use specified color space for color interpolation.
 	///
 	/// <https://developer.mozilla.org/en-US/docs/Web/CSS/color-interpolation-method>
-	pub fn color_space(mut self, color_space: ColorSpace) -> Self {
+	pub const fn color_space(mut self, color_space: ColorSpace) -> Self {
 		self.color_space = color_space;
 		self
 	}
 
 	/// Returns a new background color with the same hue, saturation, and lightness, but with a modified alpha value.
-	pub fn opacity(&self, factor: f32) -> Self {
+	pub const fn opacity(&self, factor: f32) -> Self {
 		let mut background = *self;
 		background.solid = background.solid.opacity(factor);
 		background.colors = [self.colors[0].opacity(factor), self.colors[1].opacity(factor)];
@@ -675,10 +685,10 @@ impl Background {
 	}
 
 	/// Returns whether the background color is transparent.
-	pub fn is_transparent(&self) -> bool {
+	pub const fn is_transparent(&self) -> bool {
 		match self.tag {
 			BackgroundTag::Solid => self.solid.is_transparent(),
-			BackgroundTag::LinearGradient => self.colors.iter().all(|c| c.color.is_transparent()),
+			BackgroundTag::LinearGradient => self.colors[0].color.is_transparent() && self.colors[1].color.is_transparent(),
 			BackgroundTag::PatternSlash => self.solid.is_transparent()
 		}
 	}

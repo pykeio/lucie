@@ -25,7 +25,7 @@ pub enum Axis {
 
 impl Axis {
 	/// Swap this axis to the opposite axis.
-	pub fn invert(self) -> Self {
+	pub const fn invert(self) -> Self {
 		match self {
 			Axis::Vertical => Axis::Horizontal,
 			Axis::Horizontal => Axis::Vertical
@@ -192,7 +192,7 @@ impl Point<Pixels> {
 	/// 	}
 	/// );
 	/// ```
-	pub fn scale(&self, factor: f32) -> Point<ScaledPixels> {
+	pub const fn scale(&self, factor: f32) -> Point<ScaledPixels> {
 		Point {
 			x: self.x.scale(factor),
 			y: self.y.scale(factor)
@@ -374,7 +374,7 @@ pub struct Size<T: Clone + fmt::Debug + Default + PartialEq> {
 
 impl<T: Clone + fmt::Debug + Default + PartialEq> Size<T> {
 	/// Create a new Size, a synonym for [`size`]
-	pub fn new(width: T, height: T) -> Self {
+	pub const fn new(width: T, height: T) -> Self {
 		size(width, height)
 	}
 }
@@ -665,10 +665,10 @@ impl Size<Length> {
 	/// # Returns
 	///
 	/// A `Size<Length>` that will fill the available space when used in a layout.
-	pub fn full() -> Self {
+	pub const fn full() -> Self {
 		Self {
-			width: relative(1.).into(),
-			height: relative(1.).into()
+			width: Length::Definite(relative(1.)),
+			height: Length::Definite(relative(1.))
 		}
 	}
 
@@ -681,7 +681,7 @@ impl Size<Length> {
 	/// # Returns
 	///
 	/// A `Size<Length>` with width and height set to `Length::Auto`.
-	pub fn auto() -> Self {
+	pub const fn auto() -> Self {
 		Self {
 			width: Length::Auto,
 			height: Length::Auto
@@ -717,7 +717,7 @@ pub struct Bounds<T: Clone + fmt::Debug + Default + PartialEq> {
 }
 
 /// Create a bounds with the given origin and size
-pub fn bounds<T: Clone + fmt::Debug + Default + PartialEq>(origin: Point<T>, size: Size<T>) -> Bounds<T> {
+pub const fn bounds<T: Clone + fmt::Debug + Default + PartialEq>(origin: Point<T>, size: Size<T>) -> Bounds<T> {
 	Bounds { origin, size }
 }
 
@@ -735,7 +735,7 @@ where
 	/// # Returns
 	///
 	/// Returns a `Bounds<T>` that has the given origin and size.
-	pub fn new(origin: Point<T>, size: Size<T>) -> Self {
+	pub const fn new(origin: Point<T>, size: Size<T>) -> Self {
 		Bounds { origin, size }
 	}
 }
@@ -1661,7 +1661,7 @@ where
 
 impl<T: Clone + fmt::Debug + Default + PartialEq + Copy> Copy for Edges<T> {}
 
-impl<T: Clone + fmt::Debug + Default + PartialEq> Edges<T> {
+impl<T: Clone + Copy + fmt::Debug + Default + PartialEq> Edges<T> {
 	/// Constructs `Edges` where all sides are set to the same specified value.
 	///
 	/// This function creates an `Edges` instance with the `top`, `right`, `bottom`, and `left` fields all initialized
@@ -1686,15 +1686,17 @@ impl<T: Clone + fmt::Debug + Default + PartialEq> Edges<T> {
 	/// assert_eq!(uniform_edges.bottom, 10.0);
 	/// assert_eq!(uniform_edges.left, 10.0);
 	/// ```
-	pub fn all(value: T) -> Self {
+	pub const fn all(value: T) -> Self {
 		Self {
-			top: value.clone(),
-			right: value.clone(),
-			bottom: value.clone(),
+			top: value,
+			right: value,
+			bottom: value,
 			left: value
 		}
 	}
+}
 
+impl<T: Clone + fmt::Debug + Default + PartialEq> Edges<T> {
 	/// Applies a function to each field of the `Edges`, producing a new `Edges<U>`.
 	///
 	/// This method allows for converting an `Edges<T>` to an `Edges<U>` by specifying a closure
@@ -1796,7 +1798,7 @@ impl Edges<Length> {
 	/// assert_eq!(auto_edges.bottom, Length::Auto);
 	/// assert_eq!(auto_edges.left, Length::Auto);
 	/// ```
-	pub fn auto() -> Self {
+	pub const fn auto() -> Self {
 		Self {
 			top: Length::Auto,
 			right: Length::Auto,
@@ -1824,12 +1826,12 @@ impl Edges<Length> {
 	/// assert_eq!(no_edges.bottom, Length::Definite(DefiniteLength::from(Pixels::ZERO)));
 	/// assert_eq!(no_edges.left, Length::Definite(DefiniteLength::from(Pixels::ZERO)));
 	/// ```
-	pub fn zero() -> Self {
+	pub const fn zero() -> Self {
 		Self {
-			top: px(0.).into(),
-			right: px(0.).into(),
-			bottom: px(0.).into(),
-			left: px(0.).into()
+			top: Length::Definite(DefiniteLength::Absolute(AbsoluteLength::Pixels(px(0.)))),
+			right: Length::Definite(DefiniteLength::Absolute(AbsoluteLength::Pixels(px(0.)))),
+			bottom: Length::Definite(DefiniteLength::Absolute(AbsoluteLength::Pixels(px(0.)))),
+			left: Length::Definite(DefiniteLength::Absolute(AbsoluteLength::Pixels(px(0.))))
 		}
 	}
 }
@@ -1854,12 +1856,12 @@ impl Edges<DefiniteLength> {
 	/// assert_eq!(no_edges.bottom, DefiniteLength::from(px(0.)));
 	/// assert_eq!(no_edges.left, DefiniteLength::from(px(0.)));
 	/// ```
-	pub fn zero() -> Self {
+	pub const fn zero() -> Self {
 		Self {
-			top: px(0.).into(),
-			right: px(0.).into(),
-			bottom: px(0.).into(),
-			left: px(0.).into()
+			top: DefiniteLength::Absolute(AbsoluteLength::Pixels(px(0.))),
+			right: DefiniteLength::Absolute(AbsoluteLength::Pixels(px(0.))),
+			bottom: DefiniteLength::Absolute(AbsoluteLength::Pixels(px(0.))),
+			left: DefiniteLength::Absolute(AbsoluteLength::Pixels(px(0.)))
 		}
 	}
 
@@ -1930,12 +1932,12 @@ impl Edges<AbsoluteLength> {
 	/// assert_eq!(no_edges.bottom, AbsoluteLength::Pixels(Pixels::ZERO));
 	/// assert_eq!(no_edges.left, AbsoluteLength::Pixels(Pixels::ZERO));
 	/// ```
-	pub fn zero() -> Self {
+	pub const fn zero() -> Self {
 		Self {
-			top: px(0.).into(),
-			right: px(0.).into(),
-			bottom: px(0.).into(),
-			left: px(0.).into()
+			top: AbsoluteLength::Pixels(px(0.)),
+			right: AbsoluteLength::Pixels(px(0.)),
+			bottom: AbsoluteLength::Pixels(px(0.)),
+			left: AbsoluteLength::Pixels(px(0.))
 		}
 	}
 
@@ -2069,8 +2071,7 @@ impl Corner {
 	/// # use gpui::Corner;
 	/// assert_eq!(Corner::TopLeft.opposite_corner(), Corner::BottomRight);
 	/// ```
-	#[must_use]
-	pub fn opposite_corner(self) -> Self {
+	pub const fn opposite_corner(self) -> Self {
 		match self {
 			Corner::TopLeft => Corner::BottomRight,
 			Corner::TopRight => Corner::BottomLeft,
@@ -2088,8 +2089,7 @@ impl Corner {
 	/// let result = Corner::TopLeft.other_side_corner_along(Axis::Horizontal);
 	/// assert_eq!(result, Corner::TopRight);
 	/// ```
-	#[must_use]
-	pub fn other_side_corner_along(self, axis: Axis) -> Self {
+	pub const fn other_side_corner_along(self, axis: Axis) -> Self {
 		match axis {
 			Axis::Vertical => match self {
 				Corner::TopLeft => Corner::BottomLeft,
@@ -2127,7 +2127,7 @@ pub struct Corners<T: Clone + fmt::Debug + Default + PartialEq> {
 
 impl<T> Corners<T>
 where
-	T: Clone + fmt::Debug + Default + PartialEq
+	T: Clone + Copy + fmt::Debug + Default + PartialEq
 {
 	/// Constructs `Corners` where all sides are set to the same specified value.
 	///
@@ -2153,15 +2153,20 @@ where
 	/// assert_eq!(uniform_corners.bottom_right, 5.0);
 	/// assert_eq!(uniform_corners.bottom_left, 5.0);
 	/// ```
-	pub fn all(value: T) -> Self {
+	pub const fn all(value: T) -> Self {
 		Self {
-			top_left: value.clone(),
-			top_right: value.clone(),
-			bottom_right: value.clone(),
+			top_left: value,
+			top_right: value,
+			bottom_right: value,
 			bottom_left: value
 		}
 	}
+}
 
+impl<T> Corners<T>
+where
+	T: Clone + fmt::Debug + Default + PartialEq
+{
 	/// Returns the requested corner.
 	///
 	/// # Returns
@@ -2412,7 +2417,7 @@ impl From<Pixels> for Corners<Pixels> {
 pub struct Radians(pub f32);
 
 /// Create a `Radian` from a raw value
-pub fn radians(value: f32) -> Radians {
+pub const fn radians(value: f32) -> Radians {
 	Radians(value)
 }
 
@@ -2422,8 +2427,7 @@ pub fn radians(value: f32) -> Radians {
 pub struct Percentage(pub f32);
 
 /// Generate a `Radian` from a percentage of a full circle.
-pub fn percentage(value: f32) -> Percentage {
-	debug_assert!((0.0..=1.0).contains(&value), "Percentage must be between 0 and 1");
+pub const fn percentage(value: f32) -> Percentage {
 	Percentage(value)
 }
 
@@ -2591,7 +2595,7 @@ impl Pixels {
 	/// # Returns
 	///
 	/// Returns a new `Pixels` instance with the floored value.
-	pub fn floor(&self) -> Self {
+	pub const fn floor(&self) -> Self {
 		Self(self.0.floor())
 	}
 
@@ -2600,7 +2604,7 @@ impl Pixels {
 	/// # Returns
 	///
 	/// Returns a new `Pixels` instance with the rounded value.
-	pub fn round(&self) -> Self {
+	pub const fn round(&self) -> Self {
 		Self(self.0.round())
 	}
 
@@ -2609,7 +2613,7 @@ impl Pixels {
 	/// # Returns
 	///
 	/// Returns a new `Pixels` instance with the ceiling value.
-	pub fn ceil(&self) -> Self {
+	pub const fn ceil(&self) -> Self {
 		Self(self.0.ceil())
 	}
 
@@ -2622,7 +2626,7 @@ impl Pixels {
 	/// The resulting `ScaledPixels` represent the scaled value which can be used for rendering
 	/// calculations where display scaling is considered.
 	#[must_use]
-	pub fn scale(&self, factor: f32) -> ScaledPixels {
+	pub const fn scale(&self, factor: f32) -> ScaledPixels {
 		ScaledPixels(self.0 * factor)
 	}
 
@@ -2644,7 +2648,7 @@ impl Pixels {
 	/// # Returns
 	///
 	/// A new `Pixels` instance with the absolute value of the original `Pixels`.
-	pub fn abs(&self) -> Self {
+	pub const fn abs(&self) -> Self {
 		Self(self.0.abs())
 	}
 
@@ -2655,7 +2659,7 @@ impl Pixels {
 	/// Returns:
 	/// * `1.0` if the value is positive
 	/// * `-1.0` if the value is negative
-	pub fn signum(&self) -> f32 {
+	pub const fn signum(&self) -> f32 {
 		self.0.signum()
 	}
 
@@ -2664,7 +2668,7 @@ impl Pixels {
 	/// # Returns
 	///
 	/// A f64 value of the `Pixels`.
-	pub fn to_f64(self) -> f64 {
+	pub const fn to_f64(self) -> f64 {
 		self.0 as f64
 	}
 }
@@ -2783,7 +2787,7 @@ impl DevicePixels {
 	/// let total_bytes = pixels.to_bytes(bytes_per_pixel);
 	/// assert_eq!(total_bytes, 40); // 10 pixels * 4 bytes/pixel = 40 bytes
 	/// ```
-	pub fn to_bytes(self, bytes_per_pixel: u8) -> u32 {
+	pub const fn to_bytes(self, bytes_per_pixel: u8) -> u32 {
 		self.0 as u32 * bytes_per_pixel as u32
 	}
 }
@@ -2859,7 +2863,7 @@ impl ScaledPixels {
 	/// # Returns
 	///
 	/// Returns a new `ScaledPixels` instance with the floored value.
-	pub fn floor(&self) -> Self {
+	pub const fn floor(&self) -> Self {
 		Self(self.0.floor())
 	}
 
@@ -2868,7 +2872,7 @@ impl ScaledPixels {
 	/// # Returns
 	///
 	/// Returns a new `ScaledPixels` instance with the rounded value.
-	pub fn round(&self) -> Self {
+	pub const fn round(&self) -> Self {
 		Self(self.0.round())
 	}
 
@@ -2877,7 +2881,7 @@ impl ScaledPixels {
 	/// # Returns
 	///
 	/// Returns a new `ScaledPixels` instance with the ceiled value.
-	pub fn ceil(&self) -> Self {
+	pub const fn ceil(&self) -> Self {
 		Self(self.0.ceil())
 	}
 }
