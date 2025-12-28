@@ -3,7 +3,6 @@ use std::{fmt::Debug, ops::Range};
 use lucie_common::geometry::{AbsoluteLength, Bounds, DefiniteLength, Edges, GridPlacement, Length, Pixels, Size, point, size};
 use lucie_style::Style;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
-use stacksafe::{StackSafe, stacksafe};
 use taffy::{
 	TaffyTree, TraversePartialTree as _,
 	geometry::{Point as TaffyPoint, Rect as TaffyRect, Size as TaffySize},
@@ -13,7 +12,7 @@ use taffy::{
 
 use crate::{App, Window};
 
-type NodeMeasureFn = StackSafe<Box<dyn FnMut(Size<Option<Pixels>>, Size<AvailableSpace>, &mut Window, &mut App) -> Size<Pixels>>>;
+type NodeMeasureFn = Box<dyn FnMut(Size<Option<Pixels>>, Size<AvailableSpace>, &mut Window, &mut App) -> Size<Pixels>>;
 
 struct NodeContext {
 	measure: NodeMeasureFn
@@ -69,12 +68,7 @@ impl TaffyLayoutEngine {
 		let taffy_style = style.to_taffy(rem_size, scale_factor);
 
 		self.taffy
-			.new_leaf_with_context(
-				taffy_style,
-				NodeContext {
-					measure: StackSafe::new(Box::new(measure))
-				}
-			)
+			.new_leaf_with_context(taffy_style, NodeContext { measure: Box::new(measure) })
 			.expect(EXPECT_MESSAGE)
 			.into()
 	}
@@ -123,7 +117,6 @@ impl TaffyLayoutEngine {
 		Ok(edges)
 	}
 
-	#[stacksafe]
 	pub fn compute_layout(&mut self, id: LayoutId, available_space: Size<AvailableSpace>, window: &mut Window, cx: &mut App) {
 		// Leaving this here until we have a better instrumentation approach.
 		// println!("Laying out {} children", self.count_all_children(id)?);

@@ -35,7 +35,6 @@ use lucie_common::{
 use lucie_style::{Display, Overflow, Style, StyleRefinement, Styled, Visibility};
 use rapidhash::fast::RapidHashMap;
 use smallvec::SmallVec;
-use stacksafe::{StackSafe, stacksafe};
 
 use super::ImageCacheProvider;
 use crate::{
@@ -1052,7 +1051,7 @@ pub fn div() -> Div {
 /// A [`Div`] element, the all-in-one element for building complex UIs in GPUI
 pub struct Div {
 	interactivity: Interactivity,
-	children: SmallVec<[StackSafe<AnyElement>; 2]>,
+	children: SmallVec<[AnyElement; 2]>,
 	prepaint_listener: Option<Box<dyn Fn(Vec<Bounds<Pixels>>, &mut Window, &mut App) + 'static>>,
 	image_cache: Option<Box<dyn ImageCacheProvider>>
 }
@@ -1096,7 +1095,7 @@ impl InteractiveElement for Div {
 
 impl ParentElement for Div {
 	fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
-		self.children.extend(elements.into_iter().map(StackSafe::new))
+		self.children.extend(elements.into_iter())
 	}
 }
 
@@ -1108,7 +1107,6 @@ impl Element for Div {
 		self.interactivity.element_id.clone()
 	}
 
-	#[stacksafe]
 	fn request_layout(&mut self, global_id: Option<&GlobalElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, Self::RequestLayoutState) {
 		let mut child_layout_ids = SmallVec::new();
 		let image_cache = self.image_cache.as_mut().map(|provider| provider.provide(window, cx));
@@ -1129,7 +1127,6 @@ impl Element for Div {
 		(layout_id, DivFrameState { child_layout_ids })
 	}
 
-	#[stacksafe]
 	fn prepaint(
 		&mut self,
 		global_id: Option<&GlobalElementId>,
@@ -1196,7 +1193,6 @@ impl Element for Div {
 			})
 	}
 
-	#[stacksafe]
 	fn paint(
 		&mut self,
 		global_id: Option<&GlobalElementId>,

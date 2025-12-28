@@ -123,7 +123,6 @@ sha2 = "0.10"
 slotmap = "1.0.6"
 smallvec = { version = "1.6", features = [ "union", "const_new", "const_generics" ] }
 smol = "2.0"
-stacksafe = "0.1"
 syn = { version = "2.0", features = [ "full", "extra-traits", "visit-mut" ] }
 thiserror = "2.0.12"
 tokio = { version = "1.48", default-features = false }
