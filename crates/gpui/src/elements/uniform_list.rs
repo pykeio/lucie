@@ -7,12 +7,13 @@
 use std::{cell::RefCell, cmp, ops::Range, rc::Rc, usize};
 
 use lucie_common::geometry::{Bounds, IsZero, Pixels, Point, Size, point, size};
+use lucie_style::{Overflow, StyleRefinement, Styled};
 use smallvec::SmallVec;
 
 use super::ListHorizontalSizingBehavior;
 use crate::{
 	AnyElement, App, AvailableSpace, ContentMask, Element, ElementId, Entity, GlobalElementId, Hitbox, InteractiveElement, Interactivity, IntoElement,
-	LayoutId, ListSizingBehavior, Overflow, ScrollHandle, StyleRefinement, Styled, Window
+	LayoutId, ListSizingBehavior, ScrollHandle, Window
 };
 
 /// uniform_list provides lazy rendering for a set of items that are of uniform height.

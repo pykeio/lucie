@@ -4,9 +4,10 @@ use lucie_common::{
 	SharedString,
 	geometry::{Pixels, px}
 };
+use lucie_style::TextRun;
 use rapidhash::fast::RapidHashMap;
 
-use crate::{FontId, FontRun, PlatformTextSystem, TextRun};
+use crate::{FontId, FontRun, PlatformTextSystem};
 
 /// The GPUI line wrapper, used to wrap lines of text to a given width.
 pub struct LineWrapper {
@@ -296,12 +297,15 @@ impl Boundary {
 
 #[cfg(test)]
 mod tests {
+	#[cfg(target_os = "macos")]
+	use lucie_style::TextRun;
+	use lucie_style::{Font, FontFeatures, FontStyle, FontWeight, font};
 	use rand::prelude::*;
 
 	use super::*;
-	use crate::{Font, FontFeatures, FontStyle, FontWeight, TestAppContext, TestDispatcher, font};
+	use crate::{TestAppContext, TestDispatcher};
 	#[cfg(target_os = "macos")]
-	use crate::{TextRun, WindowTextSystem, WrapBoundary};
+	use crate::{WindowTextSystem, WrapBoundary};
 
 	fn build_wrapper() -> LineWrapper {
 		let dispatcher = TestDispatcher::new(StdRng::seed_from_u64(0));

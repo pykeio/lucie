@@ -14,10 +14,11 @@ use lucie_common::{
 	refineable::Refineable as _,
 	sum_tree::{self, Bias, Dimensions, SumTree}
 };
+use lucie_style::{Overflow, Style, StyleRefinement, Styled};
 
 use crate::{
 	AnyElement, App, AvailableSpace, ContentMask, DispatchPhase, Element, EntityId, FocusHandle, GlobalElementId, Hitbox, HitboxBehavior, IntoElement,
-	Overflow, ScrollDelta, ScrollWheelEvent, Style, StyleRefinement, Styled, Window
+	ScrollDelta, ScrollWheelEvent, Window
 };
 
 type RenderItemFn = dyn FnMut(usize, &mut Window, &mut App) -> AnyElement + 'static;
@@ -1041,9 +1042,10 @@ impl sum_tree::SeekTarget<'_, ListItemSummary, ListItemSummary> for Height {
 #[cfg(test)]
 mod test {
 	use lucie_common::geometry::{point, px, size};
+	use lucie_style::Styled;
 
 	use crate::{
-		AppContext, AvailableSpace, Context, Element, IntoElement, ListState, Render, ScrollDelta, ScrollWheelEvent, Styled, TestAppContext, Window, div, list
+		AppContext, AvailableSpace, Context, Element, IntoElement, ListState, Render, ScrollDelta, ScrollWheelEvent, TestAppContext, Window, div, list
 	};
 
 	#[gpui::test]

@@ -4,8 +4,9 @@ use lucie_common::{
 	geometry::{Bounds, Pixels},
 	refineable::Refineable
 };
+use lucie_style::{ObjectFit, Style, StyleRefinement, Styled};
 
-use crate::{App, Element, ElementId, GlobalElementId, IntoElement, LayoutId, ObjectFit, Style, StyleRefinement, Styled, Window};
+use crate::{App, Element, ElementId, GlobalElementId, IntoElement, LayoutId, Window};
 
 /// A source of a surface's content.
 #[derive(Clone, Debug, PartialEq, Eq)]

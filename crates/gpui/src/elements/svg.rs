@@ -4,11 +4,9 @@ use lucie_common::{
 	ResultExt, SharedString,
 	geometry::{Bounds, Negate as _, Pixels, Point, Radians, Size, point, px, radians, size}
 };
+use lucie_style::{StyleRefinement, Styled};
 
-use crate::{
-	App, Asset, Element, GlobalElementId, Hitbox, InteractiveElement, Interactivity, IntoElement, LayoutId, StyleRefinement, Styled, TransformationMatrix,
-	Window
-};
+use crate::{App, Asset, Element, GlobalElementId, Hitbox, InteractiveElement, Interactivity, IntoElement, LayoutId, TransformationMatrix, Window};
 
 /// An SVG element.
 pub struct Svg {

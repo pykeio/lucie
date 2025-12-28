@@ -9,11 +9,13 @@ use std::{
 };
 
 use lucie_common::{
+	BoundsTree,
 	color::{Background, Hsla},
 	geometry::{Bounds, Corners, Edges, Pixels, Point, Radians, ScaledPixels, Size, point}
 };
+use lucie_style::BorderStyle;
 
-use crate::{AtlasTextureId, AtlasTile, ContentMask, bounds_tree::BoundsTree};
+use crate::{AtlasTextureId, AtlasTile, ContentMask};
 
 #[allow(non_camel_case_types, unused)]
 pub(crate) type PathVertex_ScaledPixels = PathVertex<ScaledPixels>;
@@ -441,17 +443,6 @@ impl From<Shadow> for Primitive {
 	fn from(shadow: Shadow) -> Self {
 		Primitive::Shadow(shadow)
 	}
-}
-
-/// The style of a border.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[repr(C)]
-pub enum BorderStyle {
-	/// A solid border.
-	#[default]
-	Solid = 0,
-	/// A dashed border.
-	Dashed = 1
 }
 
 /// A data type representing a 2 dimensional transformation that can be applied to an element.

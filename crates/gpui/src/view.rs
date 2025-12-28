@@ -5,11 +5,12 @@ use lucie_common::{
 	geometry::{Bounds, Pixels},
 	refineable::Refineable
 };
+use lucie_style::{Style, StyleRefinement, TextStyle};
 use rapidhash::fast::RapidHashSet;
 
 use crate::{
 	AnyElement, AnyEntity, AnyWeakEntity, App, AvailableSpace, ContentMask, Context, Element, ElementId, Empty, Entity, EntityId, GlobalElementId, IntoElement,
-	LayoutId, PaintIndex, PrepaintStateIndex, Render, Style, StyleRefinement, TextStyle, WeakEntity, Window
+	LayoutId, PaintIndex, PrepaintStateIndex, Render, WeakEntity, Window
 };
 
 struct AnyViewState {

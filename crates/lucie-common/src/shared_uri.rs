@@ -1,9 +1,18 @@
-use derive_more::{Deref, DerefMut};
+use std::ops::Deref;
+
 use lucie_common::SharedString;
 
 /// A [`SharedString`] containing a URI.
-#[derive(Deref, DerefMut, Default, PartialEq, Eq, Hash, Clone)]
+#[derive(Default, PartialEq, Eq, Hash, Clone)]
 pub struct SharedUri(SharedString);
+
+impl Deref for SharedUri {
+	type Target = str;
+
+	fn deref(&self) -> &Self::Target {
+		self.0.as_str()
+	}
+}
 
 impl std::fmt::Debug for SharedUri {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

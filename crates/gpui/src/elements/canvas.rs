@@ -2,8 +2,9 @@ use lucie_common::{
 	geometry::{Bounds, Pixels},
 	refineable::Refineable as _
 };
+use lucie_style::{Style, StyleRefinement, Styled};
 
-use crate::{App, Element, ElementId, GlobalElementId, IntoElement, Style, StyleRefinement, Styled, Window};
+use crate::{App, Element, ElementId, GlobalElementId, IntoElement, Window, util::paint_style};
 
 /// Construct a canvas element with the given paint callback.
 /// Useful for adding short term custom drawing to a view.
@@ -63,12 +64,12 @@ impl<T: 'static> Element for Canvas<T> {
 		cx: &mut App
 	) {
 		let prepaint = prepaint.take().unwrap();
-		style.paint(bounds, window, cx, |window, cx| (self.paint.take().unwrap())(bounds, prepaint, window, cx));
+		paint_style(style, bounds, window, cx, |window, cx| (self.paint.take().unwrap())(bounds, prepaint, window, cx));
 	}
 }
 
 impl<T> Styled for Canvas<T> {
-	fn style(&mut self) -> &mut crate::StyleRefinement {
+	fn style(&mut self) -> &mut StyleRefinement {
 		&mut self.style
 	}
 }

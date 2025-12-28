@@ -79,6 +79,7 @@ doctest = false
 [dependencies]
 lucie-common.workspace = true
 lucie-macros.workspace = true
+lucie-style.workspace = true
 
 anyhow.workspace = true
 async-task = "4.7"

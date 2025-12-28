@@ -3,14 +3,10 @@ use lucie_common::{
 	color::Hsla,
 	geometry::{AbsoluteLength, DefiniteLength, GridPlacement, Length, px, relative, rems}
 };
-pub use lucie_macros::{
-	border_style_methods, box_shadow_style_methods, cursor_style_methods, margin_style_methods, overflow_style_methods, padding_style_methods,
-	position_style_methods, visibility_style_methods
-};
 
 use crate::{
-	self as gpui, AlignContent, AlignItems, BorderStyle, CursorStyle, Display, Fill, FlexDirection, FlexWrap, Font, FontFeatures, FontStyle, FontWeight,
-	JustifyContent, StrikethroughStyle, StyleRefinement, TextAlign, TextOverflow, TextStyleRefinement, UnderlineStyle, WhiteSpace
+	AlignContent, AlignItems, BorderStyle, CursorStyle, Display, Fill, FlexDirection, FlexWrap, Font, FontFeatures, FontStyle, FontWeight, JustifyContent,
+	StrikethroughStyle, StyleRefinement, TextAlign, TextOverflow, TextStyleRefinement, UnderlineStyle, WhiteSpace
 };
 const ELLIPSIS: SharedString = SharedString::new_static("…");
 
@@ -21,14 +17,14 @@ pub trait Styled: Sized {
 	fn style(&mut self) -> &mut StyleRefinement;
 
 	lucie_macros::style_helpers!();
-	visibility_style_methods!();
-	margin_style_methods!();
-	padding_style_methods!();
-	position_style_methods!();
-	overflow_style_methods!();
-	cursor_style_methods!();
-	border_style_methods!();
-	box_shadow_style_methods!();
+	lucie_macros::visibility_style_methods!();
+	lucie_macros::margin_style_methods!();
+	lucie_macros::padding_style_methods!();
+	lucie_macros::position_style_methods!();
+	lucie_macros::overflow_style_methods!();
+	lucie_macros::cursor_style_methods!();
+	lucie_macros::border_style_methods!();
+	lucie_macros::box_shadow_style_methods!();
 
 	/// Sets the display type of the element to `block`.
 	/// [Docs](https://tailwindcss.com/docs/display)
@@ -92,30 +88,30 @@ pub trait Styled: Sized {
 	}
 
 	/// Sets the text alignment to left
-	fn text_left(mut self) -> Self {
+	fn text_left(self) -> Self {
 		self.text_align(TextAlign::Left)
 	}
 
 	/// Sets the text alignment to center
-	fn text_center(mut self) -> Self {
+	fn text_center(self) -> Self {
 		self.text_align(TextAlign::Center)
 	}
 
 	/// Sets the text alignment to right
-	fn text_right(mut self) -> Self {
+	fn text_right(self) -> Self {
 		self.text_align(TextAlign::Right)
 	}
 
 	/// Sets the truncate to prevent text from wrapping and truncate overflowing text with an ellipsis (…) if needed.
 	/// [Docs](https://tailwindcss.com/docs/text-overflow#truncate)
-	fn truncate(mut self) -> Self {
+	fn truncate(self) -> Self {
 		self.overflow_hidden().whitespace_nowrap().text_ellipsis()
 	}
 
 	/// Sets number of lines to show before truncating the text.
 	/// [Docs](https://tailwindcss.com/docs/line-clamp)
 	fn line_clamp(mut self, lines: usize) -> Self {
-		let mut text_style = self.text_style();
+		let text_style = self.text_style();
 		text_style.line_clamp = Some(lines);
 		self.overflow_hidden()
 	}

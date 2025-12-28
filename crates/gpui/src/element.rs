@@ -33,8 +33,7 @@
 
 use std::{
 	any::{Any, type_name},
-	fmt::{self, Debug, Display},
-	mem, panic,
+	fmt, mem, panic,
 	sync::Arc
 };
 
@@ -43,8 +42,9 @@ use lucie_common::{
 	ArenaBox,
 	geometry::{Bounds, Pixels, Point, Size}
 };
+use lucie_style::{Display, Style};
 
-use crate::{App, AvailableSpace, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Style, Window};
+use crate::{App, AvailableSpace, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Window};
 
 /// Implemented by types that participate in laying out and painting the contents of a window.
 /// Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.
@@ -272,7 +272,7 @@ impl<C: RenderOnce> IntoElement for Component<C> {
 #[derive(Deref, DerefMut, Clone, Default, Debug, Eq, PartialEq, Hash)]
 pub struct GlobalElementId(pub(crate) Arc<[ElementId]>);
 
-impl Display for GlobalElementId {
+impl fmt::Display for GlobalElementId {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		for (i, element_id) in self.0.iter().enumerate() {
 			if i > 0 {
@@ -622,7 +622,7 @@ impl Element for Empty {
 		(
 			window.request_layout(
 				Style {
-					display: crate::Display::None,
+					display: Display::None,
 					..Default::default()
 				},
 				None,

@@ -33,6 +33,7 @@ use lucie_common::{
 	measure, post_inc,
 	refineable::Refineable
 };
+use lucie_style::{BorderStyle, BoxShadow, CursorStyle, StrikethroughStyle, Style, TextStyle, TextStyleRefinement, UnderlineStyle};
 use parking_lot::RwLock;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle};
@@ -40,15 +41,14 @@ use slotmap::SlotMap;
 use smallvec::SmallVec;
 
 use crate::{
-	Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Asset, AsyncWindowContext, AvailableSpace, BorderStyle, BoxShadow,
-	Capslock, Context, CursorStyle, Decorations, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Effect, Empty, Entity, EntityId,
-	EventEmitter, FileDropEvent, FontId, Global, GlobalElementId, GlyphId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke,
-	KeystrokeEvent, LayoutId, LineLayoutIndex, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path,
-	PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render,
-	RenderGlyphParams, RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y,
-	Scene, Shadow, StrikethroughStyle, Style, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task,
-	TextStyle, TextStyleRefinement, TransformationMatrix, Underline, UnderlineStyle, WindowAppearance, WindowBackgroundAppearance, WindowBounds,
-	WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, prelude::*
+	Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Asset, AsyncWindowContext, AvailableSpace, Capslock, Context,
+	Decorations, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Effect, Empty, Entity, EntityId, EventEmitter, FileDropEvent, FontId, Global,
+	GlobalElementId, GlyphId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex,
+	Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, PlatformAtlas, PlatformDisplay,
+	PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage,
+	RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, Scene, Shadow, SubscriberSet,
+	Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TransformationMatrix, Underline, WindowAppearance,
+	WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, prelude::*
 };
 
 mod prompts;

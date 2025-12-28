@@ -5,6 +5,7 @@ use lucie_common::{
 	ResultExt,
 	geometry::{Pixels, Point, px}
 };
+use lucie_style::CursorStyle;
 use windows::{
 	UI::{
 		Color,

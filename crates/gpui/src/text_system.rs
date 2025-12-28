@@ -1,33 +1,30 @@
-mod font_fallbacks;
-mod font_features;
 mod line;
 mod line_layout;
 mod line_wrapper;
 
-use core::fmt;
 use std::{
 	borrow::Cow,
 	cmp,
-	fmt::{Debug, Display, Formatter},
+	fmt::Debug,
 	hash::{Hash, Hasher},
 	ops::{Deref, DerefMut, Range},
 	sync::Arc
 };
 
 use anyhow::{Context as _, anyhow};
-use derive_more::{Add, Deref, FromStr, Sub};
+use derive_more::Deref;
 use itertools::Itertools;
 use lucie_common::{
 	SharedString,
-	color::Hsla,
 	geometry::{Bounds, DevicePixels, Pixels, Point, Size, px}
 };
+use lucie_style::{Font, TextRun, font};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
 use rapidhash::fast::RapidHashMap;
 use smallvec::{SmallVec, smallvec};
 
-pub use self::{font_fallbacks::*, font_features::*, line::*, line_layout::*, line_wrapper::*};
-use crate::{PlatformTextSystem, Result, StrikethroughStyle, UnderlineStyle};
+pub use self::{line::*, line_layout::*, line_wrapper::*};
+use crate::{PlatformTextSystem, Result};
 
 /// An opaque identifier for a specific font.
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
@@ -550,116 +547,6 @@ impl DerefMut for LineWrapperHandle {
 	}
 }
 
-/// The degree of blackness or stroke thickness of a font. This value ranges from 100.0 to 900.0,
-/// with 400.0 as normal.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Add, Sub, FromStr)]
-pub struct FontWeight(pub f32);
-
-impl Display for FontWeight {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
-
-impl From<f32> for FontWeight {
-	fn from(weight: f32) -> Self {
-		FontWeight(weight)
-	}
-}
-
-impl Default for FontWeight {
-	#[inline]
-	fn default() -> FontWeight {
-		FontWeight::NORMAL
-	}
-}
-
-impl Hash for FontWeight {
-	fn hash<H: Hasher>(&self, state: &mut H) {
-		state.write_u32(u32::from_be_bytes(self.0.to_be_bytes()));
-	}
-}
-
-impl Eq for FontWeight {}
-
-impl FontWeight {
-	/// Thin weight (100), the thinnest value.
-	pub const THIN: FontWeight = FontWeight(100.0);
-	/// Extra light weight (200).
-	pub const EXTRA_LIGHT: FontWeight = FontWeight(200.0);
-	/// Light weight (300).
-	pub const LIGHT: FontWeight = FontWeight(300.0);
-	/// Normal (400).
-	pub const NORMAL: FontWeight = FontWeight(400.0);
-	/// Medium weight (500, higher than normal).
-	pub const MEDIUM: FontWeight = FontWeight(500.0);
-	/// Semibold weight (600).
-	pub const SEMIBOLD: FontWeight = FontWeight(600.0);
-	/// Bold weight (700).
-	pub const BOLD: FontWeight = FontWeight(700.0);
-	/// Extra-bold weight (800).
-	pub const EXTRA_BOLD: FontWeight = FontWeight(800.0);
-	/// Black weight (900), the thickest value.
-	pub const BLACK: FontWeight = FontWeight(900.0);
-
-	/// All of the font weights, in order from thinnest to thickest.
-	pub const ALL: [FontWeight; 9] = [
-		Self::THIN,
-		Self::EXTRA_LIGHT,
-		Self::LIGHT,
-		Self::NORMAL,
-		Self::MEDIUM,
-		Self::SEMIBOLD,
-		Self::BOLD,
-		Self::EXTRA_BOLD,
-		Self::BLACK
-	];
-}
-
-/// Allows italic or oblique faces to be selected.
-#[derive(Clone, Copy, Eq, PartialEq, Debug, Hash, Default)]
-pub enum FontStyle {
-	/// A face that is neither italic not obliqued.
-	#[default]
-	Normal,
-	/// A form that is generally cursive in nature.
-	Italic,
-	/// A typically-sloped version of the regular face.
-	Oblique
-}
-
-impl Display for FontStyle {
-	fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-		Debug::fmt(self, f)
-	}
-}
-
-/// A styled run of text, for use in [`crate::TextLayout`].
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct TextRun {
-	/// A number of utf8 bytes
-	pub len: usize,
-	/// The font to use for this run.
-	pub font: Font,
-	/// The color
-	pub color: Hsla,
-	/// The background color (if any)
-	pub background_color: Option<Hsla>,
-	/// The underline style (if any)
-	pub underline: Option<UnderlineStyle>,
-	/// The strikethrough style (if any)
-	pub strikethrough: Option<StrikethroughStyle>
-}
-
-#[cfg(all(target_os = "macos", test))]
-impl TextRun {
-	fn with_len(&self, len: usize) -> Self {
-		let mut this = self.clone();
-		this.len = len;
-		this
-	}
-}
-
 /// An identifier for a specific glyph, as returned by [`WindowTextSystem::layout_line`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 #[repr(C)]
@@ -685,58 +572,6 @@ impl Hash for RenderGlyphParams {
 		self.subpixel_variant.hash(state);
 		self.scale_factor.to_bits().hash(state);
 		self.is_emoji.hash(state);
-	}
-}
-
-/// The configuration details for identifying a specific font.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Font {
-	/// The font family name.
-	///
-	/// The special name ".SystemUIFont" is used to identify the system UI font, which varies based on platform.
-	pub family: SharedString,
-
-	/// The font features to use.
-	pub features: FontFeatures,
-
-	/// The fallbacks fonts to use.
-	pub fallbacks: Option<FontFallbacks>,
-
-	/// The font weight.
-	pub weight: FontWeight,
-
-	/// The font style.
-	pub style: FontStyle
-}
-
-impl Default for Font {
-	fn default() -> Self {
-		font(".SystemUIFont")
-	}
-}
-
-/// Get a [`Font`] for a given name.
-pub fn font(family: impl Into<SharedString>) -> Font {
-	Font {
-		family: family.into(),
-		features: FontFeatures::default(),
-		weight: FontWeight::default(),
-		style: FontStyle::default(),
-		fallbacks: None
-	}
-}
-
-impl Font {
-	/// Set this Font to be bold
-	pub fn bold(mut self) -> Self {
-		self.weight = FontWeight::BOLD;
-		self
-	}
-
-	/// Set this Font to be italic
-	pub fn italic(mut self) -> Self {
-		self.style = FontStyle::Italic;
-		self
 	}
 }
 

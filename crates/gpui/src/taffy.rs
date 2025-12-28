@@ -1,6 +1,7 @@
 use std::{fmt::Debug, ops::Range};
 
-use lucie_common::geometry::{AbsoluteLength, Bounds, DefiniteLength, Edges, GridPlacement, Length, Pixels, Point, Size, point, size};
+use lucie_common::geometry::{AbsoluteLength, Bounds, DefiniteLength, Edges, GridPlacement, Length, Pixels, Size, point, size};
+use lucie_style::Style;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use stacksafe::{StackSafe, stacksafe};
 use taffy::{
@@ -10,7 +11,7 @@ use taffy::{
 	tree::NodeId
 };
 
-use crate::{App, Style, Window};
+use crate::{App, Window};
 
 type NodeMeasureFn = StackSafe<Box<dyn FnMut(Size<Option<Pixels>>, Size<AvailableSpace>, &mut Window, &mut App) -> Size<Pixels>>>;
 
@@ -251,10 +252,21 @@ impl ToTaffy<taffy::style::Style> for Style {
 		}
 
 		taffy::style::Style {
-			display: self.display.into(),
-			overflow: point_to_taffy(self.overflow),
+			display: match self.display {
+				lucie_style::Display::Block => taffy::style::Display::Block,
+				lucie_style::Display::Flex => taffy::style::Display::Flex,
+				lucie_style::Display::Grid => taffy::style::Display::Grid,
+				lucie_style::Display::None => taffy::style::Display::None
+			},
+			overflow: TaffyPoint {
+				x: overflow_to_taffy(self.overflow.x),
+				y: overflow_to_taffy(self.overflow.y)
+			},
 			scrollbar_width: self.scrollbar_width.to_taffy(rem_size, scale_factor),
-			position: self.position.into(),
+			position: match self.position {
+				lucie_style::Position::Relative => taffy::style::Position::Relative,
+				lucie_style::Position::Absolute => taffy::style::Position::Absolute
+			},
 			inset: self.inset.to_taffy(rem_size, scale_factor),
 			size: self.size.to_taffy(rem_size, scale_factor),
 			min_size: self.min_size.to_taffy(rem_size, scale_factor),
@@ -263,13 +275,22 @@ impl ToTaffy<taffy::style::Style> for Style {
 			margin: self.margin.to_taffy(rem_size, scale_factor),
 			padding: self.padding.to_taffy(rem_size, scale_factor),
 			border: self.border_widths.to_taffy(rem_size, scale_factor),
-			align_items: self.align_items.map(|x| x.into()),
-			align_self: self.align_self.map(|x| x.into()),
-			align_content: self.align_content.map(|x| x.into()),
-			justify_content: self.justify_content.map(|x| x.into()),
+			align_items: self.align_items.map(items_to_taffy),
+			align_self: self.align_self.map(items_to_taffy),
+			align_content: self.align_content.map(align_to_taffy),
+			justify_content: self.justify_content.map(align_to_taffy),
 			gap: self.gap.to_taffy(rem_size, scale_factor),
-			flex_direction: self.flex_direction.into(),
-			flex_wrap: self.flex_wrap.into(),
+			flex_direction: match self.flex_direction {
+				lucie_style::FlexDirection::Row => taffy::style::FlexDirection::Row,
+				lucie_style::FlexDirection::Column => taffy::style::FlexDirection::Column,
+				lucie_style::FlexDirection::RowReverse => taffy::style::FlexDirection::RowReverse,
+				lucie_style::FlexDirection::ColumnReverse => taffy::style::FlexDirection::ColumnReverse
+			},
+			flex_wrap: match self.flex_wrap {
+				lucie_style::FlexWrap::NoWrap => taffy::style::FlexWrap::NoWrap,
+				lucie_style::FlexWrap::Wrap => taffy::style::FlexWrap::Wrap,
+				lucie_style::FlexWrap::WrapReverse => taffy::style::FlexWrap::WrapReverse
+			},
 			flex_basis: self.flex_basis.to_taffy(rem_size, scale_factor),
 			flex_grow: self.flex_grow,
 			flex_shrink: self.flex_shrink,
@@ -287,6 +308,44 @@ impl ToTaffy<taffy::style::Style> for Style {
 				.unwrap_or_default(),
 			..Default::default()
 		}
+	}
+}
+
+#[inline]
+fn overflow_to_taffy(overflow: lucie_style::Overflow) -> taffy::style::Overflow {
+	match overflow {
+		lucie_style::Overflow::Visible => taffy::style::Overflow::Visible,
+		lucie_style::Overflow::Clip => taffy::style::Overflow::Clip,
+		lucie_style::Overflow::Hidden => taffy::style::Overflow::Hidden,
+		lucie_style::Overflow::Scroll => taffy::style::Overflow::Scroll
+	}
+}
+
+#[inline]
+fn align_to_taffy(align: lucie_style::AlignContent) -> taffy::style::AlignContent {
+	match align {
+		lucie_style::AlignContent::Start => taffy::style::AlignContent::Start,
+		lucie_style::AlignContent::End => taffy::style::AlignContent::End,
+		lucie_style::AlignContent::FlexStart => taffy::style::AlignContent::FlexStart,
+		lucie_style::AlignContent::FlexEnd => taffy::style::AlignContent::FlexEnd,
+		lucie_style::AlignContent::Center => taffy::style::AlignContent::Center,
+		lucie_style::AlignContent::Stretch => taffy::style::AlignContent::Stretch,
+		lucie_style::AlignContent::SpaceBetween => taffy::style::AlignContent::SpaceBetween,
+		lucie_style::AlignContent::SpaceEvenly => taffy::style::AlignContent::SpaceEvenly,
+		lucie_style::AlignContent::SpaceAround => taffy::style::AlignContent::SpaceAround
+	}
+}
+
+#[inline]
+fn items_to_taffy(items: lucie_style::AlignItems) -> taffy::style::AlignItems {
+	match items {
+		lucie_style::AlignItems::Start => taffy::style::AlignItems::Start,
+		lucie_style::AlignItems::End => taffy::style::AlignItems::End,
+		lucie_style::AlignItems::FlexStart => taffy::style::AlignItems::FlexStart,
+		lucie_style::AlignItems::FlexEnd => taffy::style::AlignItems::FlexEnd,
+		lucie_style::AlignItems::Center => taffy::style::AlignItems::Center,
+		lucie_style::AlignItems::Baseline => taffy::style::AlignItems::Baseline,
+		lucie_style::AlignItems::Stretch => taffy::style::AlignItems::Stretch
 	}
 }
 
@@ -387,13 +446,6 @@ impl ToTaffy<taffy::style::LengthPercentage> for AbsoluteLength {
 			}
 		}
 	}
-}
-
-fn point_to_taffy<T, U>(point: Point<T>) -> TaffyPoint<U>
-where
-	T: Into<U> + Clone + Debug + Default + PartialEq
-{
-	TaffyPoint { x: point.x.into(), y: point.y.into() }
 }
 
 impl<T, U> ToTaffy<TaffySize<U>> for Size<T>

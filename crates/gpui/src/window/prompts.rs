@@ -2,11 +2,12 @@ use std::ops::Deref;
 
 use futures_channel::oneshot;
 use lucie_common::color::{opaque_grey, white};
+use lucie_style::Styled;
 
 use super::Window;
 use crate::{
 	AnyView, App, AppContext as _, Context, Entity, EventEmitter, FocusHandle, Focusable, InteractiveElement, IntoElement, ParentElement, PromptButton,
-	PromptLevel, Render, StatefulInteractiveElement, Styled, div
+	PromptLevel, Render, StatefulInteractiveElement, div
 };
 
 /// The event emitted when a prompt's option is selected.

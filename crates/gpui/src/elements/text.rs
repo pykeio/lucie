@@ -12,12 +12,12 @@ use lucie_common::{
 	ResultExt, SharedString,
 	geometry::{Bounds, Pixels, Point, Size}
 };
+use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, WhiteSpace};
 use smallvec::SmallVec;
 
 use crate::{
-	ActiveTooltip, AnyView, App, DispatchPhase, Element, ElementId, GlobalElementId, HighlightStyle, Hitbox, HitboxBehavior, IntoElement, LayoutId,
-	MouseDownEvent, MouseMoveEvent, MouseUpEvent, TextOverflow, TextRun, TextStyle, TooltipId, WhiteSpace, Window, WrappedLine, WrappedLineLayout,
-	register_tooltip_mouse_handlers, set_tooltip_on_window
+	ActiveTooltip, AnyView, App, DispatchPhase, Element, ElementId, GlobalElementId, Hitbox, HitboxBehavior, IntoElement, LayoutId, MouseDownEvent,
+	MouseMoveEvent, MouseUpEvent, TooltipId, Window, WrappedLine, WrappedLineLayout, register_tooltip_mouse_handlers, set_tooltip_on_window
 };
 
 impl Element for &'static str {
@@ -629,7 +629,7 @@ impl Element for InteractiveText {
 				if let Ok(ix) = text_layout.index_for_position(mouse_position)
 					&& self.clickable_ranges.iter().any(|range| range.contains(&ix))
 				{
-					window.set_cursor_style(crate::CursorStyle::PointingHand, hitbox)
+					window.set_cursor_style(CursorStyle::PointingHand, hitbox)
 				}
 
 				let text_layout = text_layout.clone();

@@ -7,6 +7,7 @@ use lucie_common::{
 	color::Rgba,
 	geometry::{Bounds, DevicePixels, Pixels, Point, Size, bounds, point, px, size}
 };
+use lucie_style::{Font, FontFallbacks, FontFeatures, FontStyle, FontWeight};
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use rapidhash::fast::RapidHashMap;
 use windows::{
@@ -346,7 +347,12 @@ impl DirectWriteState {
 		let fontset = unsafe { collection.GetFontSet().log_err()? };
 		let font = unsafe {
 			fontset
-				.GetMatchingFonts(&HSTRING::from(family_name), font_weight.into(), DWRITE_FONT_STRETCH_NORMAL, font_style.into())
+				.GetMatchingFonts(
+					&HSTRING::from(family_name),
+					to_dwrite_font_weight(&font_weight),
+					DWRITE_FONT_STRETCH_NORMAL,
+					to_dwrite_font_style(&font_style)
+				)
 				.log_err()?
 		};
 		let total_number = unsafe { font.GetFontCount() };
@@ -1340,36 +1346,31 @@ impl<'a> StringIndexConverter<'a> {
 	}
 }
 
-impl Into<DWRITE_FONT_STYLE> for FontStyle {
-	fn into(self) -> DWRITE_FONT_STYLE {
-		match self {
-			FontStyle::Normal => DWRITE_FONT_STYLE_NORMAL,
-			FontStyle::Italic => DWRITE_FONT_STYLE_ITALIC,
-			FontStyle::Oblique => DWRITE_FONT_STYLE_OBLIQUE
-		}
+#[inline]
+fn to_dwrite_font_style(style: &FontStyle) -> DWRITE_FONT_STYLE {
+	match style {
+		FontStyle::Normal => DWRITE_FONT_STYLE_NORMAL,
+		FontStyle::Italic => DWRITE_FONT_STYLE_ITALIC,
+		FontStyle::Oblique => DWRITE_FONT_STYLE_OBLIQUE
 	}
 }
 
-impl From<DWRITE_FONT_STYLE> for FontStyle {
-	fn from(value: DWRITE_FONT_STYLE) -> Self {
-		match value.0 {
-			0 => FontStyle::Normal,
-			1 => FontStyle::Italic,
-			2 => FontStyle::Oblique,
-			_ => unreachable!()
-		}
-	}
+#[inline]
+fn to_dwrite_font_weight(weight: &FontWeight) -> DWRITE_FONT_WEIGHT {
+	DWRITE_FONT_WEIGHT(weight.0 as i32)
 }
 
-impl Into<DWRITE_FONT_WEIGHT> for FontWeight {
-	fn into(self) -> DWRITE_FONT_WEIGHT {
-		DWRITE_FONT_WEIGHT(self.0 as i32)
-	}
+#[inline]
+fn dwrite_to_weight(weight: &DWRITE_FONT_WEIGHT) -> FontWeight {
+	FontWeight(weight.0 as _)
 }
 
-impl From<DWRITE_FONT_WEIGHT> for FontWeight {
-	fn from(value: DWRITE_FONT_WEIGHT) -> Self {
-		FontWeight(value.0 as f32)
+#[inline]
+fn dwrite_to_font_style(style: &DWRITE_FONT_STYLE) -> FontStyle {
+	match style.0 {
+		1 => FontStyle::Italic,
+		2 => FontStyle::Oblique,
+		_ => FontStyle::Normal
 	}
 }
 
@@ -1408,8 +1409,8 @@ fn get_font_identifier_and_font_struct(font_face: &IDWriteFontFace3, locale: &st
 	let font_struct = Font {
 		family: family_name.into(),
 		features: FontFeatures::default(),
-		weight: weight.into(),
-		style: style.into(),
+		weight: dwrite_to_weight(&weight),
+		style: dwrite_to_font_style(&style),
 		fallbacks: None
 	};
 	let is_emoji = unsafe { font_face.IsColorFont().as_bool() };

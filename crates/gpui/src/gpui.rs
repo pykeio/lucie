@@ -12,7 +12,6 @@ mod action;
 mod app;
 mod asset_cache;
 mod assets;
-mod bounds_tree;
 /// The default colors used by GPUI.
 pub mod colors;
 mod element;
@@ -31,9 +30,6 @@ mod profiler;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod queue;
 mod scene;
-mod shared_uri;
-mod style;
-mod styled;
 mod subscription;
 mod svg_renderer;
 mod tab_stop;
@@ -61,9 +57,8 @@ mod seal {
 	pub trait Sealed {}
 }
 
-pub extern crate lucie_common as common;
-pub extern crate lucie_macros as macros;
-
+pub use ::lucie_common as common;
+pub use ::lucie_macros as macros;
 pub use action::*;
 pub use anyhow::Result;
 pub use app::*;
@@ -84,16 +79,14 @@ pub use lucie_common::{
 	refineable::{self, Refineable}
 };
 pub use lucie_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};
+pub use lucie_style::*;
 pub use path_builder::*;
 pub use platform::*;
 pub use profiler::*;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub(crate) use queue::{PriorityQueueReceiver, PriorityQueueSender};
 pub use scene::*;
-pub use shared_uri::*;
 pub use smol::Timer;
-pub use style::*;
-pub use styled::*;
 pub use subscription::*;
 pub use svg_renderer::*;
 pub(crate) use tab_stop::TabStopMap;

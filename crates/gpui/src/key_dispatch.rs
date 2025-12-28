@@ -540,12 +540,13 @@ mod tests {
 	use std::{cell::RefCell, ops::Range, rc::Rc};
 
 	use lucie_common::geometry::{Bounds, Pixels, Point};
+	use lucie_style::Style;
 	use smallvec::SmallVec;
 
 	use super::DispatchResult;
 	use crate::{
 		self as gpui, Action, ActionRegistry, App, Context, DispatchTree, Element, ElementId, FocusHandle, GlobalElementId, InputHandler, IntoElement,
-		KeyBinding, KeyContext, Keymap, Keystroke, LayoutId, Render, Style, TestAppContext, UTF16Selection, Window
+		KeyBinding, KeyContext, Keymap, Keystroke, LayoutId, Render, TestAppContext, UTF16Selection, Window
 	};
 
 	#[derive(PartialEq, Eq)]

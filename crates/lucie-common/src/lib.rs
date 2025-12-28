@@ -13,21 +13,25 @@ extern crate self as lucie_common;
 
 mod arc_cow;
 mod arena;
+mod bounds_tree;
 pub mod color;
 mod defer;
 pub mod geometry;
 pub mod refineable;
 mod result_ext;
 mod shared_string;
+mod shared_uri;
 pub mod sum_tree;
 mod trys;
 
 pub use self::{
 	arc_cow::ArcCow,
 	arena::{Arena, ArenaBox},
+	bounds_tree::BoundsTree,
 	defer::{Deferred, defer},
 	result_ext::{Flatten, LogLevel, ResultExt},
-	shared_string::SharedString
+	shared_string::SharedString,
+	shared_uri::SharedUri
 };
 
 pub mod __private {

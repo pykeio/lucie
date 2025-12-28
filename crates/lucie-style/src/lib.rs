@@ -6,7 +6,7 @@ use std::{
 
 use lucie_common::{
 	SharedString,
-	color::{Background, BackgroundTag, Hsla, Rgba, black},
+	color::{Background, Hsla, Rgba, black},
 	geometry::{
 		AbsoluteLength, Bounds, Corners, CornersRefinement, DefiniteLength, DevicePixels, Edges, EdgesRefinement, GridLocation, Length, Pixels, Point,
 		PointRefinement, Size, SizeRefinement, phi, point, rems, size
@@ -14,16 +14,10 @@ use lucie_common::{
 	refineable::Refineable
 };
 
-use crate::{App, BorderStyle, ContentMask, CursorStyle, Font, FontFallbacks, FontFeatures, FontStyle, FontWeight, Styled, TextRun, Window, quad};
-
-/// Use this struct for interfacing with the 'debug_below' styling from your own elements.
-/// If a parent element has this style set on it, then this struct will be set as a global in
-/// GPUI.
-#[cfg(debug_assertions)]
-pub struct DebugBelow;
-
-#[cfg(debug_assertions)]
-impl crate::Global for DebugBelow {}
+mod text;
+pub use self::text::*;
+mod styled;
+pub use self::styled::Styled;
 
 /// How to fit the image into the bounds of the element.
 pub enum ObjectFit {
@@ -292,6 +286,17 @@ pub struct BoxShadow {
 	pub spread_radius: Pixels
 }
 
+/// The style of a border.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(C)]
+pub enum BorderStyle {
+	/// A solid border.
+	#[default]
+	Solid = 0,
+	/// A dashed border.
+	Dashed = 1
+}
+
 /// How to handle whitespace in text
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum WhiteSpace {
@@ -466,6 +471,97 @@ impl TextStyle {
 	}
 }
 
+/// The style of the cursor (pointer)
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, Hash)]
+pub enum CursorStyle {
+	/// The default cursor
+	#[default]
+	Arrow,
+
+	/// A text input cursor
+	/// corresponds to the CSS cursor value `text`
+	IBeam,
+
+	/// A crosshair cursor
+	/// corresponds to the CSS cursor value `crosshair`
+	Crosshair,
+
+	/// A closed hand cursor
+	/// corresponds to the CSS cursor value `grabbing`
+	ClosedHand,
+
+	/// An open hand cursor
+	/// corresponds to the CSS cursor value `grab`
+	OpenHand,
+
+	/// A pointing hand cursor
+	/// corresponds to the CSS cursor value `pointer`
+	PointingHand,
+
+	/// A resize left cursor
+	/// corresponds to the CSS cursor value `w-resize`
+	ResizeLeft,
+
+	/// A resize right cursor
+	/// corresponds to the CSS cursor value `e-resize`
+	ResizeRight,
+
+	/// A resize cursor to the left and right
+	/// corresponds to the CSS cursor value `ew-resize`
+	ResizeLeftRight,
+
+	/// A resize up cursor
+	/// corresponds to the CSS cursor value `n-resize`
+	ResizeUp,
+
+	/// A resize down cursor
+	/// corresponds to the CSS cursor value `s-resize`
+	ResizeDown,
+
+	/// A resize cursor directing up and down
+	/// corresponds to the CSS cursor value `ns-resize`
+	ResizeUpDown,
+
+	/// A resize cursor directing up-left and down-right
+	/// corresponds to the CSS cursor value `nesw-resize`
+	ResizeUpLeftDownRight,
+
+	/// A resize cursor directing up-right and down-left
+	/// corresponds to the CSS cursor value `nwse-resize`
+	ResizeUpRightDownLeft,
+
+	/// A cursor indicating that the item/column can be resized horizontally.
+	/// corresponds to the CSS cursor value `col-resize`
+	ResizeColumn,
+
+	/// A cursor indicating that the item/row can be resized vertically.
+	/// corresponds to the CSS cursor value `row-resize`
+	ResizeRow,
+
+	/// A text input cursor for vertical layout
+	/// corresponds to the CSS cursor value `vertical-text`
+	IBeamCursorForVerticalLayout,
+
+	/// A cursor indicating that the operation is not allowed
+	/// corresponds to the CSS cursor value `not-allowed`
+	OperationNotAllowed,
+
+	/// A cursor indicating that the operation will result in a link
+	/// corresponds to the CSS cursor value `alias`
+	DragLink,
+
+	/// A cursor indicating that the operation will result in a copy
+	/// corresponds to the CSS cursor value `copy`
+	DragCopy,
+
+	/// A cursor indicating that the operation will result in a context menu
+	/// corresponds to the CSS cursor value `context-menu`
+	ContextualMenu,
+
+	/// Hide the cursor
+	None
+}
+
 /// A highlight style to apply, similar to a `TextStyle` except
 /// for a single font, uniformly sized and spaced text.
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -517,113 +613,6 @@ impl Style {
 	/// Get the text style in this element style.
 	pub fn text_style(&self) -> Option<&TextStyleRefinement> {
 		if self.text.is_some() { Some(&self.text) } else { None }
-	}
-
-	/// Get the content mask for this element style, based on the given bounds.
-	/// If the element does not hide its overflow, this will return `None`.
-	pub fn overflow_mask(&self, bounds: Bounds<Pixels>, rem_size: Pixels) -> Option<ContentMask<Pixels>> {
-		match self.overflow {
-			Point {
-				x: Overflow::Visible,
-				y: Overflow::Visible
-			} => None,
-			_ => {
-				let mut min = bounds.origin;
-				let mut max = bounds.bottom_right();
-
-				if self.border_color.is_some_and(|color| !color.is_transparent()) {
-					min.x += self.border_widths.left.to_pixels(rem_size);
-					max.x -= self.border_widths.right.to_pixels(rem_size);
-					min.y += self.border_widths.top.to_pixels(rem_size);
-					max.y -= self.border_widths.bottom.to_pixels(rem_size);
-				}
-
-				let bounds = match (self.overflow.x == Overflow::Visible, self.overflow.y == Overflow::Visible) {
-					// x and y both visible
-					(true, true) => return None,
-					// x visible, y hidden
-					(true, false) => Bounds::from_corners(point(min.x, bounds.origin.y), point(max.x, bounds.bottom_right().y)),
-					// x hidden, y visible
-					(false, true) => Bounds::from_corners(point(bounds.origin.x, min.y), point(bounds.bottom_right().x, max.y)),
-					// both hidden
-					(false, false) => Bounds::from_corners(min, max)
-				};
-
-				Some(ContentMask { bounds })
-			}
-		}
-	}
-
-	/// Paints the background of an element styled with this style.
-	pub fn paint(&self, bounds: Bounds<Pixels>, window: &mut Window, cx: &mut App, continuation: impl FnOnce(&mut Window, &mut App)) {
-		#[cfg(debug_assertions)]
-		if self.debug_below {
-			cx.set_global(DebugBelow)
-		}
-
-		#[cfg(debug_assertions)]
-		if self.debug || cx.has_global::<DebugBelow>() {
-			window.paint_quad(crate::outline(bounds, lucie_common::color::red(), BorderStyle::default()));
-		}
-
-		let rem_size = window.rem_size();
-		let corner_radii = self.corner_radii.to_pixels(rem_size).clamp_radii_for_quad_size(bounds.size);
-
-		window.paint_shadows(bounds, corner_radii, &self.box_shadow);
-
-		let background_color = self.background.as_ref().and_then(Fill::color);
-		if background_color.is_some_and(|color| !color.is_transparent()) {
-			let mut border_color = match background_color {
-				Some(color) => match color.tag {
-					BackgroundTag::Solid => color.solid,
-					BackgroundTag::LinearGradient => color.colors.first().map(|stop| stop.color).unwrap_or_default(),
-					BackgroundTag::PatternSlash => color.solid
-				},
-				None => Hsla::default()
-			};
-			border_color.a = 0.;
-			window.paint_quad(quad(bounds, corner_radii, background_color.unwrap_or_default(), Edges::default(), border_color, self.border_style));
-		}
-
-		continuation(window, cx);
-
-		if self.is_border_visible() {
-			let border_widths = self.border_widths.to_pixels(rem_size);
-			let max_border_width = border_widths.max();
-			let max_corner_radius = corner_radii.max();
-
-			let top_bounds = Bounds::from_corners(bounds.origin, bounds.top_right() + point(Pixels::ZERO, max_border_width.max(max_corner_radius)));
-			let bottom_bounds =
-				Bounds::from_corners(bounds.bottom_left() - point(Pixels::ZERO, max_border_width.max(max_corner_radius)), bounds.bottom_right());
-			let left_bounds = Bounds::from_corners(top_bounds.bottom_left(), bottom_bounds.origin + point(max_border_width, Pixels::ZERO));
-			let right_bounds = Bounds::from_corners(top_bounds.bottom_right() - point(max_border_width, Pixels::ZERO), bottom_bounds.top_right());
-
-			let mut background = self.border_color.unwrap_or_default();
-			background.a = 0.;
-			let quad = quad(bounds, corner_radii, background, border_widths, self.border_color.unwrap_or_default(), self.border_style);
-
-			window.with_content_mask(Some(ContentMask { bounds: top_bounds }), |window| {
-				window.paint_quad(quad.clone());
-			});
-			window.with_content_mask(Some(ContentMask { bounds: right_bounds }), |window| {
-				window.paint_quad(quad.clone());
-			});
-			window.with_content_mask(Some(ContentMask { bounds: bottom_bounds }), |window| {
-				window.paint_quad(quad.clone());
-			});
-			window.with_content_mask(Some(ContentMask { bounds: left_bounds }), |window| {
-				window.paint_quad(quad);
-			});
-		}
-
-		#[cfg(debug_assertions)]
-		if self.debug_below {
-			cx.remove_global::<DebugBelow>();
-		}
-	}
-
-	fn is_border_visible(&self) -> bool {
-		self.border_color.is_some_and(|color| !color.is_transparent()) && self.border_widths.any(|length| !length.is_zero())
 	}
 }
 
@@ -1090,88 +1079,6 @@ pub enum Position {
 	Absolute
 }
 
-impl From<AlignItems> for taffy::style::AlignItems {
-	fn from(value: AlignItems) -> Self {
-		match value {
-			AlignItems::Start => Self::Start,
-			AlignItems::End => Self::End,
-			AlignItems::FlexStart => Self::FlexStart,
-			AlignItems::FlexEnd => Self::FlexEnd,
-			AlignItems::Center => Self::Center,
-			AlignItems::Baseline => Self::Baseline,
-			AlignItems::Stretch => Self::Stretch
-		}
-	}
-}
-
-impl From<AlignContent> for taffy::style::AlignContent {
-	fn from(value: AlignContent) -> Self {
-		match value {
-			AlignContent::Start => Self::Start,
-			AlignContent::End => Self::End,
-			AlignContent::FlexStart => Self::FlexStart,
-			AlignContent::FlexEnd => Self::FlexEnd,
-			AlignContent::Center => Self::Center,
-			AlignContent::Stretch => Self::Stretch,
-			AlignContent::SpaceBetween => Self::SpaceBetween,
-			AlignContent::SpaceEvenly => Self::SpaceEvenly,
-			AlignContent::SpaceAround => Self::SpaceAround
-		}
-	}
-}
-
-impl From<Display> for taffy::style::Display {
-	fn from(value: Display) -> Self {
-		match value {
-			Display::Block => Self::Block,
-			Display::Flex => Self::Flex,
-			Display::Grid => Self::Grid,
-			Display::None => Self::None
-		}
-	}
-}
-
-impl From<FlexWrap> for taffy::style::FlexWrap {
-	fn from(value: FlexWrap) -> Self {
-		match value {
-			FlexWrap::NoWrap => Self::NoWrap,
-			FlexWrap::Wrap => Self::Wrap,
-			FlexWrap::WrapReverse => Self::WrapReverse
-		}
-	}
-}
-
-impl From<FlexDirection> for taffy::style::FlexDirection {
-	fn from(value: FlexDirection) -> Self {
-		match value {
-			FlexDirection::Row => Self::Row,
-			FlexDirection::Column => Self::Column,
-			FlexDirection::RowReverse => Self::RowReverse,
-			FlexDirection::ColumnReverse => Self::ColumnReverse
-		}
-	}
-}
-
-impl From<Overflow> for taffy::style::Overflow {
-	fn from(value: Overflow) -> Self {
-		match value {
-			Overflow::Visible => Self::Visible,
-			Overflow::Clip => Self::Clip,
-			Overflow::Hidden => Self::Hidden,
-			Overflow::Scroll => Self::Scroll
-		}
-	}
-}
-
-impl From<Position> for taffy::style::Position {
-	fn from(value: Position) -> Self {
-		match value {
-			Position::Relative => Self::Relative,
-			Position::Absolute => Self::Absolute
-		}
-	}
-}
-
 #[cfg(test)]
 mod tests {
 	use lucie_common::{
@@ -1188,7 +1095,7 @@ mod tests {
 		let style_a = style_a.highlight(style_b);
 		assert_eq!(style_a, HighlightStyle::default(), "Combining empty styles should not produce a non-empty style.");
 
-		let mut style_b = HighlightStyle {
+		let style_b = HighlightStyle {
 			color: Some(red()),
 			strikethrough: Some(StrikethroughStyle {
 				thickness: px(2.),
@@ -1212,7 +1119,7 @@ mod tests {
 		let style_b = style_b.highlight(Default::default());
 		assert_eq!(style_b, expected_style, "Blending a style with an empty style should not change the style.");
 
-		let mut style_c = expected_style;
+		let style_c = expected_style;
 
 		let style_d = HighlightStyle {
 			color: Some(blue().alpha(0.7)),

@@ -16,16 +16,17 @@ use image::{
 	codecs::{gif::GifDecoder, webp::WebPDecoder}
 };
 use lucie_common::{
-	ResultExt, SharedString,
+	ResultExt, SharedString, SharedUri,
 	geometry::{Bounds, DefiniteLength, Length, Pixels, px}
 };
+use lucie_style::{ObjectFit, StyleRefinement, Styled};
 use smallvec::SmallVec;
 use thiserror::Error;
 
 use super::{Stateful, StatefulInteractiveElement};
 use crate::{
 	AnyElement, AnyImageCache, App, Asset, AssetLogger, Element, ElementId, Entity, GlobalElementId, Hitbox, Image, ImageCache, InteractiveElement,
-	Interactivity, IntoElement, LayoutId, ObjectFit, RenderImage, Resource, SharedUri, StyleRefinement, Styled, Task, Window
+	Interactivity, IntoElement, LayoutId, RenderImage, Resource, Task, Window
 };
 
 /// The delay before showing the loading state.
@@ -523,7 +524,7 @@ impl Asset for ImageAssetLoader {
 				Resource::Path(uri) => fs::read(uri.as_ref())?,
 				Resource::Uri(uri) => {
 					let mut response = client
-						.get(uri.as_ref(), ().into(), true)
+						.get(&*uri, ().into(), true)
 						.await
 						.with_context(|| format!("loading image asset from {uri:?}"))?;
 					let mut body = Vec::new();

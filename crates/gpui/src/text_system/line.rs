@@ -6,9 +6,10 @@ use lucie_common::{
 	color::{Hsla, black},
 	geometry::{Bounds, Half, Pixels, Point, point, px, size}
 };
+use lucie_style::{StrikethroughStyle, TextAlign, UnderlineStyle};
 use smallvec::SmallVec;
 
-use crate::{App, LineLayout, Result, StrikethroughStyle, TextAlign, UnderlineStyle, Window, WrapBoundary, WrappedLineLayout, fill};
+use crate::{App, LineLayout, Result, Window, WrapBoundary, WrappedLineLayout, fill};
 
 /// Set the text decoration for a run of text.
 #[derive(Debug, Clone)]

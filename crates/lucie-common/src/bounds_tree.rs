@@ -4,7 +4,7 @@ use std::{
 	ops::{Add, Sub}
 };
 
-use lucie_common::geometry::{Bounds, Half};
+use crate::geometry::{Bounds, Half};
 
 /// Maximum children per internal node (R-tree style branching factor).
 /// Higher values = shorter tree = fewer cache misses, but more work per node.
@@ -18,7 +18,7 @@ const MAX_CHILDREN: usize = 12;
 /// - Uses higher branching factor (4) for lower tree height
 /// - Aggressive pruning during search based on max_order metadata
 #[derive(Debug)]
-pub(crate) struct BoundsTree<U>
+pub struct BoundsTree<U>
 where
 	U: Clone + Debug + Default + PartialEq
 {

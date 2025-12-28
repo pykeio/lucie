@@ -3,8 +3,9 @@
 //! application to avoid having to import each trait individually.
 
 pub use lucie_common::refineable::Refineable;
+pub use lucie_style::Styled;
 
 pub use crate::{
 	AppContext as _, BorrowAppContext, Context, Element, FluentBuilder, InteractiveElement, IntoElement, ParentElement, Render, RenderOnce,
-	StatefulInteractiveElement, Styled, StyledImage, VisualContext
+	StatefulInteractiveElement, StyledImage, VisualContext
 };

@@ -32,16 +32,18 @@ use lucie_common::{
 	geometry::{AbsoluteLength, Bounds, IsZero, Pixels, Point, Size, point, px, size},
 	refineable::Refineable
 };
+use lucie_style::{Display, Overflow, Style, StyleRefinement, Styled, Visibility};
 use rapidhash::fast::RapidHashMap;
 use smallvec::SmallVec;
 use stacksafe::{StackSafe, stacksafe};
 
 use super::ImageCacheProvider;
 use crate::{
-	Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, ClickEvent, DispatchPhase, Display, Element, ElementId, Entity, FocusHandle, Global,
-	GlobalElementId, Hitbox, HitboxBehavior, HitboxId, IntoElement, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId,
-	ModifiersChangedEvent, MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent, MousePressureEvent, MouseUpEvent, Overflow, ParentElement, Render,
-	ScrollWheelEvent, Style, StyleRefinement, Styled, Task, TooltipId, Visibility, Window, WindowControlArea
+	Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, ClickEvent, DispatchPhase, Element, ElementId, Entity, FocusHandle, Global, GlobalElementId, Hitbox,
+	HitboxBehavior, HitboxId, IntoElement, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId, ModifiersChangedEvent,
+	MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent, MousePressureEvent, MouseUpEvent, ParentElement, Render, ScrollWheelEvent, Task, TooltipId,
+	Window, WindowControlArea,
+	util::{overflow_mask, paint_style}
 };
 
 const DRAG_THRESHOLD: f64 = 2.;
@@ -1381,7 +1383,7 @@ impl Interactivity {
 			}
 
 			window.with_text_style(style.text_style().cloned(), |window| {
-				window.with_content_mask(style.overflow_mask(bounds, window.rem_size()), |window| {
+				window.with_content_mask(overflow_mask(&style, bounds, window.rem_size()), |window| {
 					let hitbox = if self.should_insert_hitbox(&style) {
 						Some(window.insert_hitbox(bounds, self.hitbox_behavior))
 					} else {
@@ -1507,9 +1509,9 @@ impl Interactivity {
 			}
 
 			window.with_element_opacity(style.opacity, |window| {
-				style.paint(bounds, window, cx, |window: &mut Window, cx: &mut App| {
+				paint_style(&style, bounds, window, cx, |window: &mut Window, cx: &mut App| {
 					window.with_text_style(style.text_style().cloned(), |window| {
-						window.with_content_mask(style.overflow_mask(bounds, window.rem_size()), |window| {
+						window.with_content_mask(overflow_mask(&style, bounds, window.rem_size()), |window| {
 							window.with_tab_group(tab_group, |window| {
 								if let Some(hitbox) = hitbox {
 									#[cfg(debug_assertions)]
@@ -1557,9 +1559,9 @@ impl Interactivity {
 
 	#[cfg(debug_assertions)]
 	fn paint_debug_info(&self, global_id: Option<&GlobalElementId>, hitbox: &Hitbox, style: &Style, window: &mut Window, cx: &mut App) {
-		use crate::TextAlign;
+		use lucie_style::TextAlign;
 
-		if global_id.is_some() && (style.debug || style.debug_below || cx.has_global::<crate::DebugBelow>()) && hitbox.is_hovered(window) {
+		if global_id.is_some() && (style.debug || style.debug_below || cx.has_global::<crate::util::DebugBelow>()) && hitbox.is_hovered(window) {
 			const FONT_SIZE: Pixels = Pixels(10.);
 			let element_id = format!("{:?}", global_id.unwrap());
 			let str_len = element_id.len();
@@ -1576,7 +1578,7 @@ impl Interactivity {
 			};
 
 			window.with_text_style(
-				Some(crate::TextStyleRefinement {
+				Some(lucie_style::TextStyleRefinement {
 					color: Some(color::red()),
 					line_height: Some(FONT_SIZE.into()),
 					background_color: Some(color::white()),

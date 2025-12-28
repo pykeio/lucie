@@ -8,6 +8,7 @@ use std::{
 
 use anyhow::Result;
 use futures_channel::oneshot;
+use lucie_style::CursorStyle;
 use parking_lot::Mutex;
 #[cfg(target_os = "windows")]
 use windows::Win32::{
@@ -16,8 +17,8 @@ use windows::Win32::{
 };
 
 use crate::{
-	AnyWindowHandle, BackgroundExecutor, ClipboardItem, CursorStyle, DummyKeyboardMapper, ForegroundExecutor, Keymap, NoopTextSystem, Platform,
-	PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PromptButton, TestDisplay, TestWindow, WindowAppearance, WindowParams
+	AnyWindowHandle, BackgroundExecutor, ClipboardItem, DummyKeyboardMapper, ForegroundExecutor, Keymap, NoopTextSystem, Platform, PlatformDisplay,
+	PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PromptButton, TestDisplay, TestWindow, WindowAppearance, WindowParams
 };
 
 /// TestPlatform implements the Platform trait for use in tests.
@@ -220,7 +221,7 @@ impl Platform for TestPlatform {
 		unimplemented!()
 	}
 
-	fn set_cursor_style(&self, style: crate::CursorStyle) {
+	fn set_cursor_style(&self, style: CursorStyle) {
 		*self.active_cursor.lock() = style;
 	}
 

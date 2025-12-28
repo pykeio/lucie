@@ -10,6 +10,7 @@ use std::{
 
 use anyhow::{Context as _, Result, anyhow};
 use lucie_common::ResultExt;
+use lucie_style::CursorStyle;
 use parking_lot::RwLock;
 use smallvec::SmallVec;
 use windows::{

@@ -8,9 +8,9 @@ use std::{
 };
 
 use futures_util::TryFutureExt;
-use lucie_common::SharedString;
+use lucie_common::{SharedString, SharedUri};
 
-use crate::{App, SharedUri};
+use crate::App;
 
 /// An enum representing
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]

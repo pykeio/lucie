@@ -94,56 +94,56 @@ pub fn derive_refineable(input: TokenStream) -> TokenStream {
 	derive_refineable::derive_refineable(input)
 }
 
-/// Used by GPUI to generate the style helpers.
+#[doc(hidden)]
 #[proc_macro]
 #[doc(hidden)]
 pub fn style_helpers(input: TokenStream) -> TokenStream {
 	styles::style_helpers(input)
 }
 
-/// Generates methods for visibility styles.
+#[doc(hidden)]
 #[proc_macro]
 pub fn visibility_style_methods(input: TokenStream) -> TokenStream {
 	styles::visibility_style_methods(input)
 }
 
-/// Generates methods for margin styles.
+#[doc(hidden)]
 #[proc_macro]
 pub fn margin_style_methods(input: TokenStream) -> TokenStream {
 	styles::margin_style_methods(input)
 }
 
-/// Generates methods for padding styles.
+#[doc(hidden)]
 #[proc_macro]
 pub fn padding_style_methods(input: TokenStream) -> TokenStream {
 	styles::padding_style_methods(input)
 }
 
-/// Generates methods for position styles.
+#[doc(hidden)]
 #[proc_macro]
 pub fn position_style_methods(input: TokenStream) -> TokenStream {
 	styles::position_style_methods(input)
 }
 
-/// Generates methods for overflow styles.
+#[doc(hidden)]
 #[proc_macro]
 pub fn overflow_style_methods(input: TokenStream) -> TokenStream {
 	styles::overflow_style_methods(input)
 }
 
-/// Generates methods for cursor styles.
+#[doc(hidden)]
 #[proc_macro]
 pub fn cursor_style_methods(input: TokenStream) -> TokenStream {
 	styles::cursor_style_methods(input)
 }
 
-/// Generates methods for border styles.
+#[doc(hidden)]
 #[proc_macro]
 pub fn border_style_methods(input: TokenStream) -> TokenStream {
 	styles::border_style_methods(input)
 }
 
-/// Generates methods for box shadow styles.
+#[doc(hidden)]
 #[proc_macro]
 pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 	styles::box_shadow_style_methods(input)

@@ -1,7 +1,8 @@
 use lucie_common::geometry::{Axis, Bounds, Corner, Edges, Pixels, Point, Size, point, px};
+use lucie_style::{Display, Position, Style};
 use smallvec::SmallVec;
 
-use crate::{AnyElement, App, Display, Element, GlobalElementId, IntoElement, LayoutId, ParentElement, Position, Style, Window};
+use crate::{AnyElement, App, Element, GlobalElementId, IntoElement, LayoutId, ParentElement, Window};
 
 /// The state that the anchored element element uses to track its children.
 pub struct AnchoredState {

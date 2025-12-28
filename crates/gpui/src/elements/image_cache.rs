@@ -5,11 +5,12 @@ use lucie_common::{
 	geometry::{Bounds, Pixels},
 	refineable::Refineable
 };
+use lucie_style::{Style, StyleRefinement, Styled};
 use smallvec::SmallVec;
 
 use crate::{
 	AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, Element, ElementId, Entity, GlobalElementId, ImageAssetLoader, ImageCacheError, IntoElement,
-	LayoutId, ParentElement, RenderImage, Resource, Style, StyleRefinement, Styled, Task, Window, hash
+	LayoutId, ParentElement, RenderImage, Resource, Task, Window, hash
 };
 
 /// An image cache element, all its child img elements will use the cache specified by this element.
