@@ -377,8 +377,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 	let output = quote! {
 		/// Sets the box shadow of the element.
 		/// [Docs](https://tailwindcss.com/docs/box-shadow)
-		#visibility fn shadow(mut self, shadows: std::vec::Vec<crate::BoxShadow>) -> Self {
-			self.style().box_shadow = Some(shadows);
+		#visibility fn shadow(mut self, shadows: impl Into<smallvec::SmallVec<[crate::BoxShadow; 2]>>) -> Self {
+			self.style().box_shadow = Some(shadows.into());
 			self
 		}
 
@@ -394,14 +394,17 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		#visibility fn shadow_2xs(mut self) -> Self {
 			use lucie_common::{color::hsla, geometry::{point, px}};
 			use crate::BoxShadow;
-			use std::vec;
+			use std::mem::MaybeUninit;
 
-			self.style().box_shadow = Some(vec![BoxShadow {
-				color: hsla(0., 0., 0., 0.05),
-				offset: point(px(0.), px(1.)),
-				blur_radius: px(0.),
-				spread_radius: px(0.),
-			}]);
+			self.style().box_shadow = Some(unsafe { smallvec::SmallVec::from_const_with_len_unchecked([
+				BoxShadow {
+					color: hsla(0., 0., 0., 0.05),
+					offset: point(px(0.), px(1.)),
+					blur_radius: px(0.),
+					spread_radius: px(0.),
+				},
+				MaybeUninit::uninit().assume_init()
+			], 1) });
 			self
 		}
 
@@ -410,14 +413,17 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		#visibility fn shadow_xs(mut self) -> Self {
 			use lucie_common::{color::hsla, geometry::{point, px}};
 			use crate::BoxShadow;
-			use std::vec;
+			use std::mem::MaybeUninit;
 
-			self.style().box_shadow = Some(vec![BoxShadow {
-				color: hsla(0., 0., 0., 0.05),
-				offset: point(px(0.), px(1.)),
-				blur_radius: px(2.),
-				spread_radius: px(0.),
-			}]);
+			self.style().box_shadow = Some(unsafe { smallvec::SmallVec::from_const_with_len_unchecked([
+				BoxShadow {
+					color: hsla(0., 0., 0., 0.05),
+					offset: point(px(0.), px(1.)),
+					blur_radius: px(2.),
+					spread_radius: px(0.),
+				},
+				MaybeUninit::uninit().assume_init()
+			], 1) });
 			self
 		}
 
@@ -426,9 +432,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		#visibility fn shadow_sm(mut self) -> Self {
 			use lucie_common::{color::hsla, geometry::{point, px}};
 			use crate::BoxShadow;
-			use std::vec;
 
-			self.style().box_shadow = Some(vec![
+			self.style().box_shadow = Some(smallvec::SmallVec::from_const([
 				BoxShadow {
 					color: hsla(0., 0., 0., 0.1),
 					offset: point(px(0.), px(1.)),
@@ -441,7 +446,7 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 					blur_radius: px(2.),
 					spread_radius: px(-1.),
 				}
-			]);
+			]));
 			self
 		}
 
@@ -450,9 +455,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		#visibility fn shadow_md(mut self) -> Self {
 			use lucie_common::{color::hsla, geometry::{point, px}};
 			use crate::BoxShadow;
-			use std::vec;
 
-			self.style().box_shadow = Some(vec![
+			self.style().box_shadow = Some(smallvec::SmallVec::from_const([
 				BoxShadow {
 					color: hsla(0., 0., 0., 0.1),
 					offset: point(px(0.), px(4.)),
@@ -465,7 +469,7 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 					blur_radius: px(4.),
 					spread_radius: px(-2.),
 				}
-			]);
+			]));
 			self
 		}
 
@@ -474,9 +478,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		#visibility fn shadow_lg(mut self) -> Self {
 			use lucie_common::{color::hsla, geometry::{point, px}};
 			use crate::BoxShadow;
-			use std::vec;
 
-			self.style().box_shadow = Some(vec![
+			self.style().box_shadow = Some(smallvec::SmallVec::from_const([
 				BoxShadow {
 					color: hsla(0., 0., 0., 0.1),
 					offset: point(px(0.), px(10.)),
@@ -489,7 +492,7 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 					blur_radius: px(6.),
 					spread_radius: px(-4.),
 				}
-			]);
+			]));
 			self
 		}
 
@@ -498,9 +501,8 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		#visibility fn shadow_xl(mut self) -> Self {
 			use lucie_common::{color::hsla, geometry::{point, px}};
 			use crate::BoxShadow;
-			use std::vec;
 
-			self.style().box_shadow = Some(vec![
+			self.style().box_shadow = Some(smallvec::SmallVec::from_const([
 				BoxShadow {
 					color: hsla(0., 0., 0., 0.1),
 					offset: point(px(0.), px(20.)),
@@ -513,7 +515,7 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 					blur_radius: px(10.),
 					spread_radius: px(-6.),
 				}
-			]);
+			]));
 			self
 		}
 
@@ -522,14 +524,17 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 		#visibility fn shadow_2xl(mut self) -> Self {
 			use lucie_common::{color::hsla, geometry::{point, px}};
 			use crate::BoxShadow;
-			use std::vec;
+			use std::mem::MaybeUninit;
 
-			self.style().box_shadow = Some(vec![BoxShadow {
-				color: hsla(0., 0., 0., 0.25),
-				offset: point(px(0.), px(25.)),
-				blur_radius: px(50.),
-				spread_radius: px(-12.),
-			}]);
+			self.style().box_shadow = Some(unsafe { smallvec::SmallVec::from_const_with_len_unchecked([
+				BoxShadow {
+					color: hsla(0., 0., 0., 0.25),
+					offset: point(px(0.), px(25.)),
+					blur_radius: px(50.),
+					spread_radius: px(-12.),
+				},
+				MaybeUninit::uninit().assume_init()
+			], 1) });
 			self
 		}
 	};

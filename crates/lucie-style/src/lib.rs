@@ -13,6 +13,7 @@ use lucie_common::{
 	},
 	refineable::Refineable
 };
+use smallvec::SmallVec;
 
 mod text;
 pub use self::text::*;
@@ -218,7 +219,7 @@ pub struct Style {
 	pub corner_radii: Corners<AbsoluteLength>,
 
 	/// Box shadow of the element
-	pub box_shadow: Vec<BoxShadow>,
+	pub box_shadow: SmallVec<[BoxShadow; 2]>,
 
 	/// The text style of this element
 	#[refineable]
