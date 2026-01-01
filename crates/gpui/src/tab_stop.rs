@@ -98,7 +98,6 @@ impl TabStopMap {
 	}
 
 	pub fn clear(&mut self) {
-		*self = Self::default();
 		self.current_path.0.clear();
 		self.insertion_history.clear();
 		self.by_id.clear();
