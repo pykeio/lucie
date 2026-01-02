@@ -38,6 +38,12 @@ pub(crate) fn file_url_to_path(url: &str) -> Option<std::path::PathBuf> {
 	std::path::Path::new(path_str).canonicalize().ok()
 }
 
+#[inline]
+pub(crate) const fn mix_hashes(a: u64, b: u64) -> u64 {
+	let r = (a as u128).wrapping_mul(b as u128);
+	(r as u64) ^ (r >> 64) as u64
+}
+
 /// Use this struct for interfacing with the 'debug_below' styling from your own elements.
 /// If a parent element has this style set on it, then this struct will be set as a global in
 /// GPUI.

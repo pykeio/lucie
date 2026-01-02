@@ -3,7 +3,7 @@ use std::{
 	borrow::Cow,
 	cell::{Cell, RefCell},
 	cmp,
-	fmt::{Debug, Display},
+	fmt::Debug,
 	hash::{Hash, Hasher},
 	marker::PhantomData,
 	mem,
@@ -35,7 +35,10 @@ use lucie_common::{
 };
 use lucie_style::{BorderStyle, BoxShadow, CursorStyle, StrikethroughStyle, Style, TextStyle, TextStyleRefinement, UnderlineStyle};
 use parking_lot::RwLock;
-use rapidhash::fast::{RapidHashMap, RapidHashSet};
+use rapidhash::{
+	fast::{RapidHashMap, RapidHashSet},
+	v3::{RapidSecrets, rapidhash_v3_micro_inline}
+};
 use raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle};
 use slotmap::SlotMap;
 use smallvec::SmallVec;
@@ -48,7 +51,7 @@ use crate::{
 	PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage,
 	RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, Scene, Shadow, SubscriberSet,
 	Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TransformationMatrix, Underline, WindowAppearance,
-	WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, prelude::*
+	WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, prelude::*, util::mix_hashes
 };
 
 mod prompts;
@@ -1761,7 +1764,7 @@ impl Window {
 	/// Only valid for the duration of the provided closure.
 	pub fn with_global_id<R>(&mut self, element_id: ElementId, f: impl FnOnce(&GlobalElementId, &mut Self) -> R) -> R {
 		self.element_id_stack.push(element_id);
-		let global_id = GlobalElementId(Arc::from(&*self.element_id_stack));
+		let global_id = GlobalElementId::new(&*self.element_id_stack);
 
 		let result = f(&global_id, self);
 		self.element_id_stack.pop();
@@ -2413,17 +2416,6 @@ impl Window {
 	/// Immediately push an element ID onto the stack. Useful for simplifying IDs in lists
 	pub fn with_id<R>(&mut self, id: impl Into<ElementId>, f: impl FnOnce(&mut Self) -> R) -> R {
 		self.with_global_id(id.into(), |_, window| f(window))
-	}
-
-	/// Use a piece of state that exists as long this element is being rendered in consecutive frames, without needing
-	/// to specify a key
-	///
-	/// NOTE: This method uses the location of the caller to generate an ID for this state.
-	///       If this is not sufficient to identify your state (e.g. you're rendering a list item),
-	///       you can provide a custom ElementID using the `use_keyed_state` method.
-	#[track_caller]
-	pub fn use_state<S: 'static>(&mut self, cx: &mut App, init: impl FnOnce(&mut Self, &mut Context<S>) -> S) -> Entity<S> {
-		self.use_keyed_state(ElementId::CodeLocation(*core::panic::Location::caller()), cx, init)
 	}
 
 	/// Updates or initializes state for an element with the given id that lives across multiple
@@ -4227,141 +4219,102 @@ impl HasDisplayHandle for Window {
 ///
 /// Can be constructed with a string, a number, or both, as well
 /// as other internal representations.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub enum ElementId {
-	/// The ID of a View element
-	View(EntityId),
-	/// An integer ID.
-	Integer(u64),
-	/// A string based ID.
-	Name(SharedString),
-	/// An ID that's equated with a focus handle.
-	FocusHandle(FocusId),
-	/// A combination of a name and an integer.
-	NamedInteger(SharedString, u64),
-	/// A path.
-	Path(Arc<std::path::Path>),
-	/// A code location.
-	CodeLocation(core::panic::Location<'static>),
-	/// A labeled child of an element.
-	NamedChild(Arc<ElementId>, SharedString)
-}
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[repr(transparent)]
+pub struct ElementId(u64);
 
 impl ElementId {
-	/// Constructs an `ElementId::NamedInteger` from a name and `usize`.
-	pub fn named_usize(name: impl Into<SharedString>, integer: usize) -> ElementId {
-		Self::NamedInteger(name.into(), integer as u64)
+	pub(crate) const SECRETS_ENTITY_ID: RapidSecrets = RapidSecrets::seed(294001);
+	pub(crate) const SECRETS_INTEGER: RapidSecrets = RapidSecrets::seed(505447);
+	pub(crate) const SECRETS_STRING: RapidSecrets = RapidSecrets::seed(584141);
+	pub(crate) const SECRETS_FOCUS_HANDLE: RapidSecrets = RapidSecrets::seed(604171);
+	pub(crate) const SECRETS_PATH: RapidSecrets = RapidSecrets::seed(971767);
+	pub(crate) const SECRETS_CHILD: RapidSecrets = RapidSecrets::seed(1062599);
+
+	pub(crate) fn from_hash(data: &[u8], secrets: &RapidSecrets) -> Self {
+		Self(rapidhash_v3_micro_inline::<true, false>(data, secrets))
 	}
 
-	pub fn into_shared_string(self) -> Option<SharedString> {
-		if let ElementId::Name(name) = self { Some(name) } else { None }
+	pub(crate) fn from_hash_and_integer(data: &[u8], i: u64, secrets: &RapidSecrets) -> Self {
+		let a = rapidhash_v3_micro_inline::<true, false>(data, secrets);
+		let b = rapidhash_v3_micro_inline::<true, false>(&i.to_ne_bytes(), &Self::SECRETS_INTEGER);
+		Self(mix_hashes(a, b))
 	}
-}
 
-impl Display for ElementId {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			ElementId::View(entity_id) => write!(f, "view-{}", entity_id)?,
-			ElementId::Integer(ix) => write!(f, "{}", ix)?,
-			ElementId::Name(name) => write!(f, "{}", name)?,
-			ElementId::FocusHandle(_) => write!(f, "FocusHandle")?,
-			ElementId::NamedInteger(s, i) => write!(f, "{}-{}", s, i)?,
-			ElementId::Path(path) => write!(f, "{}", path.display())?,
-			ElementId::CodeLocation(location) => write!(f, "{}", location)?,
-			ElementId::NamedChild(id, name) => write!(f, "{}-{}", id, name)?
-		}
-
-		Ok(())
+	pub(crate) fn as_u64(&self) -> u64 {
+		self.0
 	}
 }
 
 impl From<usize> for ElementId {
 	fn from(id: usize) -> Self {
-		ElementId::Integer(id as u64)
+		Self::from_hash(&id.to_ne_bytes(), &Self::SECRETS_INTEGER)
 	}
 }
 
 impl From<i32> for ElementId {
 	fn from(id: i32) -> Self {
-		Self::Integer(id as u64)
+		Self::from_hash(&id.to_ne_bytes(), &Self::SECRETS_INTEGER)
 	}
 }
 
 impl From<SharedString> for ElementId {
 	fn from(name: SharedString) -> Self {
-		ElementId::Name(name)
+		Self::from_hash(name.as_bytes(), &Self::SECRETS_STRING)
 	}
 }
 
-impl From<String> for ElementId {
-	fn from(name: String) -> Self {
-		ElementId::Name(name.into())
+impl From<&std::path::Path> for ElementId {
+	fn from(path: &std::path::Path) -> Self {
+		Self::from_hash(path.as_os_str().as_encoded_bytes(), &Self::SECRETS_PATH)
 	}
 }
 
-impl From<Arc<str>> for ElementId {
-	fn from(name: Arc<str>) -> Self {
-		ElementId::Name(name.into())
-	}
-}
-
-impl From<Arc<std::path::Path>> for ElementId {
-	fn from(path: Arc<std::path::Path>) -> Self {
-		ElementId::Path(path)
-	}
-}
-
-impl From<&'static str> for ElementId {
-	fn from(name: &'static str) -> Self {
-		ElementId::Name(name.into())
+impl From<&str> for ElementId {
+	fn from(name: &str) -> Self {
+		Self::from_hash(name.as_bytes(), &Self::SECRETS_STRING)
 	}
 }
 
 impl<'a> From<&'a FocusHandle> for ElementId {
 	fn from(handle: &'a FocusHandle) -> Self {
-		ElementId::FocusHandle(handle.id)
+		Self::from_hash(&handle.id.0.as_ffi().to_ne_bytes(), &Self::SECRETS_FOCUS_HANDLE)
 	}
 }
 
-impl From<(&'static str, EntityId)> for ElementId {
-	fn from((name, id): (&'static str, EntityId)) -> Self {
-		ElementId::NamedInteger(name.into(), id.as_u64())
+impl From<(&str, EntityId)> for ElementId {
+	fn from((name, id): (&str, EntityId)) -> Self {
+		ElementId::from_hash_and_integer(name.as_bytes(), id.as_u64(), &Self::SECRETS_ENTITY_ID)
 	}
 }
 
-impl From<(&'static str, usize)> for ElementId {
-	fn from((name, id): (&'static str, usize)) -> Self {
-		ElementId::NamedInteger(name.into(), id as u64)
+impl From<(&str, usize)> for ElementId {
+	fn from((name, id): (&str, usize)) -> Self {
+		ElementId::from_hash_and_integer(name.as_bytes(), id as u64, &Self::SECRETS_STRING)
 	}
 }
 
 impl From<(SharedString, usize)> for ElementId {
 	fn from((name, id): (SharedString, usize)) -> Self {
-		ElementId::NamedInteger(name, id as u64)
+		ElementId::from_hash_and_integer(name.as_bytes(), id as u64, &Self::SECRETS_STRING)
 	}
 }
 
-impl From<(&'static str, u64)> for ElementId {
-	fn from((name, id): (&'static str, u64)) -> Self {
-		ElementId::NamedInteger(name.into(), id)
+impl From<(&str, u64)> for ElementId {
+	fn from((name, id): (&str, u64)) -> Self {
+		ElementId::from_hash_and_integer(name.as_bytes(), id, &Self::SECRETS_STRING)
 	}
 }
 
-impl From<(&'static str, u32)> for ElementId {
-	fn from((name, id): (&'static str, u32)) -> Self {
-		ElementId::NamedInteger(name.into(), id.into())
+impl From<(&str, u32)> for ElementId {
+	fn from((name, id): (&str, u32)) -> Self {
+		ElementId::from_hash_and_integer(name.as_bytes(), id as u64, &Self::SECRETS_STRING)
 	}
 }
 
-impl<T: Into<SharedString>> From<(ElementId, T)> for ElementId {
+impl<T: AsRef<str>> From<(ElementId, T)> for ElementId {
 	fn from((id, name): (ElementId, T)) -> Self {
-		ElementId::NamedChild(Arc::new(id), name.into())
-	}
-}
-
-impl From<&'static core::panic::Location<'static>> for ElementId {
-	fn from(location: &'static core::panic::Location<'static>) -> Self {
-		ElementId::CodeLocation(*location)
+		ElementId::from_hash_and_integer(name.as_ref().as_bytes(), id.0, &Self::SECRETS_CHILD)
 	}
 }
 

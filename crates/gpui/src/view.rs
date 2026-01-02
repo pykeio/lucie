@@ -32,7 +32,7 @@ impl<V: Render> Element for Entity<V> {
 	type PrepaintState = ();
 
 	fn id(&self) -> Option<ElementId> {
-		Some(ElementId::View(self.entity_id()))
+		Some(ElementId::from_hash(&self.entity_id().as_u64().to_ne_bytes(), &ElementId::SECRETS_ENTITY_ID))
 	}
 
 	fn request_layout(&mut self, _id: Option<&GlobalElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, Self::RequestLayoutState) {
@@ -132,7 +132,7 @@ impl Element for AnyView {
 	type PrepaintState = Option<AnyElement>;
 
 	fn id(&self) -> Option<ElementId> {
-		Some(ElementId::View(self.entity_id()))
+		Some(ElementId::from_hash(&self.entity_id().as_u64().to_ne_bytes(), &ElementId::SECRETS_ENTITY_ID))
 	}
 
 	fn request_layout(&mut self, _id: Option<&GlobalElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, Self::RequestLayoutState) {

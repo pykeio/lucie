@@ -226,7 +226,7 @@ impl PaintingViewer {
 
 fn button(text: &str, cx: &mut Context<PaintingViewer>, on_click: impl Fn(&mut PaintingViewer, &mut Context<PaintingViewer>) + 'static) -> impl IntoElement {
 	div()
-		.id(text.to_string())
+		.id(text)
 		.child(text.to_string())
 		.bg(gpui::black())
 		.text_color(gpui::white())

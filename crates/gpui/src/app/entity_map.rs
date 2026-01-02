@@ -171,6 +171,7 @@ impl EntityMap {
 }
 
 #[track_caller]
+#[cold]
 fn double_lease_panic<T>(operation: &str) -> ! {
 	panic!("cannot {operation} {} while it is already being updated", std::any::type_name::<T>())
 }

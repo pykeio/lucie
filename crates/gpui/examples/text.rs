@@ -92,7 +92,7 @@ impl Specimen {
 	pub fn new(id: usize) -> Self {
 		let string = SharedString::new_static("The quick brown fox jumps over the lazy dog");
 		let id_string = format!("specimen-{}", id);
-		let id = ElementId::Name(id_string.into());
+		let id = ElementId::from(&*id_string);
 		Self {
 			id,
 			scale: 1.0,

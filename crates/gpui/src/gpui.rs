@@ -73,7 +73,7 @@ pub use interactive::*;
 use key_dispatch::{DispatchActionListener, DispatchNodeId, DispatchTree, Replay};
 pub use keymap::*;
 pub use lucie_common::{
-	SharedString,
+	SharedString, SharedUri,
 	color::*,
 	geometry::*,
 	refineable::{self, Refineable}

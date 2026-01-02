@@ -33,18 +33,16 @@
 
 use std::{
 	any::{Any, type_name},
-	fmt, mem, panic,
-	sync::Arc
+	mem, panic
 };
 
-use derive_more::{Deref, DerefMut};
 use lucie_common::{
 	ArenaBox,
 	geometry::{Bounds, Pixels, Point, Size}
 };
 use lucie_style::{Display, Style};
 
-use crate::{App, AvailableSpace, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Window};
+use crate::{App, AvailableSpace, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Window, util::mix_hashes};
 
 /// Implemented by types that participate in laying out and painting the contents of a window.
 /// Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.
@@ -231,7 +229,7 @@ impl<C: RenderOnce> Element for Component<C> {
 	}
 
 	fn request_layout(&mut self, _id: Option<&GlobalElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, Self::RequestLayoutState) {
-		window.with_global_id(ElementId::Name(type_name::<C>().into()), |_, window| {
+		window.with_global_id(ElementId::from(type_name::<C>()), |_, window| {
 			let mut element = self.component.take().unwrap().render(window, cx).into_any_element();
 
 			let layout_id = element.request_layout(window, cx);
@@ -240,7 +238,7 @@ impl<C: RenderOnce> Element for Component<C> {
 	}
 
 	fn prepaint(&mut self, _id: Option<&GlobalElementId>, _: Bounds<Pixels>, element: &mut AnyElement, window: &mut Window, cx: &mut App) {
-		window.with_global_id(ElementId::Name(type_name::<C>().into()), |_, window| {
+		window.with_global_id(ElementId::from(type_name::<C>()), |_, window| {
 			element.prepaint(window, cx);
 		})
 	}
@@ -254,7 +252,7 @@ impl<C: RenderOnce> Element for Component<C> {
 		window: &mut Window,
 		cx: &mut App
 	) {
-		window.with_global_id(ElementId::Name(type_name::<C>().into()), |_, window| {
+		window.with_global_id(ElementId::from(type_name::<C>()), |_, window| {
 			element.paint(window, cx);
 		})
 	}
@@ -269,18 +267,18 @@ impl<C: RenderOnce> IntoElement for Component<C> {
 }
 
 /// A globally unique identifier for an element, used to track state across frames.
-#[derive(Deref, DerefMut, Clone, Default, Debug, Eq, PartialEq, Hash)]
-pub struct GlobalElementId(pub(crate) Arc<[ElementId]>);
+#[derive(Clone, Copy, Default, Debug, Eq, PartialEq, Hash)]
+pub struct GlobalElementId(u64);
 
-impl fmt::Display for GlobalElementId {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		for (i, element_id) in self.0.iter().enumerate() {
-			if i > 0 {
-				write!(f, ".")?;
-			}
-			write!(f, "{}", element_id)?;
+impl GlobalElementId {
+	pub(crate) fn new(id_stack: &[ElementId]) -> Self {
+		debug_assert!(!id_stack.is_empty());
+
+		let mut id = id_stack[0].as_u64();
+		for x in &id_stack[1..] {
+			id = mix_hashes(id, x.as_u64());
 		}
-		Ok(())
+		Self(id)
 	}
 }
 
@@ -342,7 +340,7 @@ impl<E: Element> Drawable<E> {
 			ElementDrawPhase::Start => {
 				let global_id = self.element.id().map(|element_id| {
 					window.element_id_stack.push(element_id);
-					GlobalElementId(Arc::from(&*window.element_id_stack))
+					GlobalElementId::new(&window.element_id_stack)
 				});
 
 				let (layout_id, request_layout) = self.element.request_layout(global_id.as_ref(), window, cx);
@@ -373,7 +371,7 @@ impl<E: Element> Drawable<E> {
 			} => {
 				if let Some(element_id) = self.element.id() {
 					window.element_id_stack.push(element_id);
-					debug_assert_eq!(&*global_id.as_ref().unwrap().0, &*window.element_id_stack);
+					debug_assert_eq!(global_id.as_ref().unwrap(), &GlobalElementId::new(&window.element_id_stack));
 				}
 
 				let bounds = window.layout_bounds(layout_id);
@@ -409,7 +407,7 @@ impl<E: Element> Drawable<E> {
 			} => {
 				if let Some(element_id) = self.element.id() {
 					window.element_id_stack.push(element_id);
-					debug_assert_eq!(&*global_id.as_ref().unwrap().0, &*window.element_id_stack);
+					debug_assert_eq!(global_id.as_ref().unwrap(), &GlobalElementId::new(&window.element_id_stack));
 				}
 
 				window.next_frame.dispatch_tree.set_active_node(node_id);

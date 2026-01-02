@@ -8,7 +8,7 @@ struct SubWindow {
 
 fn button(text: &str, on_click: impl Fn(&mut Window, &mut App) + 'static) -> impl IntoElement {
 	div()
-		.id(text.to_string())
+		.id(text)
 		.flex_none()
 		.px_2()
 		.bg(rgb(0xf7f7f7))
