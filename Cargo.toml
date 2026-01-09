@@ -4,6 +4,7 @@ members = [
 	"crates/lucie-common",
     "crates/lucie-macros",
 	"crates/lucie-style",
+	"crates/lucie-text",
     "crates/gpui",
     "crates/gpui_tokio",
     "crates/media",
@@ -28,6 +29,7 @@ authors = ["Carson M. <carson@pyke.io>"]
 lucie-common = { path = "crates/lucie-common" }
 lucie-macros = { path = "crates/lucie-macros" }
 lucie-style = { path = "crates/lucie-style" }
+lucie-text = { path = "crates/lucie-text" }
 gpui = { path = "crates/gpui", default-features = false }
 gpui_tokio = { path = "crates/gpui_tokio" }
 media = { path = "crates/media" }

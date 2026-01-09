@@ -1,0 +1,23 @@
+[package]
+name = "lucie-text"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+lucie-common.workspace = true
+lucie-style.workspace = true
+derive_more.workspace = true
+parking_lot.workspace = true
+itertools.workspace = true
+anyhow.workspace = true
+rapidhash.workspace = true
+smallvec.workspace = true
+log.workspace = true

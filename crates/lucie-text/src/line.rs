@@ -1,15 +1,15 @@
-use std::sync::Arc;
+use std::{ops::DerefMut, sync::Arc};
 
 use derive_more::{Deref, DerefMut};
 use lucie_common::{
 	SharedString,
 	color::{Hsla, black},
-	geometry::{Bounds, Half, Pixels, Point, point, px, size}
+	geometry::{Bounds, ContentMask, Half, Pixels, Point, point, px, size}
 };
 use lucie_style::{StrikethroughStyle, TextAlign, UnderlineStyle};
 use smallvec::SmallVec;
 
-use crate::{App, LineLayout, Result, Window, WrapBoundary, WrappedLineLayout, fill};
+use crate::{FontId, GlyphId, LineLayout, Result, TextSystem, WrapBoundary, WrappedLineLayout};
 
 /// Set the text decoration for a run of text.
 #[derive(Debug, Clone)]
@@ -64,15 +64,21 @@ impl ShapedLine {
 	}
 
 	/// Paint the line of text to the window.
-	pub fn paint(&self, origin: Point<Pixels>, line_height: Pixels, window: &mut Window, cx: &mut App) -> Result<()> {
-		paint_line(origin, &self.layout, line_height, TextAlign::default(), None, &self.decoration_runs, &[], window, cx)?;
+	pub fn paint<P: TextPainter>(&self, origin: Point<Pixels>, line_height: Pixels, text_system: &TextSystem, painter: &mut P) -> Result<(), P::Error> {
+		paint_line(origin, &self.layout, line_height, TextAlign::default(), None, &self.decoration_runs, &[], text_system, painter)?;
 
 		Ok(())
 	}
 
 	/// Paint the background of the line to the window.
-	pub fn paint_background(&self, origin: Point<Pixels>, line_height: Pixels, window: &mut Window, cx: &mut App) -> Result<()> {
-		paint_line_background(origin, &self.layout, line_height, TextAlign::default(), None, &self.decoration_runs, &[], window, cx)?;
+	pub fn paint_background<P: TextPainter>(
+		&self,
+		origin: Point<Pixels>,
+		line_height: Pixels,
+		text_system: &TextSystem,
+		painter: &mut P
+	) -> Result<(), P::Error> {
+		paint_line_background(origin, &self.layout, line_height, TextAlign::default(), None, &self.decoration_runs, &[], text_system, painter)?;
 
 		Ok(())
 	}
@@ -83,7 +89,7 @@ impl ShapedLine {
 pub struct WrappedLine {
 	#[deref]
 	#[deref_mut]
-	pub(crate) layout: Arc<WrappedLineLayout>,
+	pub layout: Arc<WrappedLineLayout>,
 	/// The text that was shaped for this line.
 	pub text: SharedString,
 	pub(crate) decoration_runs: SmallVec<[DecorationRun; 32]>
@@ -97,35 +103,35 @@ impl WrappedLine {
 	}
 
 	/// Paint this line of text to the window.
-	pub fn paint(
+	pub fn paint<P: TextPainter>(
 		&self,
 		origin: Point<Pixels>,
 		line_height: Pixels,
 		align: TextAlign,
 		bounds: Option<Bounds<Pixels>>,
-		window: &mut Window,
-		cx: &mut App
-	) -> Result<()> {
+		text_system: &TextSystem,
+		painter: &mut P
+	) -> Result<(), P::Error> {
 		let align_width = match bounds {
 			Some(bounds) => Some(bounds.size.width),
 			None => self.layout.wrap_width
 		};
 
-		paint_line(origin, &self.layout.unwrapped_layout, line_height, align, align_width, &self.decoration_runs, &self.wrap_boundaries, window, cx)?;
+		paint_line(origin, &self.layout.unwrapped_layout, line_height, align, align_width, &self.decoration_runs, &self.wrap_boundaries, text_system, painter)?;
 
 		Ok(())
 	}
 
 	/// Paint the background of line of text to the window.
-	pub fn paint_background(
+	pub fn paint_background<P: TextPainter>(
 		&self,
 		origin: Point<Pixels>,
 		line_height: Pixels,
 		align: TextAlign,
 		bounds: Option<Bounds<Pixels>>,
-		window: &mut Window,
-		cx: &mut App
-	) -> Result<()> {
+		text_system: &TextSystem,
+		painter: &mut P
+	) -> Result<(), P::Error> {
 		let align_width = match bounds {
 			Some(bounds) => Some(bounds.size.width),
 			None => self.layout.wrap_width
@@ -139,15 +145,15 @@ impl WrappedLine {
 			align_width,
 			&self.decoration_runs,
 			&self.wrap_boundaries,
-			window,
-			cx
+			text_system,
+			painter
 		)?;
 
 		Ok(())
 	}
 }
 
-fn paint_line(
+fn paint_line<P: TextPainter>(
 	origin: Point<Pixels>,
 	layout: &LineLayout,
 	line_height: Pixels,
@@ -155,11 +161,12 @@ fn paint_line(
 	align_width: Option<Pixels>,
 	decoration_runs: &[DecorationRun],
 	wrap_boundaries: &[WrapBoundary],
-	window: &mut Window,
-	cx: &mut App
-) -> Result<()> {
+	text_system: &TextSystem,
+	painter: &mut P
+) -> Result<(), P::Error> {
 	let line_bounds = Bounds::new(origin, size(layout.width, line_height * (wrap_boundaries.len() as f32 + 1.)));
-	window.paint_layer(line_bounds, |window| {
+	{
+		let mut painter = painter.create_layer(line_bounds);
 		let padding_top = (line_height - layout.ascent - layout.descent) / 2.;
 		let baseline_offset = point(px(0.), padding_top + layout.ascent);
 		let mut decoration_runs = decoration_runs.iter();
@@ -168,7 +175,6 @@ fn paint_line(
 		let mut color = black();
 		let mut current_underline: Option<(Point<Pixels>, UnderlineStyle)> = None;
 		let mut current_strikethrough: Option<(Point<Pixels>, StrikethroughStyle)> = None;
-		let text_system = cx.text_system().clone();
 		let mut glyph_origin = point(aligned_origin_x(origin, align_width.unwrap_or(layout.width), px(0.0), &align, layout, wraps.peek()), origin.y);
 		let mut prev_glyph_position = Point::default();
 		let mut max_glyph_size = size(px(0.), px(0.));
@@ -188,7 +194,7 @@ fn paint_line(
 						if glyph_origin.x == underline_origin.x {
 							underline_origin.x -= max_glyph_size.width.half();
 						};
-						window.paint_underline(*underline_origin, glyph_origin.x - underline_origin.x, underline_style);
+						painter.paint_underline(*underline_origin, glyph_origin.x - underline_origin.x, underline_style);
 						underline_origin.x = origin.x;
 						underline_origin.y += line_height;
 					}
@@ -196,7 +202,7 @@ fn paint_line(
 						if glyph_origin.x == strikethrough_origin.x {
 							strikethrough_origin.x -= max_glyph_size.width.half();
 						};
-						window.paint_strikethrough(*strikethrough_origin, glyph_origin.x - strikethrough_origin.x, strikethrough_style);
+						painter.paint_strikethrough(*strikethrough_origin, glyph_origin.x - strikethrough_origin.x, strikethrough_style);
 						strikethrough_origin.x = origin.x;
 						strikethrough_origin.y += line_height;
 					}
@@ -264,14 +270,14 @@ fn paint_line(
 					if underline_origin.x == glyph_origin.x {
 						underline_origin.x -= max_glyph_size.width.half();
 					};
-					window.paint_underline(underline_origin, glyph_origin.x - underline_origin.x, &underline_style);
+					painter.paint_underline(underline_origin, glyph_origin.x - underline_origin.x, &underline_style);
 				}
 
 				if let Some((mut strikethrough_origin, strikethrough_style)) = finished_strikethrough {
 					if strikethrough_origin.x == glyph_origin.x {
 						strikethrough_origin.x -= max_glyph_size.width.half();
 					};
-					window.paint_strikethrough(strikethrough_origin, glyph_origin.x - strikethrough_origin.x, &strikethrough_style);
+					painter.paint_strikethrough(strikethrough_origin, glyph_origin.x - strikethrough_origin.x, &strikethrough_style);
 				}
 
 				let max_glyph_bounds = Bounds {
@@ -279,13 +285,13 @@ fn paint_line(
 					size: max_glyph_size
 				};
 
-				let content_mask = window.content_mask();
+				let content_mask = painter.content_mask();
 				if max_glyph_bounds.intersects(&content_mask.bounds) {
 					let vertical_offset = point(px(0.0), glyph.position.y);
 					if glyph.is_emoji {
-						window.paint_emoji(glyph_origin + baseline_offset + vertical_offset, run.font_id, glyph.id, layout.font_size)?;
+						painter.paint_polychrome_glyph(glyph_origin + baseline_offset + vertical_offset, run.font_id, glyph.id, layout.font_size)?;
 					} else {
-						window.paint_glyph(glyph_origin + baseline_offset + vertical_offset, run.font_id, glyph.id, layout.font_size, color)?;
+						painter.paint_monochrome_glyph(glyph_origin + baseline_offset + vertical_offset, run.font_id, glyph.id, layout.font_size, color)?;
 					}
 				}
 			}
@@ -302,21 +308,20 @@ fn paint_line(
 			if last_line_end_x == underline_start.x {
 				underline_start.x -= max_glyph_size.width.half()
 			};
-			window.paint_underline(underline_start, last_line_end_x - underline_start.x, &underline_style);
+			painter.paint_underline(underline_start, last_line_end_x - underline_start.x, &underline_style);
 		}
 
 		if let Some((mut strikethrough_start, strikethrough_style)) = current_strikethrough.take() {
 			if last_line_end_x == strikethrough_start.x {
 				strikethrough_start.x -= max_glyph_size.width.half()
 			};
-			window.paint_strikethrough(strikethrough_start, last_line_end_x - strikethrough_start.x, &strikethrough_style);
+			painter.paint_strikethrough(strikethrough_start, last_line_end_x - strikethrough_start.x, &strikethrough_style);
 		}
-
-		Ok(())
-	})
+	}
+	Ok(())
 }
 
-fn paint_line_background(
+fn paint_line_background<P: TextPainter>(
 	origin: Point<Pixels>,
 	layout: &LineLayout,
 	line_height: Pixels,
@@ -324,16 +329,16 @@ fn paint_line_background(
 	align_width: Option<Pixels>,
 	decoration_runs: &[DecorationRun],
 	wrap_boundaries: &[WrapBoundary],
-	window: &mut Window,
-	cx: &mut App
-) -> Result<()> {
+	text_system: &TextSystem,
+	painter: &mut P
+) -> Result<(), P::Error> {
 	let line_bounds = Bounds::new(origin, size(layout.width, line_height * (wrap_boundaries.len() as f32 + 1.)));
-	window.paint_layer(line_bounds, |window| {
+	{
+		let mut painter = painter.create_layer(line_bounds);
 		let mut decoration_runs = decoration_runs.iter();
 		let mut wraps = wrap_boundaries.iter().peekable();
 		let mut run_end = 0;
 		let mut current_background: Option<(Point<Pixels>, Hsla)> = None;
-		let text_system = cx.text_system().clone();
 		let mut glyph_origin = point(aligned_origin_x(origin, align_width.unwrap_or(layout.width), px(0.0), &align, layout, wraps.peek()), origin.y);
 		let mut prev_glyph_position = Point::default();
 		let mut max_glyph_size = size(px(0.), px(0.));
@@ -349,13 +354,13 @@ fn paint_line_background(
 						if glyph_origin.x == background_origin.x {
 							background_origin.x -= max_glyph_size.width.half()
 						}
-						window.paint_quad(fill(
+						painter.paint_background(
 							Bounds {
 								origin: *background_origin,
 								size: size(glyph_origin.x - background_origin.x, line_height)
 							},
 							*background_color
-						));
+						);
 						background_origin.x = origin.x;
 						background_origin.y += line_height;
 					}
@@ -395,17 +400,17 @@ fn paint_line_background(
 				}
 
 				if let Some((mut background_origin, background_color)) = finished_background {
-					let mut width = glyph_origin.x - background_origin.x;
+					let width = glyph_origin.x - background_origin.x;
 					if background_origin.x == glyph_origin.x {
 						background_origin.x -= max_glyph_size.width.half();
 					};
-					window.paint_quad(fill(
+					painter.paint_background(
 						Bounds {
 							origin: background_origin,
 							size: size(width, line_height)
 						},
 						background_color
-					));
+					);
 				}
 			}
 		}
@@ -421,17 +426,16 @@ fn paint_line_background(
 			if last_line_end_x == background_origin.x {
 				background_origin.x -= max_glyph_size.width.half()
 			};
-			window.paint_quad(fill(
+			painter.paint_background(
 				Bounds {
 					origin: background_origin,
 					size: size(last_line_end_x - background_origin.x, line_height)
 				},
 				background_color
-			));
+			);
 		}
-
-		Ok(())
-	})
+	}
+	Ok(())
 }
 
 fn aligned_origin_x(
@@ -455,4 +459,19 @@ fn aligned_origin_x(
 		TextAlign::Center => (origin.x * 2.0 + align_width - line_width) / 2.0,
 		TextAlign::Right => origin.x + align_width - line_width
 	}
+}
+
+pub trait TextPainter {
+	type Error;
+
+	fn create_layer<'s>(&'s mut self, bounds: Bounds<Pixels>) -> impl DerefMut<Target = Self> + 's;
+	fn content_mask(&self) -> ContentMask<Pixels>;
+
+	fn paint_underline(&mut self, origin: Point<Pixels>, width: Pixels, style: &UnderlineStyle);
+	fn paint_strikethrough(&mut self, origin: Point<Pixels>, width: Pixels, style: &StrikethroughStyle);
+
+	fn paint_polychrome_glyph(&mut self, origin: Point<Pixels>, font_id: FontId, glyph_id: GlyphId, font_size: Pixels) -> Result<(), Self::Error>;
+	fn paint_monochrome_glyph(&mut self, origin: Point<Pixels>, font_id: FontId, glyph_id: GlyphId, font_size: Pixels, color: Hsla) -> Result<(), Self::Error>;
+
+	fn paint_background(&mut self, bounds: Bounds<Pixels>, background: Hsla);
 }

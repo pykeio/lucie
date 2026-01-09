@@ -25,6 +25,7 @@ use lucie_common::{
 	geometry::{Bounds, Pixels, Point}
 };
 use lucie_style::CursorStyle;
+use lucie_text::TextSystem;
 use parking_lot::RwLock;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 use slotmap::SlotMap;
@@ -34,8 +35,8 @@ use crate::{
 	Action, ActionBuildError, ActionRegistry, Any, AnyView, AnyWindowHandle, AppContext, Asset, AssetSource, BackgroundExecutor, ClipboardItem, DispatchPhase,
 	DisplayId, EventEmitter, FocusHandle, FocusMap, ForegroundExecutor, Global, KeyBinding, KeyContext, Keymap, Keystroke, LayoutId, Menu, MenuItem, OwnedMenu,
 	Platform, PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, Priority, PromptBuilder, PromptButton, PromptHandle, PromptLevel, Render,
-	RenderImage, RenderablePromptHandle, Reservation, SubscriberSet, Subscription, SvgRenderer, Task, TextSystem, Window, WindowAppearance, WindowHandle,
-	WindowId, WindowInvalidator,
+	RenderImage, RenderablePromptHandle, Reservation, SubscriberSet, Subscription, SvgRenderer, Task, Window, WindowAppearance, WindowHandle, WindowId,
+	WindowInvalidator,
 	colors::{Colors, GlobalColors},
 	current_platform, hash,
 	http::{AsyncBody, HttpClient, Uri},

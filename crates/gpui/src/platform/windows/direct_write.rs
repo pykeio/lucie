@@ -8,6 +8,10 @@ use lucie_common::{
 	geometry::{Bounds, DevicePixels, Pixels, Point, Size, bounds, point, px, size}
 };
 use lucie_style::{Font, FontFallbacks, FontFeatures, FontStyle, FontWeight};
+use lucie_text::{
+	FontId, FontMetrics, FontRun, GlyphId, LineLayout, PlatformTextSystem, RenderGlyphParams, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, ShapedGlyph, ShapedRun,
+	font_name_with_fallbacks
+};
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 use rapidhash::fast::RapidHashMap;
 use windows::{

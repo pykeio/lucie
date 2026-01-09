@@ -9,6 +9,7 @@ use std::{
 use anyhow::Result;
 use futures_channel::oneshot;
 use lucie_style::CursorStyle;
+use lucie_text::{NoopTextSystem, PlatformTextSystem};
 use parking_lot::Mutex;
 #[cfg(target_os = "windows")]
 use windows::Win32::{
@@ -17,8 +18,8 @@ use windows::Win32::{
 };
 
 use crate::{
-	AnyWindowHandle, BackgroundExecutor, ClipboardItem, DummyKeyboardMapper, ForegroundExecutor, Keymap, NoopTextSystem, Platform, PlatformDisplay,
-	PlatformKeyboardLayout, PlatformKeyboardMapper, PlatformTextSystem, PromptButton, TestDisplay, TestWindow, WindowAppearance, WindowParams
+	AnyWindowHandle, BackgroundExecutor, ClipboardItem, DummyKeyboardMapper, ForegroundExecutor, Keymap, Platform, PlatformDisplay, PlatformKeyboardLayout,
+	PlatformKeyboardMapper, PromptButton, TestDisplay, TestWindow, WindowAppearance, WindowParams
 };
 
 /// TestPlatform implements the Platform trait for use in tests.

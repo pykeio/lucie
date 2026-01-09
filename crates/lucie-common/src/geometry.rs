@@ -1596,6 +1596,29 @@ impl Bounds<DevicePixels> {
 	}
 }
 
+/// Indicates which region of the window is visible. Content falling outside of this mask will not be
+/// rendered. Currently, only rectangular content masks are supported, but we give the mask its own type
+/// to leave room to support more complex shapes in the future.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[repr(C)]
+pub struct ContentMask<P: Clone + fmt::Debug + Default + PartialEq> {
+	/// The bounds
+	pub bounds: Bounds<P>
+}
+
+impl ContentMask<Pixels> {
+	/// Scale the content mask's pixel units by the given scaling factor.
+	pub fn scale(&self, factor: f32) -> ContentMask<ScaledPixels> {
+		ContentMask { bounds: self.bounds.scale(factor) }
+	}
+
+	/// Intersect the content mask with the given content mask.
+	pub fn intersect(&self, other: &Self) -> Self {
+		let bounds = self.bounds.intersect(&other.bounds);
+		ContentMask { bounds }
+	}
+}
+
 /// Represents the edges of a box in a 2D space, such as padding or margin.
 ///
 /// Each field represents the size of the edge on one side of the box: `top`, `right`, `bottom`, and `left`.

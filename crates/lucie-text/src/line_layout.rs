@@ -284,7 +284,7 @@ impl WrappedLineLayout {
 		self._index_for_position(position, line_height, true)
 	}
 
-	fn _index_for_position(&self, mut position: Point<Pixels>, line_height: Pixels, closest: bool) -> Result<usize, usize> {
+	fn _index_for_position(&self, position: Point<Pixels>, line_height: Pixels, closest: bool) -> Result<usize, usize> {
 		let wrapped_line_ix = (position.y / line_height) as usize;
 
 		let wrapped_line_start_index;
@@ -334,7 +334,7 @@ impl WrappedLineLayout {
 	/// Returns the pixel position for the given byte index.
 	pub fn position_for_index(&self, index: usize, line_height: Pixels) -> Option<Point<Pixels>> {
 		let mut line_start_ix = 0;
-		let mut line_end_indices = self
+		let line_end_indices = self
 			.wrap_boundaries
 			.iter()
 			.map(|wrap_boundary| {
@@ -377,7 +377,7 @@ struct FrameCache {
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct LineLayoutIndex {
+pub struct LineLayoutIndex {
 	lines_index: usize,
 	wrapped_lines_index: usize
 }
@@ -400,8 +400,8 @@ impl LineLayoutCache {
 	}
 
 	pub fn reuse_layouts(&self, range: Range<LineLayoutIndex>) {
-		let mut previous_frame = &mut *self.previous_frame.lock();
-		let mut current_frame = &mut *self.current_frame.write();
+		let previous_frame = &mut *self.previous_frame.lock();
+		let current_frame = &mut *self.current_frame.write();
 
 		for key in &previous_frame.used_lines[range.start.lines_index..range.end.lines_index] {
 			if let Some((key, line)) = previous_frame.lines.remove_entry(key) {
@@ -419,7 +419,7 @@ impl LineLayoutCache {
 	}
 
 	pub fn truncate_layouts(&self, index: LineLayoutIndex) {
-		let mut current_frame = &mut *self.current_frame.write();
+		let current_frame = &mut *self.current_frame.write();
 		current_frame.used_lines.truncate(index.lines_index);
 		current_frame.used_wrapped_lines.truncate(index.wrapped_lines_index);
 	}
@@ -552,8 +552,8 @@ impl LineLayoutCache {
 /// A run of text with a single font.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct FontRun {
-	pub(crate) len: usize,
-	pub(crate) font_id: FontId
+	pub len: usize,
+	pub font_id: FontId
 }
 
 trait AsCacheKeyRef {

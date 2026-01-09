@@ -13,11 +13,12 @@ use lucie_common::{
 	geometry::{Bounds, Pixels, Point, Size}
 };
 use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, WhiteSpace};
+use lucie_text::{WrappedLine, WrappedLineLayout};
 use smallvec::SmallVec;
 
 use crate::{
 	ActiveTooltip, AnyView, App, DispatchPhase, Element, ElementId, GlobalElementId, Hitbox, HitboxBehavior, IntoElement, LayoutId, MouseDownEvent,
-	MouseMoveEvent, MouseUpEvent, TooltipId, Window, WrappedLine, WrappedLineLayout, register_tooltip_mouse_handlers, set_tooltip_on_window
+	MouseMoveEvent, MouseUpEvent, TooltipId, Window, register_tooltip_mouse_handlers, set_tooltip_on_window
 };
 
 impl Element for &'static str {
@@ -369,9 +370,9 @@ impl TextLayout {
 		let mut line_origin = bounds.origin;
 		let text_style = window.text_style();
 		for line in &element_state.lines {
-			line.paint_background(line_origin, line_height, text_style.text_align, Some(bounds), window, cx)
+			line.paint_background(line_origin, line_height, text_style.text_align, Some(bounds), cx.text_system(), window)
 				.log_err();
-			line.paint(line_origin, line_height, text_style.text_align, Some(bounds), window, cx)
+			line.paint(line_origin, line_height, text_style.text_align, Some(bounds), cx.text_system(), window)
 				.log_err();
 			line_origin.y += line.size(line_height).height;
 		}

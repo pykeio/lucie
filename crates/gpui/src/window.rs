@@ -27,13 +27,14 @@ use itertools::{
 	Itertools
 };
 use lucie_common::{
-	Arena, ResultExt as _, SharedString, atomic_incr_if_not_zero,
+	Arena, RefScope, ResultExt as _, SharedString, atomic_incr_if_not_zero,
 	color::{Background, Hsla, transparent_black},
-	geometry::{Bounds, Corners, DevicePixels, Edges, IsZero, Pixels, Point, ScaledPixels, Size, point, px, size},
+	geometry::{Bounds, ContentMask, Corners, DevicePixels, Edges, IsZero, Pixels, Point, ScaledPixels, Size, point, px, size},
 	measure, post_inc,
 	refineable::Refineable
 };
 use lucie_style::{BorderStyle, BoxShadow, CursorStyle, StrikethroughStyle, Style, TextStyle, TextStyleRefinement, UnderlineStyle};
+use lucie_text::{FontId, GlyphId, LineLayoutIndex, RenderGlyphParams, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, WindowTextSystem};
 use parking_lot::RwLock;
 use rapidhash::{
 	fast::{RapidHashMap, RapidHashSet},
@@ -45,13 +46,13 @@ use smallvec::SmallVec;
 
 use crate::{
 	Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Asset, AsyncWindowContext, AvailableSpace, Capslock, Context,
-	Decorations, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Effect, Empty, Entity, EntityId, EventEmitter, FileDropEvent, FontId, Global,
-	GlobalElementId, GlyphId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, LineLayoutIndex,
-	Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, PlatformAtlas, PlatformDisplay,
-	PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderGlyphParams, RenderImage,
-	RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, SUBPIXEL_VARIANTS_X, SUBPIXEL_VARIANTS_Y, Scene, Shadow, SubscriberSet,
-	Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TransformationMatrix, Underline, WindowAppearance,
-	WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, WindowTextSystem, prelude::*, util::mix_hashes
+	Decorations, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Effect, Empty, Entity, EntityId, EventEmitter, FileDropEvent, Global,
+	GlobalElementId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke, KeystrokeEvent, LayoutId, Modifiers,
+	ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, PlatformAtlas, PlatformDisplay, PlatformInput,
+	PlatformInputHandler, PlatformWindow, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderImage, RenderImageParams, RenderSvgParams,
+	Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, Scene, Shadow, SubscriberSet, Subscription, SystemWindowTab, SystemWindowTabController, TabStopMap,
+	TaffyLayoutEngine, Task, TransformationMatrix, Underline, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControls, WindowDecorations,
+	WindowOptions, WindowParams, prelude::*, util::mix_hashes
 };
 
 mod prompts;
@@ -1231,29 +1232,6 @@ impl Window {
 pub(crate) struct DispatchEventResult {
 	pub propagate: bool,
 	pub default_prevented: bool
-}
-
-/// Indicates which region of the window is visible. Content falling outside of this mask will not be
-/// rendered. Currently, only rectangular content masks are supported, but we give the mask its own type
-/// to leave room to support more complex shapes in the future.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[repr(C)]
-pub struct ContentMask<P: Clone + Debug + Default + PartialEq> {
-	/// The bounds
-	pub bounds: Bounds<P>
-}
-
-impl ContentMask<Pixels> {
-	/// Scale the content mask's pixel units by the given scaling factor.
-	pub fn scale(&self, factor: f32) -> ContentMask<ScaledPixels> {
-		ContentMask { bounds: self.bounds.scale(factor) }
-	}
-
-	/// Intersect the content mask with the given content mask.
-	pub fn intersect(&self, other: &Self) -> Self {
-		let bounds = self.bounds.intersect(&other.bounds);
-		ContentMask { bounds }
-	}
 }
 
 impl Window {
@@ -2554,7 +2532,7 @@ impl Window {
 	/// for performance reasons.
 	///
 	/// This method should only be called as part of the paint phase of element drawing.
-	pub fn paint_layer<R>(&mut self, bounds: Bounds<Pixels>, f: impl FnOnce(&mut Self) -> R) -> R {
+	pub fn paint_layer(&mut self, bounds: Bounds<Pixels>) -> impl DerefMut<Target = Self> + '_ {
 		self.invalidator.debug_assert_paint();
 
 		let scale_factor = self.scale_factor();
@@ -2564,13 +2542,11 @@ impl Window {
 			self.next_frame.scene.push_layer(clipped_bounds.scale(scale_factor));
 		}
 
-		let result = f(self);
-
-		if !clipped_bounds.is_empty() {
-			self.next_frame.scene.pop_layer();
-		}
-
-		result
+		RefScope::new(self, move |window| {
+			if !clipped_bounds.is_empty() {
+				window.next_frame.scene.pop_layer();
+			}
+		})
 	}
 
 	/// Paint one or more drop shadows into the scene for the next frame at the current z-index.
@@ -2635,161 +2611,6 @@ impl Window {
 		let color: Background = color.into();
 		path.color = color.opacity(opacity);
 		self.next_frame.scene.insert_primitive(path.scale(scale_factor));
-	}
-
-	/// Paint an underline into the scene for the next frame at the current z-index.
-	///
-	/// This method should only be called as part of the paint phase of element drawing.
-	pub fn paint_underline(&mut self, origin: Point<Pixels>, width: Pixels, style: &UnderlineStyle) {
-		self.invalidator.debug_assert_paint();
-
-		let scale_factor = self.scale_factor();
-		let height = if style.wavy { style.thickness * 3. } else { style.thickness };
-		let bounds = Bounds { origin, size: size(width, height) };
-		let content_mask = self.content_mask();
-		let element_opacity = self.element_opacity();
-
-		self.next_frame.scene.insert_primitive(Underline {
-			order: 0,
-			pad: 0,
-			bounds: bounds.scale(scale_factor),
-			content_mask: content_mask.scale(scale_factor),
-			color: style.color.unwrap_or_default().opacity(element_opacity),
-			thickness: style.thickness.scale(scale_factor),
-			wavy: if style.wavy { 1 } else { 0 }
-		});
-	}
-
-	/// Paint a strikethrough into the scene for the next frame at the current z-index.
-	///
-	/// This method should only be called as part of the paint phase of element drawing.
-	pub fn paint_strikethrough(&mut self, origin: Point<Pixels>, width: Pixels, style: &StrikethroughStyle) {
-		self.invalidator.debug_assert_paint();
-
-		let scale_factor = self.scale_factor();
-		let height = style.thickness;
-		let bounds = Bounds { origin, size: size(width, height) };
-		let content_mask = self.content_mask();
-		let opacity = self.element_opacity();
-
-		self.next_frame.scene.insert_primitive(Underline {
-			order: 0,
-			pad: 0,
-			bounds: bounds.scale(scale_factor),
-			content_mask: content_mask.scale(scale_factor),
-			thickness: style.thickness.scale(scale_factor),
-			color: style.color.unwrap_or_default().opacity(opacity),
-			wavy: 0
-		});
-	}
-
-	/// Paints a monochrome (non-emoji) glyph into the scene for the next frame at the current z-index.
-	///
-	/// The y component of the origin is the baseline of the glyph.
-	/// You should generally prefer to use the [`ShapedLine::paint`](crate::ShapedLine::paint) or
-	/// [`WrappedLine::paint`](crate::WrappedLine::paint) methods in the [`TextSystem`](crate::TextSystem).
-	/// This method is only useful if you need to paint a single glyph that has already been shaped.
-	///
-	/// This method should only be called as part of the paint phase of element drawing.
-	pub fn paint_glyph(&mut self, origin: Point<Pixels>, font_id: FontId, glyph_id: GlyphId, font_size: Pixels, color: Hsla) -> Result<()> {
-		self.invalidator.debug_assert_paint();
-
-		let element_opacity = self.element_opacity();
-		let scale_factor = self.scale_factor();
-		let glyph_origin = origin.scale(scale_factor);
-
-		let subpixel_variant = Point {
-			x: (glyph_origin.x.0.fract() * SUBPIXEL_VARIANTS_X as f32).floor() as u8,
-			y: (glyph_origin.y.0.fract() * SUBPIXEL_VARIANTS_Y as f32).floor() as u8
-		};
-		let params = RenderGlyphParams {
-			font_id,
-			glyph_id,
-			font_size,
-			subpixel_variant,
-			scale_factor,
-			is_emoji: false
-		};
-
-		let raster_bounds = self.text_system().raster_bounds(&params)?;
-		if !raster_bounds.is_zero() {
-			let tile = self
-				.sprite_atlas
-				.get_or_insert_with(&params.clone().into(), &mut || {
-					let (size, bytes) = self.text_system().rasterize_glyph(&params)?;
-					Ok(Some((size, Cow::Owned(bytes))))
-				})?
-				.expect("Callback above only errors or returns Some");
-			let bounds = Bounds {
-				origin: glyph_origin.map(|px| px.floor()) + raster_bounds.origin.map(Into::into),
-				size: tile.bounds.size.map(Into::into)
-			};
-			let content_mask = self.content_mask().scale(scale_factor);
-			self.next_frame.scene.insert_primitive(MonochromeSprite {
-				order: 0,
-				pad: 0,
-				bounds,
-				content_mask,
-				color: color.opacity(element_opacity),
-				tile,
-				transformation: TransformationMatrix::unit()
-			});
-		}
-		Ok(())
-	}
-
-	/// Paints an emoji glyph into the scene for the next frame at the current z-index.
-	///
-	/// The y component of the origin is the baseline of the glyph.
-	/// You should generally prefer to use the [`ShapedLine::paint`](crate::ShapedLine::paint) or
-	/// [`WrappedLine::paint`](crate::WrappedLine::paint) methods in the [`TextSystem`](crate::TextSystem).
-	/// This method is only useful if you need to paint a single emoji that has already been shaped.
-	///
-	/// This method should only be called as part of the paint phase of element drawing.
-	pub fn paint_emoji(&mut self, origin: Point<Pixels>, font_id: FontId, glyph_id: GlyphId, font_size: Pixels) -> Result<()> {
-		self.invalidator.debug_assert_paint();
-
-		let scale_factor = self.scale_factor();
-		let glyph_origin = origin.scale(scale_factor);
-		let params = RenderGlyphParams {
-			font_id,
-			glyph_id,
-			font_size,
-			// We don't render emojis with subpixel variants.
-			subpixel_variant: Default::default(),
-			scale_factor,
-			is_emoji: true
-		};
-
-		let raster_bounds = self.text_system().raster_bounds(&params)?;
-		if !raster_bounds.is_zero() {
-			let tile = self
-				.sprite_atlas
-				.get_or_insert_with(&params.clone().into(), &mut || {
-					let (size, bytes) = self.text_system().rasterize_glyph(&params)?;
-					Ok(Some((size, Cow::Owned(bytes))))
-				})?
-				.expect("Callback above only errors or returns Some");
-
-			let bounds = Bounds {
-				origin: glyph_origin.map(|px| px.floor()) + raster_bounds.origin.map(Into::into),
-				size: tile.bounds.size.map(Into::into)
-			};
-			let content_mask = self.content_mask().scale(scale_factor);
-			let opacity = self.element_opacity();
-
-			self.next_frame.scene.insert_primitive(PolychromeSprite {
-				order: 0,
-				pad: 0,
-				grayscale: false,
-				bounds,
-				corner_radii: Default::default(),
-				content_mask,
-				tile,
-				opacity
-			});
-		}
-		Ok(())
 	}
 
 	/// Paint a monochrome SVG into the scene for the next frame at the current stacking context.
@@ -3998,6 +3819,176 @@ impl Window {
 	#[cfg(any(test, feature = "test-support"))]
 	pub fn set_modifiers(&mut self, modifiers: Modifiers) {
 		self.modifiers = modifiers;
+	}
+}
+
+impl lucie_text::TextPainter for Window {
+	type Error = anyhow::Error;
+
+	fn create_layer<'s>(&'s mut self, bounds: Bounds<Pixels>) -> impl DerefMut<Target = Self> + 's {
+		self.paint_layer(bounds)
+	}
+	fn content_mask(&self) -> ContentMask<Pixels> {
+		self.content_mask()
+	}
+
+	/// Paint a strikethrough into the scene for the next frame at the current z-index.
+	///
+	/// This method should only be called as part of the paint phase of element drawing.
+	fn paint_strikethrough(&mut self, origin: Point<Pixels>, width: Pixels, style: &StrikethroughStyle) {
+		self.invalidator.debug_assert_paint();
+
+		let scale_factor = self.scale_factor();
+		let height = style.thickness;
+		let bounds = Bounds { origin, size: size(width, height) };
+		let content_mask = self.content_mask();
+		let opacity = self.element_opacity();
+
+		self.next_frame.scene.insert_primitive(Underline {
+			order: 0,
+			pad: 0,
+			bounds: bounds.scale(scale_factor),
+			content_mask: content_mask.scale(scale_factor),
+			thickness: style.thickness.scale(scale_factor),
+			color: style.color.unwrap_or_default().opacity(opacity),
+			wavy: 0
+		});
+	}
+
+	/// Paint an underline into the scene for the next frame at the current z-index.
+	///
+	/// This method should only be called as part of the paint phase of element drawing.
+	fn paint_underline(&mut self, origin: Point<Pixels>, width: Pixels, style: &UnderlineStyle) {
+		self.invalidator.debug_assert_paint();
+
+		let scale_factor = self.scale_factor();
+		let height = if style.wavy { style.thickness * 3. } else { style.thickness };
+		let bounds = Bounds { origin, size: size(width, height) };
+		let content_mask = self.content_mask();
+		let element_opacity = self.element_opacity();
+
+		self.next_frame.scene.insert_primitive(Underline {
+			order: 0,
+			pad: 0,
+			bounds: bounds.scale(scale_factor),
+			content_mask: content_mask.scale(scale_factor),
+			color: style.color.unwrap_or_default().opacity(element_opacity),
+			thickness: style.thickness.scale(scale_factor),
+			wavy: if style.wavy { 1 } else { 0 }
+		});
+	}
+
+	fn paint_background(&mut self, bounds: Bounds<Pixels>, background: Hsla) {
+		self.paint_quad(fill(bounds, background));
+	}
+
+	/// Paints a monochrome (non-emoji) glyph into the scene for the next frame at the current z-index.
+	///
+	/// The y component of the origin is the baseline of the glyph.
+	/// You should generally prefer to use the [`ShapedLine::paint`](crate::ShapedLine::paint) or
+	/// [`WrappedLine::paint`](crate::WrappedLine::paint) methods in the [`TextSystem`](crate::TextSystem).
+	/// This method is only useful if you need to paint a single glyph that has already been shaped.
+	///
+	/// This method should only be called as part of the paint phase of element drawing.
+	fn paint_monochrome_glyph(&mut self, origin: Point<Pixels>, font_id: FontId, glyph_id: GlyphId, font_size: Pixels, color: Hsla) -> Result<(), Self::Error> {
+		self.invalidator.debug_assert_paint();
+
+		let element_opacity = self.element_opacity();
+		let scale_factor = self.scale_factor();
+		let glyph_origin = origin.scale(scale_factor);
+
+		let subpixel_variant = Point {
+			x: (glyph_origin.x.0.fract() * SUBPIXEL_VARIANTS_X as f32).floor() as u8,
+			y: (glyph_origin.y.0.fract() * SUBPIXEL_VARIANTS_Y as f32).floor() as u8
+		};
+		let params = RenderGlyphParams {
+			font_id,
+			glyph_id,
+			font_size,
+			subpixel_variant,
+			scale_factor,
+			is_emoji: false
+		};
+
+		let raster_bounds = self.text_system().raster_bounds(&params)?;
+		if !raster_bounds.is_zero() {
+			let tile = self
+				.sprite_atlas
+				.get_or_insert_with(&params.clone().into(), &mut || {
+					let (size, bytes) = self.text_system().rasterize_glyph(&params)?;
+					Ok(Some((size, Cow::Owned(bytes))))
+				})?
+				.expect("Callback above only errors or returns Some");
+			let bounds = Bounds {
+				origin: glyph_origin.map(|px| px.floor()) + raster_bounds.origin.map(Into::into),
+				size: tile.bounds.size.map(Into::into)
+			};
+			let content_mask = self.content_mask().scale(scale_factor);
+			self.next_frame.scene.insert_primitive(MonochromeSprite {
+				order: 0,
+				pad: 0,
+				bounds,
+				content_mask,
+				color: color.opacity(element_opacity),
+				tile,
+				transformation: TransformationMatrix::unit()
+			});
+		}
+		Ok(())
+	}
+
+	/// Paints an emoji glyph into the scene for the next frame at the current z-index.
+	///
+	/// The y component of the origin is the baseline of the glyph.
+	/// You should generally prefer to use the [`ShapedLine::paint`](crate::ShapedLine::paint) or
+	/// [`WrappedLine::paint`](crate::WrappedLine::paint) methods in the [`TextSystem`](crate::TextSystem).
+	/// This method is only useful if you need to paint a single emoji that has already been shaped.
+	///
+	/// This method should only be called as part of the paint phase of element drawing.
+	fn paint_polychrome_glyph(&mut self, origin: Point<Pixels>, font_id: FontId, glyph_id: GlyphId, font_size: Pixels) -> Result<(), Self::Error> {
+		self.invalidator.debug_assert_paint();
+
+		let scale_factor = self.scale_factor();
+		let glyph_origin = origin.scale(scale_factor);
+		let params = RenderGlyphParams {
+			font_id,
+			glyph_id,
+			font_size,
+			// We don't render emojis with subpixel variants.
+			subpixel_variant: Default::default(),
+			scale_factor,
+			is_emoji: true
+		};
+
+		let raster_bounds = self.text_system().raster_bounds(&params)?;
+		if !raster_bounds.is_zero() {
+			let tile = self
+				.sprite_atlas
+				.get_or_insert_with(&params.clone().into(), &mut || {
+					let (size, bytes) = self.text_system().rasterize_glyph(&params)?;
+					Ok(Some((size, Cow::Owned(bytes))))
+				})?
+				.expect("Callback above only errors or returns Some");
+
+			let bounds = Bounds {
+				origin: glyph_origin.map(|px| px.floor()) + raster_bounds.origin.map(Into::into),
+				size: tile.bounds.size.map(Into::into)
+			};
+			let content_mask = self.content_mask().scale(scale_factor);
+			let opacity = self.element_opacity();
+
+			self.next_frame.scene.insert_primitive(PolychromeSprite {
+				order: 0,
+				pad: 0,
+				grayscale: false,
+				bounds,
+				corner_radii: Default::default(),
+				content_mask,
+				tile,
+				opacity
+			});
+		}
+		Ok(())
 	}
 }
 

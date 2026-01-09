@@ -17,6 +17,7 @@ mod bounds_tree;
 pub mod color;
 mod defer;
 pub mod geometry;
+mod ref_scope;
 pub mod refineable;
 mod result_ext;
 mod shared_string;
@@ -29,6 +30,7 @@ pub use self::{
 	arena::{Arena, ArenaBox},
 	bounds_tree::BoundsTree,
 	defer::{Deferred, defer},
+	ref_scope::RefScope,
 	result_ext::{Flatten, LogLevel, ResultExt},
 	shared_string::SharedString,
 	shared_uri::SharedUri

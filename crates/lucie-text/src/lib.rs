@@ -11,12 +11,12 @@ use std::{
 	sync::Arc
 };
 
-use anyhow::{Context as _, anyhow};
+use anyhow::{Context as _, Result, anyhow};
 use derive_more::Deref;
 use itertools::Itertools;
 use lucie_common::{
 	SharedString,
-	geometry::{Bounds, DevicePixels, Pixels, Point, Size, px}
+	geometry::{Bounds, DevicePixels, Pixels, Point, Size, point, px, size}
 };
 use lucie_style::{Font, TextRun, font};
 use parking_lot::{Mutex, RwLock, RwLockUpgradableReadGuard};
@@ -24,7 +24,6 @@ use rapidhash::fast::RapidHashMap;
 use smallvec::{SmallVec, smallvec};
 
 pub use self::{line::*, line_layout::*, line_wrapper::*};
-use crate::{PlatformTextSystem, Result};
 
 /// An opaque identifier for a specific font.
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
@@ -35,9 +34,8 @@ pub struct FontId(pub usize);
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct FontFamilyId(pub usize);
 
-pub(crate) const SUBPIXEL_VARIANTS_X: u8 = 4;
-
-pub(crate) const SUBPIXEL_VARIANTS_Y: u8 = if cfg!(target_os = "windows") || cfg!(target_os = "linux") { 1 } else { SUBPIXEL_VARIANTS_X };
+pub const SUBPIXEL_VARIANTS_X: u8 = 4;
+pub const SUBPIXEL_VARIANTS_Y: u8 = if cfg!(target_os = "windows") || cfg!(target_os = "linux") { 1 } else { SUBPIXEL_VARIANTS_X };
 
 /// The GPUI text rendering sub system.
 pub struct TextSystem {
@@ -51,7 +49,7 @@ pub struct TextSystem {
 }
 
 impl TextSystem {
-	pub(crate) fn new(platform_text_system: Arc<dyn PlatformTextSystem>) -> Self {
+	pub fn new(platform_text_system: Arc<dyn PlatformTextSystem>) -> Self {
 		TextSystem {
 			platform_text_system,
 			font_metrics: RwLock::default(),
@@ -263,7 +261,7 @@ impl TextSystem {
 	}
 
 	/// Get the rasterized size and location of a specific, rendered glyph.
-	pub(crate) fn raster_bounds(&self, params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>> {
+	pub fn raster_bounds(&self, params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>> {
 		let raster_bounds = self.raster_bounds.upgradable_read();
 		if let Some(bounds) = raster_bounds.get(params) {
 			Ok(*bounds)
@@ -275,7 +273,7 @@ impl TextSystem {
 		}
 	}
 
-	pub(crate) fn rasterize_glyph(&self, params: &RenderGlyphParams) -> Result<(Size<DevicePixels>, Vec<u8>)> {
+	pub fn rasterize_glyph(&self, params: &RenderGlyphParams) -> Result<(Size<DevicePixels>, Vec<u8>)> {
 		let raster_bounds = self.raster_bounds(params)?;
 		self.platform_text_system.rasterize_glyph(params, raster_bounds)
 	}
@@ -290,22 +288,22 @@ pub struct WindowTextSystem {
 }
 
 impl WindowTextSystem {
-	pub(crate) fn new(text_system: Arc<TextSystem>) -> Self {
+	pub fn new(text_system: Arc<TextSystem>) -> Self {
 		Self {
 			line_layout_cache: LineLayoutCache::new(text_system.platform_text_system.clone()),
 			text_system
 		}
 	}
 
-	pub(crate) fn layout_index(&self) -> LineLayoutIndex {
+	pub fn layout_index(&self) -> LineLayoutIndex {
 		self.line_layout_cache.layout_index()
 	}
 
-	pub(crate) fn reuse_layouts(&self, index: Range<LineLayoutIndex>) {
+	pub fn reuse_layouts(&self, index: Range<LineLayoutIndex>) {
 		self.line_layout_cache.reuse_layouts(index)
 	}
 
-	pub(crate) fn truncate_layouts(&self, index: LineLayoutIndex) {
+	pub fn truncate_layouts(&self, index: LineLayoutIndex) {
 		self.line_layout_cache.truncate_layouts(index)
 	}
 
@@ -358,7 +356,7 @@ impl WindowTextSystem {
 		let mut font_runs = self.font_runs_pool.lock().pop().unwrap_or_default();
 
 		let mut lines = SmallVec::new();
-		let mut max_wrap_lines = line_clamp;
+		let max_wrap_lines = line_clamp;
 		let mut wrapped_lines = 0;
 
 		let mut process_line = |line_text: SharedString, line_start, line_end| {
@@ -459,7 +457,7 @@ impl WindowTextSystem {
 		Ok(lines)
 	}
 
-	pub(crate) fn finish_frame(&self) {
+	pub fn finish_frame(&self) {
 		self.line_layout_cache.finish_frame()
 	}
 
@@ -550,16 +548,16 @@ impl DerefMut for LineWrapperHandle {
 /// An identifier for a specific glyph, as returned by [`WindowTextSystem::layout_line`].
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 #[repr(C)]
-pub struct GlyphId(pub(crate) u32);
+pub struct GlyphId(pub u32);
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct RenderGlyphParams {
-	pub(crate) font_id: FontId,
-	pub(crate) glyph_id: GlyphId,
-	pub(crate) font_size: Pixels,
-	pub(crate) subpixel_variant: Point<u8>,
-	pub(crate) scale_factor: f32,
-	pub(crate) is_emoji: bool
+pub struct RenderGlyphParams {
+	pub font_id: FontId,
+	pub glyph_id: GlyphId,
+	pub font_size: Pixels,
+	pub subpixel_variant: Point<u8>,
+	pub scale_factor: f32,
+	pub is_emoji: bool
 }
 
 impl Eq for RenderGlyphParams {}
@@ -581,32 +579,32 @@ impl Hash for RenderGlyphParams {
 pub struct FontMetrics {
 	/// The number of font units that make up the "em square",
 	/// a scalable grid for determining the size of a typeface.
-	pub(crate) units_per_em: u32,
+	pub units_per_em: u32,
 
 	/// The vertical distance from the baseline of the font to the top of the glyph covers.
-	pub(crate) ascent: f32,
+	pub ascent: f32,
 
 	/// The vertical distance from the baseline of the font to the bottom of the glyph covers.
-	pub(crate) descent: f32,
+	pub descent: f32,
 
 	/// The recommended additional space to add between lines of type.
-	pub(crate) line_gap: f32,
+	pub line_gap: f32,
 
 	/// The suggested position of the underline.
-	pub(crate) underline_position: f32,
+	pub underline_position: f32,
 
 	/// The suggested thickness of the underline.
-	pub(crate) underline_thickness: f32,
+	pub underline_thickness: f32,
 
 	/// The height of a capital letter measured from the baseline of the font.
-	pub(crate) cap_height: f32,
+	pub cap_height: f32,
 
 	/// The height of a lowercase x.
-	pub(crate) x_height: f32,
+	pub x_height: f32,
 
 	/// The outer limits of the area that the font covers.
 	/// Corresponds to the xMin / xMax / yMin / yMax values in the OpenType `head` table
-	pub(crate) bounding_box: Bounds<f32>
+	pub bounding_box: Bounds<f32>
 }
 
 impl FontMetrics {
@@ -651,8 +649,7 @@ impl FontMetrics {
 	}
 }
 
-#[allow(unused)]
-pub(crate) fn font_name_with_fallbacks<'a>(name: &'a str, system: &'a str) -> &'a str {
+pub fn font_name_with_fallbacks<'a>(name: &'a str, system: &'a str) -> &'a str {
 	// Note: the "Zed Plex" fonts were deprecated as we are not allowed to use "Plex"
 	// in a derived font name. They are essentially indistinguishable from IBM Plex/Lilex,
 	// and so retained here for backward compatibility.
@@ -661,5 +658,120 @@ pub(crate) fn font_name_with_fallbacks<'a>(name: &'a str, system: &'a str) -> &'
 		".ZedSans" | "Zed Plex Sans" => "IBM Plex Sans",
 		".ZedMono" | "Zed Plex Mono" => "Lilex",
 		_ => name
+	}
+}
+
+pub trait PlatformTextSystem: Send + Sync {
+	fn add_fonts(&self, fonts: Vec<Cow<'static, [u8]>>) -> Result<()>;
+	fn all_font_names(&self) -> Vec<String>;
+	fn font_id(&self, descriptor: &Font) -> Result<FontId>;
+	fn font_metrics(&self, font_id: FontId) -> FontMetrics;
+	fn typographic_bounds(&self, font_id: FontId, glyph_id: GlyphId) -> Result<Bounds<f32>>;
+	fn advance(&self, font_id: FontId, glyph_id: GlyphId) -> Result<Size<f32>>;
+	fn glyph_for_char(&self, font_id: FontId, ch: char) -> Option<GlyphId>;
+	fn glyph_raster_bounds(&self, params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>>;
+	fn rasterize_glyph(&self, params: &RenderGlyphParams, raster_bounds: Bounds<DevicePixels>) -> Result<(Size<DevicePixels>, Vec<u8>)>;
+	fn layout_line(&self, text: &str, font_size: Pixels, runs: &[FontRun]) -> LineLayout;
+}
+
+pub struct NoopTextSystem;
+
+impl NoopTextSystem {
+	#[allow(dead_code)]
+	pub fn new() -> Self {
+		Self
+	}
+}
+
+impl PlatformTextSystem for NoopTextSystem {
+	fn add_fonts(&self, _fonts: Vec<Cow<'static, [u8]>>) -> Result<()> {
+		Ok(())
+	}
+
+	fn all_font_names(&self) -> Vec<String> {
+		Vec::new()
+	}
+
+	fn font_id(&self, _descriptor: &Font) -> Result<FontId> {
+		Ok(FontId(1))
+	}
+
+	fn font_metrics(&self, _font_id: FontId) -> FontMetrics {
+		FontMetrics {
+			units_per_em: 1000,
+			ascent: 1025.0,
+			descent: -275.0,
+			line_gap: 0.0,
+			underline_position: -95.0,
+			underline_thickness: 60.0,
+			cap_height: 698.0,
+			x_height: 516.0,
+			bounding_box: Bounds {
+				origin: Point { x: -260.0, y: -245.0 },
+				size: Size { width: 1501.0, height: 1364.0 }
+			}
+		}
+	}
+
+	fn typographic_bounds(&self, _font_id: FontId, _glyph_id: GlyphId) -> Result<Bounds<f32>> {
+		Ok(Bounds {
+			origin: Point { x: 54.0, y: 0.0 },
+			size: size(392.0, 528.0)
+		})
+	}
+
+	fn advance(&self, _font_id: FontId, glyph_id: GlyphId) -> Result<Size<f32>> {
+		Ok(size(600.0 * glyph_id.0 as f32, 0.0))
+	}
+
+	fn glyph_for_char(&self, _font_id: FontId, ch: char) -> Option<GlyphId> {
+		Some(GlyphId(ch.len_utf16() as u32))
+	}
+
+	fn glyph_raster_bounds(&self, _params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>> {
+		Ok(Default::default())
+	}
+
+	fn rasterize_glyph(&self, _params: &RenderGlyphParams, raster_bounds: Bounds<DevicePixels>) -> Result<(Size<DevicePixels>, Vec<u8>)> {
+		Ok((raster_bounds.size, Vec::new()))
+	}
+
+	fn layout_line(&self, text: &str, font_size: Pixels, _runs: &[FontRun]) -> LineLayout {
+		let mut position = px(0.);
+		let metrics = self.font_metrics(FontId(0));
+		let em_width = font_size * self.advance(FontId(0), self.glyph_for_char(FontId(0), 'm').unwrap()).unwrap().width / metrics.units_per_em as f32;
+		let mut glyphs = Vec::new();
+		for (ix, c) in text.char_indices() {
+			if let Some(glyph) = self.glyph_for_char(FontId(0), c) {
+				glyphs.push(ShapedGlyph {
+					id: glyph,
+					position: point(position, px(0.)),
+					index: ix,
+					is_emoji: glyph.0 == 2
+				});
+				if glyph.0 == 2 {
+					position += em_width * 2.0;
+				} else {
+					position += em_width;
+				}
+			} else {
+				position += em_width
+			}
+		}
+		let mut runs = Vec::default();
+		if !glyphs.is_empty() {
+			runs.push(ShapedRun { font_id: FontId(0), glyphs });
+		} else {
+			position = px(0.);
+		}
+
+		LineLayout {
+			font_size,
+			width: position,
+			ascent: font_size * (metrics.ascent / metrics.units_per_em as f32),
+			descent: font_size * (metrics.descent / metrics.units_per_em as f32),
+			runs,
+			len: text.len()
+		}
 	}
 }

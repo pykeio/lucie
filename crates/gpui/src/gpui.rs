@@ -36,7 +36,6 @@ mod tab_stop;
 mod taffy;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test;
-mod text_system;
 mod util;
 mod view;
 mod window;
@@ -80,6 +79,7 @@ pub use lucie_common::{
 };
 pub use lucie_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};
 pub use lucie_style::*;
+pub use lucie_text::*;
 pub use path_builder::*;
 pub use platform::*;
 pub use profiler::*;
@@ -94,7 +94,6 @@ use taffy::TaffyLayoutEngine;
 pub use taffy::{AvailableSpace, LayoutId};
 #[cfg(any(test, feature = "test-support"))]
 pub use test::*;
-pub use text_system::*;
 pub use view::*;
 pub use window::*;
 

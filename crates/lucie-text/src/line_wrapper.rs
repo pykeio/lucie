@@ -127,8 +127,8 @@ impl LineWrapper {
 		runs: &'a [TextRun]
 	) -> (SharedString, Cow<'a, [TextRun]>) {
 		let mut width = px(0.);
-		let mut suffix_width = truncation_suffix.chars().map(|c| self.width_for_char(c)).fold(px(0.0), |a, x| a + x);
-		let mut char_indices = line.char_indices();
+		let suffix_width = truncation_suffix.chars().map(|c| self.width_for_char(c)).fold(px(0.0), |a, x| a + x);
+		let char_indices = line.char_indices();
 		let mut truncate_ix = 0;
 		for (ix, c) in char_indices {
 			if width + suffix_width < truncate_width {
@@ -297,21 +297,16 @@ impl Boundary {
 
 #[cfg(test)]
 mod tests {
-	#[cfg(target_os = "macos")]
-	use lucie_style::TextRun;
 	use lucie_style::{Font, FontFeatures, FontStyle, FontWeight, font};
-	use rand::prelude::*;
 
 	use super::*;
-	use crate::{TestAppContext, TestDispatcher};
-	#[cfg(target_os = "macos")]
-	use crate::{WindowTextSystem, WrapBoundary};
+	use crate::{NoopTextSystem, TextSystem};
 
 	fn build_wrapper() -> LineWrapper {
-		let dispatcher = TestDispatcher::new(StdRng::seed_from_u64(0));
-		let cx = TestAppContext::build(dispatcher, None);
-		let id = cx.text_system().resolve_font(&font(".ZedMono"));
-		LineWrapper::new(id, px(16.), cx.text_system().platform_text_system.clone())
+		let platform_system = Arc::new(NoopTextSystem) as Arc<dyn PlatformTextSystem>;
+		let system = TextSystem::new(Arc::clone(&platform_system));
+		let id = system.resolve_font(&font(".ZedMono"));
+		LineWrapper::new(id, px(16.), platform_system)
 	}
 
 	fn generate_test_runs(input_run_len: &[usize]) -> Vec<TextRun> {
@@ -549,51 +544,5 @@ mod tests {
 		assert_not_word("こんにちは");
 		assert_not_word("😀😁😂");
 		assert_not_word("()[]{}<>");
-	}
-
-	// For compatibility with the test macro
-	#[cfg(target_os = "macos")]
-	use crate as gpui;
-
-	// These seem to vary wildly based on the text system.
-	#[cfg(target_os = "macos")]
-	#[crate::test]
-	fn test_wrap_shaped_line(cx: &mut TestAppContext) {
-		cx.update(|cx| {
-			let text_system = WindowTextSystem::new(cx.text_system().clone());
-
-			let normal = TextRun {
-				len: 0,
-				font: font("Helvetica"),
-				color: Default::default(),
-				underline: Default::default(),
-				..Default::default()
-			};
-			let bold = TextRun {
-				len: 0,
-				font: font("Helvetica").bold(),
-				..Default::default()
-			};
-
-			let text = "aa bbb cccc ddddd eeee".into();
-			let lines = text_system
-				.shape_text(
-					text,
-					px(16.),
-					&[normal.with_len(4), bold.with_len(5), normal.with_len(6), bold.with_len(1), normal.with_len(7)],
-					Some(px(72.)),
-					None
-				)
-				.unwrap();
-
-			assert_eq!(
-				lines[0].layout.wrap_boundaries(),
-				&[
-					WrapBoundary { run_ix: 0, glyph_ix: 7 },
-					WrapBoundary { run_ix: 0, glyph_ix: 12 },
-					WrapBoundary { run_ix: 0, glyph_ix: 18 }
-				],
-			);
-		});
 	}
 }

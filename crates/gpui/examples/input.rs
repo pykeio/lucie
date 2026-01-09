@@ -450,7 +450,7 @@ impl Element for TextElement {
 			window.paint_quad(selection)
 		}
 		let line = prepaint.line.take().unwrap();
-		line.paint(bounds.origin, window.line_height(), window, cx).unwrap();
+		line.paint(bounds.origin, window.line_height(), cx.text_system(), window).unwrap();
 
 		if focus_handle.is_focused(window)
 			&& let Some(cursor) = prepaint.cursor.take()
