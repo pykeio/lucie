@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::Context as _;
+use itertools::Itertools;
 use lucie_common::{
 	ResultExt, SharedString,
 	geometry::{Bounds, Pixels, Point, Size}
@@ -478,32 +479,27 @@ impl TextLayout {
 
 	/// The text for this layout.
 	pub fn text(&self) -> String {
-		self.0
-			.borrow()
-			.as_ref()
-			.unwrap()
-			.lines
-			.iter()
-			.map(|s| s.text.to_string())
-			.collect::<Vec<_>>()
-			.join("\n")
+		self.0.borrow().as_ref().unwrap().lines.iter().map(|s| &s.text).join("\n")
 	}
 
 	/// The text for this layout (with soft-wraps as newlines)
 	pub fn wrapped_text(&self) -> String {
-		let mut lines = Vec::new();
+		let mut accumulator = String::new();
 		for wrapped in self.0.borrow().as_ref().unwrap().lines.iter() {
 			let mut seen = 0;
 			for boundary in wrapped.layout.wrap_boundaries.iter() {
 				let index = wrapped.layout.unwrapped_layout.runs[boundary.run_ix].glyphs[boundary.glyph_ix].index;
 
-				lines.push(wrapped.text[seen..index].to_string());
+				accumulator.push_str(&wrapped.text[seen..index]);
+				accumulator.push('\n');
 				seen = index;
 			}
-			lines.push(wrapped.text[seen..].to_string());
+			accumulator.push_str(&wrapped.text[seen..]);
+			accumulator.push('\n');
 		}
-
-		lines.join("\n")
+		// Remove trailing newline
+		accumulator.pop();
+		accumulator
 	}
 }
 
