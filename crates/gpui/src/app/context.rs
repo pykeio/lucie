@@ -243,7 +243,7 @@ impl<'a, T: 'static> Context<'a, T> {
 
 	/// Focus the given view in the given window. View type is required to implement Focusable.
 	pub fn focus_view<W: Focusable>(&mut self, view: &Entity<W>, window: &mut Window) {
-		window.focus(&view.focus_handle(self));
+		window.focus(&view.focus_handle(self), self);
 	}
 
 	/// Sets a given callback to be run on the next frame.
@@ -603,7 +603,7 @@ impl<'a, T: 'static> Context<'a, T> {
 		T: Focusable
 	{
 		let view = self.entity();
-		window.defer(self, move |window, cx| view.read(cx).focus_handle(cx).focus(window))
+		window.defer(self, move |window, cx| view.read(cx).focus_handle(cx).focus(window, cx))
 	}
 }
 

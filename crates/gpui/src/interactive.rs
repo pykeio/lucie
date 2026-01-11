@@ -670,7 +670,9 @@ mod test {
 			cx.bind_keys(vec![KeyBinding::new("ctrl-g", TestAction, Some("parent"))]);
 		});
 
-		window.update(cx, |test_view, window, _cx| window.focus(&test_view.focus_handle)).unwrap();
+		window
+			.update(cx, |test_view, window, cx| window.focus(&test_view.focus_handle, cx))
+			.unwrap();
 
 		cx.dispatch_keystroke(*window, Keystroke::parse("a").unwrap());
 		cx.dispatch_keystroke(*window, Keystroke::parse("ctrl-g").unwrap());
