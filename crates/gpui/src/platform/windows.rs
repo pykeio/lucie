@@ -1,6 +1,5 @@
 mod clipboard;
 mod destination_list;
-mod direct_write;
 mod directx_atlas;
 mod directx_devices;
 mod directx_renderer;
@@ -17,7 +16,6 @@ mod wrapper;
 
 pub(crate) use clipboard::*;
 pub(crate) use destination_list::*;
-pub(crate) use direct_write::*;
 pub(crate) use directx_atlas::*;
 pub(crate) use directx_devices::*;
 pub(crate) use directx_renderer::*;

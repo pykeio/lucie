@@ -13,8 +13,7 @@ use lucie_common::{
 	ResultExt, SharedString,
 	geometry::{Bounds, Pixels, Point, Size}
 };
-use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, WhiteSpace};
-use lucie_text::{WrappedLine, WrappedLineLayout};
+use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, TextStyleRefinement, WhiteSpace};
 use smallvec::SmallVec;
 
 use crate::{
@@ -245,8 +244,8 @@ impl IntoElement for StyledText {
 pub struct TextLayout(Rc<RefCell<Option<TextLayoutInner>>>);
 
 struct TextLayoutInner {
-	len: usize,
-	lines: SmallVec<[WrappedLine; 1]>,
+	text: SharedString,
+	layout: lucie_text::Layout,
 	line_height: Pixels,
 	wrap_width: Option<Pixels>,
 	size: Option<Size<Pixels>>,
@@ -296,46 +295,34 @@ impl TextLayout {
 					return text_layout.size.unwrap();
 				}
 
-				let mut line_wrapper = cx.text_system().line_wrapper(text_style.font(), font_size);
-				let (text, runs) = if let Some(truncate_width) = truncate_width {
-					line_wrapper.truncate_line(text.clone(), truncate_width, &truncation_suffix, &runs)
-				} else {
-					(text.clone(), Cow::Borrowed(&*runs))
-				};
-				let len = text.len();
+				// TODO: truncation
+				// TODO: do not rebuild layout if params dont change
 
-				let Some(lines) = window
-					.text_system()
-					.shape_text(
-						text,
-						font_size,
-						&runs,
-						wrap_width,            // Wrap if we know the width.
-						text_style.line_clamp  // Limit the number of lines if line_clamp is set.
-					)
-					.log_err()
-				else {
-					element_state.0.borrow_mut().replace(TextLayoutInner {
-						lines: Default::default(),
-						len: 0,
-						line_height,
-						wrap_width,
-						size: Some(Size::default()),
-						bounds: None
-					});
-					return Size::default();
-				};
-
-				let mut size: Size<Pixels> = Size::default();
-				for line in &lines {
-					let line_size = line.size(line_height);
-					size.height += line_size.height;
-					size.width = size.width.max(line_size.width).ceil();
+				let mut builder = cx.text_system().ranged_builder(&text, font_size, window.scale_factor(), &text_style);
+				let mut run_start = 0;
+				for run in &runs {
+					builder.push_style(
+						run_start..run_start + run.len,
+						&TextStyleRefinement {
+							font_family: Some(run.font.family.clone()),
+							font_weight: Some(run.font.weight),
+							font_fallbacks: run.font.fallbacks.clone(),
+							color: Some(run.color),
+							background_color: run.background_color,
+							..Default::default()
+						}
+					);
+					run_start += run.len;
 				}
 
+				let mut layout = builder.build(&text);
+				layout.fit(wrap_width);
+
+				let size = layout.size();
+
 				element_state.0.borrow_mut().replace(TextLayoutInner {
-					lines,
-					len,
+					layout,
+					text: text.clone(),
 					line_height,
 					wrap_width,
 					size: Some(size),
@@ -367,99 +354,22 @@ impl TextLayout {
 			.with_context(|| format!("prepaint has not been performed on {text}"))
 			.unwrap();
 
-		let line_height = element_state.line_height;
-		let mut line_origin = bounds.origin;
-		let text_style = window.text_style();
-		for line in &element_state.lines {
-			line.paint_background(line_origin, line_height, text_style.text_align, Some(bounds), cx.text_system(), window)
-				.log_err();
-			line.paint(line_origin, line_height, text_style.text_align, Some(bounds), cx.text_system(), window)
-				.log_err();
-			line_origin.y += line.size(line_height).height;
+		let scale_factor = window.scale_factor();
+		let line_origin = bounds.origin.scale(scale_factor);
+		let text_system = window.text_system().clone();
+		for line in element_state.layout.lines() {
+			line.paint(&text_system, window, line_origin).unwrap();
 		}
 	}
 
 	/// Get the byte index into the input of the pixel position.
 	pub fn index_for_position(&self, mut position: Point<Pixels>) -> Result<usize, usize> {
-		let element_state = self.0.borrow();
-		let element_state = element_state.as_ref().expect("measurement has not been performed");
-		let bounds = element_state.bounds.expect("prepaint has not been performed");
-
-		if position.y < bounds.top() {
-			return Err(0);
-		}
-
-		let line_height = element_state.line_height;
-		let mut line_origin = bounds.origin;
-		let mut line_start_ix = 0;
-		for line in &element_state.lines {
-			let line_bottom = line_origin.y + line.size(line_height).height;
-			if position.y > line_bottom {
-				line_origin.y = line_bottom;
-				line_start_ix += line.len() + 1;
-			} else {
-				let position_within_line = position - line_origin;
-				match line.index_for_position(position_within_line, line_height) {
-					Ok(index_within_line) => return Ok(line_start_ix + index_within_line),
-					Err(index_within_line) => return Err(line_start_ix + index_within_line)
-				}
-			}
-		}
-
-		Err(line_start_ix.saturating_sub(1))
+		unimplemented!();
 	}
 
 	/// Get the pixel position for the given byte index.
 	pub fn position_for_index(&self, index: usize) -> Option<Point<Pixels>> {
-		let element_state = self.0.borrow();
-		let element_state = element_state.as_ref().expect("measurement has not been performed");
-		let bounds = element_state.bounds.expect("prepaint has not been performed");
-		let line_height = element_state.line_height;
-
-		let mut line_origin = bounds.origin;
-		let mut line_start_ix = 0;
-
-		for line in &element_state.lines {
-			let line_end_ix = line_start_ix + line.len();
-			if index < line_start_ix {
-				break;
-			} else if index > line_end_ix {
-				line_origin.y += line.size(line_height).height;
-				line_start_ix = line_end_ix + 1;
-				continue;
-			} else {
-				let ix_within_line = index - line_start_ix;
-				return Some(line_origin + line.position_for_index(ix_within_line, line_height)?);
-			}
-		}
-
-		None
-	}
-
-	/// Retrieve the layout for the line containing the given byte index.
-	pub fn line_layout_for_index(&self, index: usize) -> Option<Arc<WrappedLineLayout>> {
-		let element_state = self.0.borrow();
-		let element_state = element_state.as_ref().expect("measurement has not been performed");
-		let bounds = element_state.bounds.expect("prepaint has not been performed");
-		let line_height = element_state.line_height;
-
-		let mut line_origin = bounds.origin;
-		let mut line_start_ix = 0;
-
-		for line in &element_state.lines {
-			let line_end_ix = line_start_ix + line.len();
-			if index < line_start_ix {
-				break;
-			} else if index > line_end_ix {
-				line_origin.y += line.size(line_height).height;
-				line_start_ix = line_end_ix + 1;
-				continue;
-			} else {
-				return Some(line.layout.clone());
-			}
-		}
-
-		None
+		unimplemented!();
 	}
 
 	/// The bounds of this layout.
@@ -474,27 +384,21 @@ impl TextLayout {
 
 	/// The UTF-8 length of the underlying text.
 	pub fn len(&self) -> usize {
-		self.0.borrow().as_ref().unwrap().len
+		self.0.borrow().as_ref().unwrap().text.len()
 	}
 
 	/// The text for this layout.
-	pub fn text(&self) -> String {
-		self.0.borrow().as_ref().unwrap().lines.iter().map(|s| &s.text).join("\n")
+	pub fn text(&self) -> SharedString {
+		self.0.borrow().as_ref().unwrap().text.clone()
 	}
 
 	/// The text for this layout (with soft-wraps as newlines)
 	pub fn wrapped_text(&self) -> String {
 		let mut accumulator = String::new();
-		for wrapped in self.0.borrow().as_ref().unwrap().lines.iter() {
-			let mut seen = 0;
-			for boundary in wrapped.layout.wrap_boundaries.iter() {
-				let index = wrapped.layout.unwrapped_layout.runs[boundary.run_ix].glyphs[boundary.glyph_ix].index;
-
-				accumulator.push_str(&wrapped.text[seen..index]);
-				accumulator.push('\n');
-				seen = index;
-			}
-			accumulator.push_str(&wrapped.text[seen..]);
+		let inner = self.0.borrow();
+		let inner = inner.as_ref().unwrap();
+		for wrapped in inner.layout.lines() {
+			accumulator.push_str(&inner.text[wrapped.text_range()]);
 			accumulator.push('\n');
 		}
 		// Remove trailing newline

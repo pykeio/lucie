@@ -388,8 +388,7 @@ impl Default for TextStyle {
 	fn default() -> Self {
 		TextStyle {
 			color: black(),
-			// todo(linux) make this configurable or choose better default
-			font_family: ".SystemUIFont".into(),
+			font_family: "system-ui".into(),
 			font_features: FontFeatures::default(),
 			font_fallbacks: None,
 			font_size: rems(1.).into(),

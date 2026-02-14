@@ -594,7 +594,7 @@ impl App {
 		let foreground_executor = platform.foreground_executor();
 		assert!(executor.is_main_thread(), "must construct App on main thread");
 
-		let text_system = Arc::new(TextSystem::new(platform.text_system()));
+		let text_system = Arc::new(TextSystem::new());
 		let entities = EntityMap::new();
 		let keyboard_layout = platform.keyboard_layout();
 		let keyboard_mapper = platform.keyboard_mapper();

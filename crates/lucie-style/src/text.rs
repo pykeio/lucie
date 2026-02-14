@@ -167,7 +167,7 @@ impl FontFallbacks {
 pub struct Font {
 	/// The font family name.
 	///
-	/// The special name ".SystemUIFont" is used to identify the system UI font, which varies based on platform.
+	/// The special name "system-ui" is used to identify the system UI font, which varies based on platform.
 	pub family: SharedString,
 
 	/// The font features to use.
@@ -185,7 +185,7 @@ pub struct Font {
 
 impl Default for Font {
 	fn default() -> Self {
-		font(".SystemUIFont")
+		font("system-ui")
 	}
 }
 
