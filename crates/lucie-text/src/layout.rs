@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use lucie_common::geometry::{Bounds, Pixels, Point, ScaledPixels, Size, px, size};
+use lucie_common::geometry::{Bounds, Point, ScaledPixels, Size, size};
 use lucie_style::TextAlign;
 
 use crate::{
@@ -13,7 +13,9 @@ use crate::{
 #[derive(Clone)]
 pub struct Layout {
 	layout: parley::Layout<Brush>,
-	alignment: Option<TextAlign>
+	pub(crate) alignment: Option<TextAlign>,
+	pub(crate) wrap_width: Option<ScaledPixels>,
+	pub(crate) has_shaped: bool
 }
 
 impl Layout {
@@ -21,7 +23,9 @@ impl Layout {
 	pub fn new() -> Self {
 		Layout {
 			layout: parley::Layout::new(),
-			alignment: None
+			alignment: None,
+			wrap_width: None,
+			has_shaped: false
 		}
 	}
 
@@ -39,12 +43,19 @@ impl Layout {
 		self.alignment = alignment;
 	}
 
-	pub fn fit(&mut self, max_width: Option<Pixels>) {
+	pub fn fit(&mut self, max_width: Option<ScaledPixels>) {
+		self.wrap_width = max_width;
+
 		let max_width = max_width.map(|x| x.0);
 		self.layout.break_all_lines(max_width);
-		if let Some(alignment) = self.alignment {
+		self.has_shaped = true;
+
+		if let Some(wrap_width) = self.wrap_width
+			&& let Some(alignment) = self.alignment
+			&& self.has_shaped
+		{
 			self.layout.align(
-				max_width,
+				Some(wrap_width.0),
 				match alignment {
 					TextAlign::Left => parley::Alignment::Start,
 					TextAlign::Center => parley::Alignment::Center,
@@ -59,23 +70,23 @@ impl Layout {
 		self.layout.len()
 	}
 
-	pub fn width(&self) -> Pixels {
-		px(self.layout.width())
+	pub fn width(&self) -> ScaledPixels {
+		ScaledPixels(self.layout.width())
 	}
 
-	pub fn height(&self) -> Pixels {
-		px(self.layout.height())
+	pub fn height(&self) -> ScaledPixels {
+		ScaledPixels(self.layout.height())
 	}
 
-	pub fn size(&self) -> Size<Pixels> {
-		size(px(self.layout.width()), px(self.layout.height()))
+	pub fn size(&self) -> Size<ScaledPixels> {
+		size(ScaledPixels(self.layout.width()), ScaledPixels(self.layout.height()))
 	}
 
 	pub fn lines(&self) -> impl Iterator<Item = Line<'_>> + '_ + Clone {
 		self.layout.lines().map(|line| Line { line })
 	}
 
-	pub fn cursor_at(&self, point: Point<Pixels>) -> Cursor {
+	pub fn cursor_at(&self, point: Point<ScaledPixels>) -> Cursor {
 		Cursor::new(parley::Cursor::from_point(&self.layout, point.x.0, point.y.0))
 	}
 
@@ -95,8 +106,12 @@ impl<'a> Line<'a> {
 		self.line.text_range()
 	}
 
-	pub fn height(&self) -> Pixels {
-		px(self.line.metrics().line_height)
+	pub fn width(&self) -> ScaledPixels {
+		ScaledPixels(self.line.metrics().advance)
+	}
+
+	pub fn height(&self) -> ScaledPixels {
+		ScaledPixels(self.line.metrics().line_height)
 	}
 
 	pub fn runs(&self) -> impl Iterator<Item = Run<'a>> + 'a + Clone {
@@ -108,16 +123,16 @@ impl<'a> Line<'a> {
 			parley::PositionedLayoutItem::GlyphRun(run) => Renderable::GlyphRun(GlyphRun::new(run)),
 			parley::PositionedLayoutItem::InlineBox(b) => Renderable::InlineBox {
 				id: b.id,
-				x: px(b.x),
-				y: px(b.y),
-				width: px(b.width),
-				height: px(b.height)
+				x: ScaledPixels(b.x),
+				y: ScaledPixels(b.y),
+				width: ScaledPixels(b.width),
+				height: ScaledPixels(b.height)
 			}
 		})
 	}
 
 	pub fn paint<P: TextPainter>(&self, text_system: &TextSystem, painter: &mut P, origin: Point<ScaledPixels>) -> Result<(), P::Error> {
-		let mut painter = painter.create_layer(Bounds::new(Point::default(), size(px(1_000.0), px(1_000_000.0))));
+		let mut painter = painter.create_layer(Bounds::new(origin, size(self.width(), self.height())));
 		for renderable in self.renderables() {
 			match renderable {
 				Renderable::GlyphRun(run) => {

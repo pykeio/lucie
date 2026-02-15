@@ -298,7 +298,9 @@ impl TextLayout {
 				// TODO: truncation
 				// TODO: do not rebuild layout if params dont change
 
-				let mut builder = cx.text_system().ranged_builder(&text, font_size, window.scale_factor(), &text_style);
+				let scale_factor = window.scale_factor();
+
+				let mut builder = cx.text_system().ranged_builder(&text, font_size, scale_factor, &text_style);
 				let mut run_start = 0;
 				for run in &runs {
 					builder.push_style(
@@ -316,9 +318,10 @@ impl TextLayout {
 				}
 
 				let mut layout = builder.build(&text);
-				layout.fit(wrap_width);
+				layout.fit(wrap_width.map(|p| p.scale(scale_factor)));
 
-				let size = layout.size();
+				// Text system operates in scaled pixels, layout operates in unscaled.
+				let size = layout.size().map(|x| Pixels(x.0 / scale_factor));
 
 				element_state.0.borrow_mut().replace(TextLayoutInner {
 					layout,

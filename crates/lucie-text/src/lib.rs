@@ -7,7 +7,7 @@ use std::{
 
 use lucie_common::{
 	color::Hsla,
-	geometry::{Bounds, ContentMask, Pixels, Point, ScaledPixels, Size}
+	geometry::{Bounds, Pixels, Point, ScaledPixels, Size}
 };
 use lucie_style::{StrikethroughStyle, TextAlign, TextStyle, TextStyleRefinement, UnderlineStyle};
 use parking_lot::Mutex;
@@ -145,7 +145,7 @@ impl<'s> RangedBuilder<'s> {
 		});
 	}
 
-	pub fn push_inline_box(&mut self, id: u64, char_index: usize, size: Size<Pixels>) {
+	pub fn push_inline_box(&mut self, id: u64, char_index: usize, size: Size<ScaledPixels>) {
 		self.builder.push_inline_box(parley::InlineBox {
 			id,
 			index: char_index,
@@ -185,8 +185,7 @@ impl<'ctx> Drop for RangedBuilder<'ctx> {
 pub trait TextPainter {
 	type Error;
 
-	fn create_layer<'s>(&'s mut self, bounds: Bounds<Pixels>) -> impl DerefMut<Target = Self> + 's;
-	fn content_mask(&self) -> ContentMask<Pixels>;
+	fn create_layer<'s>(&'s mut self, bounds: Bounds<ScaledPixels>) -> impl DerefMut<Target = Self> + 's;
 
 	fn paint_underline(&mut self, origin: Point<ScaledPixels>, width: ScaledPixels, style: &UnderlineStyle);
 	fn paint_strikethrough(&mut self, origin: Point<ScaledPixels>, width: ScaledPixels, style: &StrikethroughStyle);

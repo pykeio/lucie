@@ -3854,11 +3854,20 @@ impl Window {
 impl lucie_text::TextPainter for Window {
 	type Error = anyhow::Error;
 
-	fn create_layer<'s>(&'s mut self, bounds: Bounds<Pixels>) -> impl DerefMut<Target = Self> + 's {
-		self.paint_layer(bounds)
-	}
-	fn content_mask(&self) -> ContentMask<Pixels> {
-		self.content_mask()
+	fn create_layer<'s>(&'s mut self, bounds: Bounds<ScaledPixels>) -> impl DerefMut<Target = Self> + 's {
+		self.invalidator.debug_assert_paint();
+
+		let content_mask = self.content_mask().scale(self.scale_factor());
+		let clipped_bounds = bounds.intersect(&content_mask.bounds);
+		if !clipped_bounds.is_empty() {
+			self.next_frame.scene.push_layer(clipped_bounds);
+		}
+
+		RefScope::new(self, move |window| {
+			if !clipped_bounds.is_empty() {
+				window.next_frame.scene.pop_layer();
+			}
+		})
 	}
 
 	/// Paint a strikethrough into the scene for the next frame at the current z-index.

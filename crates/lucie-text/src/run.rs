@@ -3,7 +3,7 @@ use std::{
 	slice
 };
 
-use lucie_common::geometry::{DevicePixels, Pixels, Point, ScaledPixels, point, px};
+use lucie_common::geometry::{DevicePixels, Point, ScaledPixels, point};
 use parley::GlyphClass;
 
 use crate::{
@@ -13,6 +13,7 @@ use crate::{
 };
 
 pub struct Run<'a> {
+	#[expect(unused)]
 	run: parley::Run<'a, Brush>,
 	data: RunData<'a>
 }
@@ -73,7 +74,13 @@ impl<'a> RunData<'a> {
 
 pub enum Renderable<'a> {
 	GlyphRun(GlyphRun<'a>),
-	InlineBox { id: u64, x: Pixels, y: Pixels, width: Pixels, height: Pixels }
+	InlineBox {
+		id: u64,
+		x: ScaledPixels,
+		y: ScaledPixels,
+		width: ScaledPixels,
+		height: ScaledPixels
+	}
 }
 
 pub struct GlyphRun<'a> {
@@ -93,23 +100,18 @@ impl<'a> GlyphRun<'a> {
 	}
 
 	#[inline]
-	pub fn x(&self) -> Pixels {
-		px(self.run.offset())
+	pub fn x(&self) -> ScaledPixels {
+		ScaledPixels(self.run.offset())
 	}
 
 	#[inline]
-	pub fn y(&self) -> Pixels {
-		px(self.run.baseline())
+	pub fn y(&self) -> ScaledPixels {
+		ScaledPixels(self.run.baseline())
 	}
 
 	#[inline]
 	pub fn style(&self) -> &parley::Style<Brush> {
 		self.run.style()
-	}
-
-	#[inline]
-	pub fn font_size(&self) -> Pixels {
-		px(self.run.run().font_size())
 	}
 
 	#[inline]
