@@ -3960,17 +3960,27 @@ impl lucie_text::TextPainter for Window {
 			};
 			let scale_factor = self.scale_factor();
 			let content_mask = self.content_mask().scale(scale_factor);
-			self.next_frame.scene.insert_primitive(PolychromeSprite {
-				order: 0,
-				pad: 0,
-				bounds,
-				content_mask,
-				grayscale: false,
-				// color: color.opacity(element_opacity),
-				tile,
-				corner_radii: Corners::default(),
-				opacity: element_opacity // transformation: TransformationMatrix::unit()
-			});
+			match tile.texture_id.kind {
+				AtlasTextureKind::Monochrome => self.next_frame.scene.insert_primitive(MonochromeSprite {
+					order: 0,
+					pad: 0,
+					bounds,
+					content_mask,
+					color: color.opacity(element_opacity),
+					tile,
+					transformation: TransformationMatrix::unit()
+				}),
+				AtlasTextureKind::Polychrome => self.next_frame.scene.insert_primitive(PolychromeSprite {
+					order: 0,
+					pad: 0,
+					bounds,
+					content_mask,
+					grayscale: false,
+					tile,
+					corner_radii: Corners::default(),
+					opacity: element_opacity
+				})
+			}
 		}
 
 		Ok(())

@@ -47,10 +47,15 @@ pub(crate) fn rasterize_outline_glyph(
 	let mut pixmap = tiny_skia::Pixmap::new(w, h)?;
 	pixmap.fill_path(&path, &tiny_skia::Paint::default(), tiny_skia::FillRule::Winding, tiny_skia::Transform::from_translate(-x, -y), None);
 
+	let mut data = vec![0; w as usize * h as usize];
+	for (i, pixel) in pixmap.pixels().iter().enumerate() {
+		data[i] = pixel.alpha();
+	}
+
 	Some(RasterizedGlyph {
 		size: size(DevicePixels(pixmap.width() as _), DevicePixels(pixmap.height() as _)),
-		data: pixmap.data().to_vec(),
-		is_monochromatic: false,
+		data,
+		is_monochromatic: true,
 		offset: point(ScaledPixels(x.round()), ScaledPixels(y.round()))
 	})
 }
