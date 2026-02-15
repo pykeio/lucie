@@ -1,4 +1,4 @@
-use lucie_common::geometry::{DevicePixels, Point, Size, point, size};
+use lucie_common::geometry::{DevicePixels, Point, ScaledPixels, Size, point, size};
 
 use crate::{
 	SubpixelVariant,
@@ -13,7 +13,7 @@ pub struct RasterizedGlyph {
 	/// If `true`, `data` has only alpha channel (1 byte/pixel); otherwise RGBA (4 bytes/pixel).
 	pub is_monochromatic: bool,
 	/// Offset to draw glyph at
-	pub offset: Point<DevicePixels>
+	pub offset: Point<ScaledPixels>
 }
 
 pub(crate) fn rasterize_outline_glyph(
@@ -24,7 +24,7 @@ pub(crate) fn rasterize_outline_glyph(
 	outlines: &skrifa::OutlineGlyphCollection<'_>,
 	hint_cache: Option<&mut HintCache>
 ) -> Option<RasterizedGlyph> {
-	let mut pen = TinySkiaPen::default();
+	let mut pen = TinySkiaPen::new(subpixel_variant.offset(), 0.0);
 	outline
 		.draw(
 			if let Some(hint_cache) = hint_cache
@@ -38,52 +38,56 @@ pub(crate) fn rasterize_outline_glyph(
 		)
 		.unwrap();
 
-	let subpixel_offset = subpixel_variant.offset();
-
 	let path = pen.path.finish()?;
-	let bounds = path.bounds().round_out().unwrap();
-	let (mut w, h) = (bounds.width() as u32, bounds.height() as u32);
-	if subpixel_offset > 0. {
-		w += 1;
-	}
+	let bounds = path.bounds();
+
+	let (x, y) = (bounds.x(), bounds.y());
+	let (w, h) = (bounds.width().ceil() as u32, bounds.height().ceil() as u32);
 
 	let mut pixmap = tiny_skia::Pixmap::new(w, h)?;
-	pixmap.fill_path(
-		&path,
-		&tiny_skia::Paint::default(),
-		tiny_skia::FillRule::Winding,
-		tiny_skia::Transform::from_translate(-(bounds.left() as f32 - subpixel_offset), -bounds.top() as f32 - bounds.height() as f32).post_scale(1.0, -1.0),
-		None
-	);
+	pixmap.fill_path(&path, &tiny_skia::Paint::default(), tiny_skia::FillRule::Winding, tiny_skia::Transform::from_translate(-x, -y), None);
 
 	Some(RasterizedGlyph {
 		size: size(DevicePixels(pixmap.width() as _), DevicePixels(pixmap.height() as _)),
 		data: pixmap.data().to_vec(),
 		is_monochromatic: false,
-		offset: point(DevicePixels(bounds.left()), DevicePixels(-(pixmap.height() as i32) - bounds.top()))
+		offset: point(ScaledPixels(x.round()), ScaledPixels(y.round()))
 	})
 }
 
-#[derive(Default)]
 struct TinySkiaPen {
-	pub(crate) path: tiny_skia::PathBuilder
+	pub(crate) path: tiny_skia::PathBuilder,
+	x_offset: f32,
+	y_offset: f32
+}
+
+impl TinySkiaPen {
+	pub(crate) fn new(x_offset: f32, y_offset: f32) -> Self {
+		Self {
+			path: tiny_skia::PathBuilder::new(),
+			x_offset,
+			y_offset
+		}
+	}
 }
 
 impl skrifa::outline::OutlinePen for TinySkiaPen {
 	fn move_to(&mut self, x: f32, y: f32) {
-		self.path.move_to(x, y);
+		self.path.move_to(self.x_offset + x, self.y_offset - y);
 	}
 
 	fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32) {
-		self.path.cubic_to(cx0, cy0, cx1, cy1, x, y);
+		self.path
+			.cubic_to(self.x_offset + cx0, self.y_offset - cy0, self.x_offset + cx1, self.y_offset - cy1, self.x_offset + x, self.y_offset - y);
 	}
 
 	fn line_to(&mut self, x: f32, y: f32) {
-		self.path.line_to(x, y);
+		self.path.line_to(self.x_offset + x, self.y_offset - y);
 	}
 
 	fn quad_to(&mut self, cx0: f32, cy0: f32, x: f32, y: f32) {
-		self.path.quad_to(cx0, cy0, x, y);
+		self.path
+			.quad_to(self.x_offset + cx0, self.y_offset - cy0, self.x_offset + x, self.y_offset - y);
 	}
 
 	fn close(&mut self) {
