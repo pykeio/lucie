@@ -5,7 +5,7 @@ use std::{
 };
 
 use derive_more::{Add, FromStr, Sub};
-use lucie_common::{SharedString, color::Hsla};
+use lucie_common::{SharedString, color::Hsla, geometry::AbsoluteLength};
 
 use crate::{StrikethroughStyle, UnderlineStyle};
 
@@ -94,12 +94,13 @@ impl fmt::Display for FontStyle {
 }
 
 /// A styled run of text, for use in [`crate::TextLayout`].
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default, Hash)]
 pub struct TextRun {
 	/// A number of utf8 bytes
 	pub len: usize,
 	/// The font to use for this run.
 	pub font: Font,
+	pub font_size: AbsoluteLength,
 	/// The color
 	pub color: Hsla,
 	/// The background color (if any)

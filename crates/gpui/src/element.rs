@@ -281,6 +281,10 @@ impl GlobalElementId {
 		}
 		Self(id)
 	}
+
+	pub(crate) fn from_raw(hash: u64) -> Self {
+		Self(hash)
+	}
 }
 
 trait ElementObject {

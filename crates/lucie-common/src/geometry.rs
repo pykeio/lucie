@@ -3025,6 +3025,12 @@ impl MulAssign<f32> for ScaledPixels {
 	}
 }
 
+impl std::hash::Hash for ScaledPixels {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.0.to_bits().hash(state);
+	}
+}
+
 /// Represents a length in rems, a unit based on the font-size of the window, which can be assigned with
 /// [`Window::set_rem_size`][set_rem_size].
 ///
@@ -3068,6 +3074,14 @@ impl fmt::Debug for Rems {
 	}
 }
 
+impl Eq for Rems {}
+
+impl Hash for Rems {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.0.to_bits().hash(state)
+	}
+}
+
 #[derive(Debug, Clone)]
 pub enum RemsParseError {
 	MissingSuffix,
@@ -3103,7 +3117,7 @@ impl TryFrom<&'_ str> for Rems {
 /// affected by the current font size, or a number of rems, which is relative to the font size of
 /// the root element. It is used for specifying dimensions that are either independent of or
 /// related to the typographic scale.
-#[derive(Clone, Copy, Neg, PartialEq)]
+#[derive(Clone, Copy, Neg, PartialEq, Eq, Hash)]
 pub enum AbsoluteLength {
 	/// A length in pixels.
 	Pixels(Pixels),

@@ -1,20 +1,19 @@
 use std::{
-	borrow::Cow,
 	cell::{Cell, RefCell},
+	hash::{Hash, Hasher},
 	mem,
 	ops::Range,
-	rc::Rc,
-	sync::Arc
+	rc::Rc
 };
 
 use anyhow::Context as _;
-use itertools::Itertools;
 use lucie_common::{
-	ResultExt, SharedString,
-	geometry::{Bounds, Pixels, Point, Size}
+	SharedString,
+	geometry::{Bounds, Pixels, Point}
 };
-use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, TextStyleRefinement, WhiteSpace};
-use smallvec::SmallVec;
+use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, WhiteSpace};
+use lucie_text::Layout;
+use rapidhash::fast::RapidHasher;
 
 use crate::{
 	ActiveTooltip, AnyView, App, DispatchPhase, Element, ElementId, GlobalElementId, Hitbox, HitboxBehavior, IntoElement, LayoutId, MouseDownEvent,
@@ -38,16 +37,15 @@ impl Element for &'static str {
 	fn prepaint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
-		bounds: Bounds<Pixels>,
-		text_layout: &mut Self::RequestLayoutState,
+		_bounds: Bounds<Pixels>,
+		_text_layout: &mut Self::RequestLayoutState,
 		_window: &mut Window,
 		_cx: &mut App
 	) {
-		text_layout.prepaint(bounds, self)
 	}
 
-	fn paint(&mut self, _id: Option<&GlobalElementId>, _bounds: Bounds<Pixels>, text_layout: &mut TextLayout, _: &mut (), window: &mut Window, cx: &mut App) {
-		text_layout.paint(self, window, cx)
+	fn paint(&mut self, _id: Option<&GlobalElementId>, bounds: Bounds<Pixels>, text_layout: &mut TextLayout, _: &mut (), window: &mut Window, cx: &mut App) {
+		text_layout.paint(self, bounds, window, cx)
 	}
 }
 
@@ -84,24 +82,23 @@ impl Element for SharedString {
 	fn prepaint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
-		bounds: Bounds<Pixels>,
-		text_layout: &mut Self::RequestLayoutState,
+		_bounds: Bounds<Pixels>,
+		_text_layout: &mut Self::RequestLayoutState,
 		_window: &mut Window,
 		_cx: &mut App
 	) {
-		text_layout.prepaint(bounds, self.as_ref())
 	}
 
 	fn paint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
-		_bounds: Bounds<Pixels>,
+		bounds: Bounds<Pixels>,
 		text_layout: &mut Self::RequestLayoutState,
 		_: &mut Self::PrepaintState,
 		window: &mut Window,
 		cx: &mut App
 	) {
-		text_layout.paint(self.as_ref(), window, cx)
+		text_layout.paint(self, bounds, window, cx)
 	}
 }
 
@@ -214,20 +211,18 @@ impl Element for StyledText {
 		(layout_id, ())
 	}
 
-	fn prepaint(&mut self, _id: Option<&GlobalElementId>, bounds: Bounds<Pixels>, _: &mut Self::RequestLayoutState, _window: &mut Window, _cx: &mut App) {
-		self.layout.prepaint(bounds, &self.text)
-	}
+	fn prepaint(&mut self, _id: Option<&GlobalElementId>, _bounds: Bounds<Pixels>, _: &mut Self::RequestLayoutState, _window: &mut Window, _cx: &mut App) {}
 
 	fn paint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
-		_bounds: Bounds<Pixels>,
+		bounds: Bounds<Pixels>,
 		_: &mut Self::RequestLayoutState,
 		_: &mut Self::PrepaintState,
 		window: &mut Window,
 		cx: &mut App
 	) {
-		self.layout.paint(&self.text, window, cx)
+		self.layout.paint(&self.text, bounds, window, cx)
 	}
 }
 
@@ -245,18 +240,14 @@ pub struct TextLayout(Rc<RefCell<Option<TextLayoutInner>>>);
 
 struct TextLayoutInner {
 	text: SharedString,
-	layout: lucie_text::Layout,
-	line_height: Pixels,
-	wrap_width: Option<Pixels>,
-	size: Option<Size<Pixels>>,
-	bounds: Option<Bounds<Pixels>>
+	layout: Rc<RefCell<lucie_text::Layout>>
 }
 
 impl TextLayout {
 	fn layout(&self, text: SharedString, runs: Option<Vec<TextRun>>, window: &mut Window, _: &mut App) -> LayoutId {
 		let text_style = window.text_style();
 		let font_size = text_style.font_size.to_pixels(window.rem_size());
-		let line_height = text_style.line_height.to_pixels(font_size.into(), window.rem_size());
+		let scale_factor = window.scale_factor();
 
 		let runs = if let Some(runs) = runs { runs } else { vec![text_style.to_run(text.len())] };
 		window.request_measured_layout(Default::default(), {
@@ -272,7 +263,7 @@ impl TextLayout {
 					None
 				};
 
-				let (truncate_width, truncation_suffix) = if let Some(text_overflow) = text_style.text_overflow.clone() {
+				let (_truncate_width, _truncation_suffix) = if let Some(text_overflow) = text_style.text_overflow.clone() {
 					let width = known_dimensions.width.or(match available_space.width {
 						crate::AvailableSpace::Definite(x) => match text_style.line_clamp {
 							Some(max_lines) => Some(x * max_lines),
@@ -288,79 +279,46 @@ impl TextLayout {
 					(None, "".into())
 				};
 
-				if let Some(text_layout) = element_state.0.borrow().as_ref()
-					&& text_layout.size.is_some()
-					&& (wrap_width.is_none() || wrap_width == text_layout.wrap_width)
-				{
-					return text_layout.size.unwrap();
-				}
-
 				// TODO: truncation
-				// TODO: do not rebuild layout if params dont change
 
-				let scale_factor = window.scale_factor();
+				window.with_element_state(&global_id(&text, font_size, scale_factor, Some(&runs)), |state, _| {
+					let mut layout = state.unwrap_or_else(|| {
+						let mut builder = cx.text_system().ranged_builder(&text, font_size, scale_factor, &text_style);
+						let mut layout = Layout::new(); // TODO: would be nice to reuse allocations from dead layouts
+						builder.build_into_from_runs(&mut layout, &text, &runs);
+						Rc::new(RefCell::new(layout))
+					});
 
-				let mut builder = cx.text_system().ranged_builder(&text, font_size, scale_factor, &text_style);
-				let mut run_start = 0;
-				for run in &runs {
-					builder.push_style(
-						run_start..run_start + run.len,
-						&TextStyleRefinement {
-							font_family: Some(run.font.family.clone()),
-							font_weight: Some(run.font.weight),
-							font_fallbacks: run.font.fallbacks.clone(),
-							color: Some(run.color),
-							background_color: run.background_color,
-							..Default::default()
-						}
-					);
-					run_start += run.len;
-				}
+					let size = {
+						let mut layout = layout.borrow_mut();
+						layout.fit(wrap_width.map(|p| p.scale(scale_factor)));
+						layout.align(Some(text_style.text_align));
+						layout.size().map(|x| Pixels(x.0 / scale_factor))
+					};
 
-				let mut layout = builder.build(&text);
-				layout.fit(wrap_width.map(|p| p.scale(scale_factor)));
+					element_state.0.borrow_mut().replace(TextLayoutInner {
+						text: text.clone(),
+						layout: Rc::clone(&layout)
+					});
 
-				// Text system operates in scaled pixels, layout operates in unscaled.
-				let size = layout.size().map(|x| Pixels(x.0 / scale_factor));
-
-				element_state.0.borrow_mut().replace(TextLayoutInner {
-					layout,
-					text: text.clone(),
-					line_height,
-					wrap_width,
-					size: Some(size),
-					bounds: None
-				});
-
-				size
+					(size, layout)
+				})
 			}
 		})
 	}
 
-	fn prepaint(&self, bounds: Bounds<Pixels>, text: &str) {
-		let mut element_state = self.0.borrow_mut();
-		let element_state = element_state
-			.as_mut()
-			.with_context(|| format!("measurement has not been performed on {text}"))
-			.unwrap();
-		element_state.bounds = Some(bounds);
-	}
-
-	fn paint(&self, text: &str, window: &mut Window, cx: &mut App) {
+	fn paint(&self, text: &str, bounds: Bounds<Pixels>, window: &mut Window, _cx: &mut App) {
 		let element_state = self.0.borrow();
 		let element_state = element_state
 			.as_ref()
 			.with_context(|| format!("measurement has not been performed on {text}"))
 			.unwrap();
-		let bounds = element_state
-			.bounds
-			.with_context(|| format!("prepaint has not been performed on {text}"))
-			.unwrap();
 
 		let scale_factor = window.scale_factor();
 		let line_origin = bounds.origin.scale(scale_factor);
 		let text_system = window.text_system().clone();
-		for line in element_state.layout.lines() {
+		let layout = element_state.layout.borrow();
+		for line in layout.lines() {
 			line.paint(&text_system, window, line_origin).unwrap();
 		}
 	}
@@ -373,16 +331,6 @@ impl TextLayout {
 	/// Get the pixel position for the given byte index.
 	pub fn position_for_index(&self, index: usize) -> Option<Point<Pixels>> {
 		unimplemented!();
-	}
-
-	/// The bounds of this layout.
-	pub fn bounds(&self) -> Bounds<Pixels> {
-		self.0.borrow().as_ref().unwrap().bounds.unwrap()
-	}
-
-	/// The line height for this layout.
-	pub fn line_height(&self) -> Pixels {
-		self.0.borrow().as_ref().unwrap().line_height
 	}
 
 	/// The UTF-8 length of the underlying text.
@@ -400,7 +348,8 @@ impl TextLayout {
 		let mut accumulator = String::new();
 		let inner = self.0.borrow();
 		let inner = inner.as_ref().unwrap();
-		for wrapped in inner.layout.lines() {
+		let layout = inner.layout.borrow();
+		for wrapped in layout.lines() {
 			accumulator.push_str(&inner.text[wrapped.text_range()]);
 			accumulator.push('\n');
 		}
@@ -636,4 +585,17 @@ impl IntoElement for InteractiveText {
 	fn into_element(self) -> Self::Element {
 		self
 	}
+}
+
+fn global_id(text: &str, font_size: Pixels, scale_factor: f32, runs: Option<&[TextRun]>) -> GlobalElementId {
+	let mut hasher = const { RapidHasher::new(1282529) };
+	scale_factor.to_bits().hash(&mut hasher);
+	font_size.hash(&mut hasher);
+	text.hash(&mut hasher);
+	if let Some(runs) = runs {
+		for run in runs {
+			run.hash(&mut hasher);
+		}
+	}
+	GlobalElementId::from_raw(hasher.finish())
 }

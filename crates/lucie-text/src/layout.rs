@@ -15,7 +15,8 @@ pub struct Layout {
 	layout: parley::Layout<Brush>,
 	pub(crate) alignment: Option<TextAlign>,
 	pub(crate) wrap_width: Option<ScaledPixels>,
-	pub(crate) has_shaped: bool
+	pub(crate) has_shaped: bool,
+	needs_realign: bool
 }
 
 impl Layout {
@@ -25,7 +26,8 @@ impl Layout {
 			layout: parley::Layout::new(),
 			alignment: None,
 			wrap_width: None,
-			has_shaped: false
+			has_shaped: false,
+			needs_realign: false
 		}
 	}
 
@@ -39,31 +41,43 @@ impl Layout {
 		&mut self.layout
 	}
 
-	pub fn set_alignment(&mut self, alignment: Option<TextAlign>) {
-		self.alignment = alignment;
+	pub fn align(&mut self, alignment: Option<TextAlign>) {
+		debug_assert!(self.has_shaped);
+		if alignment != self.alignment || self.needs_realign {
+			self.layout.align(
+				self.wrap_width.map(|x| x.0),
+				match alignment {
+					Some(TextAlign::Left) | None => parley::Alignment::Start,
+					Some(TextAlign::Center) => parley::Alignment::Center,
+					Some(TextAlign::Right) => parley::Alignment::End
+				},
+				parley::AlignmentOptions::default()
+			);
+			self.needs_realign = false;
+		}
 	}
 
 	pub fn fit(&mut self, max_width: Option<ScaledPixels>) {
+		if max_width == self.wrap_width && self.has_shaped {
+			return;
+		}
+		if self.num_lines() == 1
+			&& let Some(wrap_width) = self.wrap_width
+			&& (max_width.is_none() || max_width.is_some_and(|mw| mw >= wrap_width))
+		{
+			// don't bother re-wrapping if the old text wasn't wrapped within a smaller bound than the new bound
+			// but still store wrap_width so align works
+			self.wrap_width = max_width;
+			self.needs_realign = true;
+			return;
+		}
+
 		self.wrap_width = max_width;
 
 		let max_width = max_width.map(|x| x.0);
 		self.layout.break_all_lines(max_width);
 		self.has_shaped = true;
-
-		if let Some(wrap_width) = self.wrap_width
-			&& let Some(alignment) = self.alignment
-			&& self.has_shaped
-		{
-			self.layout.align(
-				Some(wrap_width.0),
-				match alignment {
-					TextAlign::Left => parley::Alignment::Start,
-					TextAlign::Center => parley::Alignment::Center,
-					TextAlign::Right => parley::Alignment::End
-				},
-				parley::AlignmentOptions::default()
-			);
-		}
+		self.needs_realign = true;
 	}
 
 	pub fn num_lines(&self) -> usize {

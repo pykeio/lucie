@@ -2794,7 +2794,7 @@ impl Window {
 	/// This method should only be called as part of the request_layout or prepaint phase of element drawing.
 	pub fn request_measured_layout<F>(&mut self, style: Style, measure: F) -> LayoutId
 	where
-		F: Fn(Size<Option<Pixels>>, Size<AvailableSpace>, &mut Window, &mut App) -> Size<Pixels> + 'static
+		F: FnMut(Size<Option<Pixels>>, Size<AvailableSpace>, &mut Window, &mut App) -> Size<Pixels> + 'static
 	{
 		self.invalidator.debug_assert_prepaint();
 

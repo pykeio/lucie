@@ -14,10 +14,7 @@ workspace = true
 [dependencies]
 lucie-common.workspace = true
 lucie-style.workspace = true
-derive_more.workspace = true
 parking_lot.workspace = true
-itertools.workspace = true
-anyhow.workspace = true
 rapidhash.workspace = true
 smallvec.workspace = true
 log.workspace = true

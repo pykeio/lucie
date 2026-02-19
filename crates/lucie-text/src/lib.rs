@@ -9,7 +9,7 @@ use lucie_common::{
 	color::Hsla,
 	geometry::{Bounds, Pixels, Point, ScaledPixels, Size}
 };
-use lucie_style::{StrikethroughStyle, TextAlign, TextStyle, TextStyleRefinement, UnderlineStyle};
+use lucie_style::{StrikethroughStyle, TextStyle, TextStyleRefinement, UnderlineStyle};
 use parking_lot::Mutex;
 
 mod font;
@@ -65,10 +65,9 @@ impl TextSystem {
 	}
 
 	/// Add a font's data to the text system.
-	pub fn add_font(&self, font: Vec<u8>) -> anyhow::Result<()> {
+	pub fn add_font(&self, font: Vec<u8>) {
 		let mut font_context = self.parley_ctx.font.lock();
 		font_context.collection.register_fonts(font.into(), None);
-		Ok(())
 	}
 
 	pub fn finish_frame(&self) {}
@@ -110,7 +109,6 @@ impl TextSystem {
 					underline: base_style.underline.clone(),
 					strikethrough: base_style.strikethrough.clone(),
 					white_space: Some(base_style.white_space),
-					text_align: Some(base_style.text_align),
 					..Default::default()
 				},
 				rem_size,
@@ -124,7 +122,6 @@ impl TextSystem {
 		};
 		RangedBuilder {
 			builder,
-			alignment: base_style.text_align,
 			rem_size,
 			_parley_ctx: self.parley_ctx.clone()
 		}
@@ -133,7 +130,6 @@ impl TextSystem {
 
 pub struct RangedBuilder<'ctx> {
 	builder: parley::RangedBuilder<'ctx, Brush>,
-	alignment: TextAlign,
 	rem_size: Pixels,
 	_parley_ctx: Arc<ParleyContext>
 }
@@ -158,7 +154,6 @@ impl<'s> RangedBuilder<'s> {
 		let mut this = ManuallyDrop::new(self);
 		let builder = unsafe { ptr::read(&mut this.builder) };
 		builder.build_into(layout.layout_mut(), text.as_ref());
-		layout.set_alignment(Some(this.alignment));
 		unsafe { this.release() };
 	}
 
@@ -166,6 +161,10 @@ impl<'s> RangedBuilder<'s> {
 		let mut layout = Layout::new();
 		self.build_into(&mut layout, text.as_ref());
 		layout
+	}
+
+	pub fn build_into_from_runs(self, layout: &mut Layout, text: &str, runs: &[lucie_style::TextRun]) {
+		build_from_runs(text, runs, self, layout);
 	}
 
 	unsafe fn release(&self) {
@@ -180,6 +179,26 @@ impl<'ctx> Drop for RangedBuilder<'ctx> {
 	fn drop(&mut self) {
 		unsafe { self.release() };
 	}
+}
+
+fn build_from_runs(text: &str, runs: &[lucie_style::TextRun], mut builder: RangedBuilder, layout: &mut Layout) {
+	let mut run_start = 0;
+	for run in runs {
+		builder.push_style(
+			run_start..run_start + run.len,
+			&TextStyleRefinement {
+				font_family: Some(run.font.family.clone()),
+				font_weight: Some(run.font.weight),
+				font_fallbacks: run.font.fallbacks.clone(),
+				color: Some(run.color),
+				background_color: run.background_color,
+				..Default::default()
+			}
+		);
+		run_start += run.len;
+	}
+
+	builder.build_into(layout, text);
 }
 
 pub trait TextPainter {
