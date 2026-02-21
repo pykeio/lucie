@@ -11,6 +11,7 @@ use lucie_common::{
 };
 use lucie_style::{StrikethroughStyle, TextStyle, TextStyleRefinement, UnderlineStyle};
 use parking_lot::Mutex;
+use parley::fontique;
 
 mod font;
 mod glyph;
@@ -65,9 +66,15 @@ impl TextSystem {
 	}
 
 	/// Add a font's data to the text system.
-	pub fn add_font(&self, font: Vec<u8>) {
+	pub fn add_font(&self, font: Vec<u8>, name_override: Option<&str>) {
 		let mut font_context = self.parley_ctx.font.lock();
-		font_context.collection.register_fonts(font.into(), None);
+		font_context.collection.register_fonts(
+			font.into(),
+			name_override.map(|name| fontique::FontInfoOverride {
+				family_name: Some(name),
+				..Default::default()
+			})
+		);
 	}
 
 	pub fn finish_frame(&self) {}
@@ -141,6 +148,24 @@ impl<'s> RangedBuilder<'s> {
 		});
 	}
 
+	pub fn push_runs(&mut self, runs: &[lucie_style::TextRun]) {
+		let mut run_start = 0;
+		for run in runs {
+			self.push_style(
+				run_start..run_start + run.len,
+				&TextStyleRefinement {
+					font_family: Some(run.font.family.clone()),
+					font_weight: Some(run.font.weight),
+					font_fallbacks: run.font.fallbacks.clone(),
+					color: Some(run.color),
+					background_color: run.background_color,
+					..Default::default()
+				}
+			);
+			run_start += run.len;
+		}
+	}
+
 	pub fn push_inline_box(&mut self, id: u64, char_index: usize, size: Size<ScaledPixels>) {
 		self.builder.push_inline_box(parley::InlineBox {
 			id,
@@ -163,10 +188,6 @@ impl<'s> RangedBuilder<'s> {
 		layout
 	}
 
-	pub fn build_into_from_runs(self, layout: &mut Layout, text: &str, runs: &[lucie_style::TextRun]) {
-		build_from_runs(text, runs, self, layout);
-	}
-
 	unsafe fn release(&self) {
 		unsafe {
 			self._parley_ctx.font.force_unlock();
@@ -179,26 +200,6 @@ impl<'ctx> Drop for RangedBuilder<'ctx> {
 	fn drop(&mut self) {
 		unsafe { self.release() };
 	}
-}
-
-fn build_from_runs(text: &str, runs: &[lucie_style::TextRun], mut builder: RangedBuilder, layout: &mut Layout) {
-	let mut run_start = 0;
-	for run in runs {
-		builder.push_style(
-			run_start..run_start + run.len,
-			&TextStyleRefinement {
-				font_family: Some(run.font.family.clone()),
-				font_weight: Some(run.font.weight),
-				font_fallbacks: run.font.fallbacks.clone(),
-				color: Some(run.color),
-				background_color: run.background_color,
-				..Default::default()
-			}
-		);
-		run_start += run.len;
-	}
-
-	builder.build_into(layout, text);
 }
 
 pub trait TextPainter {

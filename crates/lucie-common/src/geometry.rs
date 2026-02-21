@@ -2907,6 +2907,10 @@ impl ScaledPixels {
 	pub const fn ceil(&self) -> Self {
 		Self(self.0.ceil())
 	}
+
+	pub const fn unscale(&self, factor: f32) -> Pixels {
+		Pixels(self.0 / factor)
+	}
 }
 
 impl Eq for ScaledPixels {}

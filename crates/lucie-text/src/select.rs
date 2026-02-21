@@ -1,5 +1,7 @@
 use std::ops::Range;
 
+use lucie_common::geometry::{Bounds, ScaledPixels, point, size};
+
 use crate::layout::Layout;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
@@ -42,6 +44,11 @@ impl Cursor {
 	pub fn refresh(&self, layout: &Layout) -> Cursor {
 		Cursor(self.0.refresh(layout.layout()))
 	}
+
+	#[inline]
+	pub fn x(&self, layout: &Layout) -> ScaledPixels {
+		ScaledPixels(self.0.geometry(layout.layout(), 0.0).x0 as f32)
+	}
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -51,6 +58,12 @@ pub struct Selection(parley::Selection);
 impl Selection {
 	pub fn new(anchor: Cursor, focus: Cursor) -> Self {
 		Selection(parley::Selection::new(anchor.0, focus.0))
+	}
+
+	pub fn from_range(range: Range<usize>, layout: &Layout) -> Self {
+		let start = layout.cursor_at_byte(range.start);
+		let end = layout.cursor_at_byte(range.end);
+		Selection::new(start, end)
 	}
 
 	#[inline]
@@ -82,5 +95,20 @@ impl Selection {
 	#[must_use]
 	pub fn refresh(&self, layout: &Layout) -> Self {
 		Selection(self.0.refresh(layout.layout()))
+	}
+
+	#[inline]
+	pub fn bounds(&self, layout: &Layout) -> Vec<(usize, Bounds<ScaledPixels>)> {
+		let mut xs = vec![];
+		self.0.geometry_with(layout.layout(), |bb, line| {
+			xs.push((
+				line,
+				Bounds {
+					origin: point(ScaledPixels(bb.x0 as f32), ScaledPixels(bb.y0 as f32)),
+					size: size(ScaledPixels(bb.width() as f32), ScaledPixels(bb.height() as f32))
+				}
+			));
+		});
+		xs
 	}
 }

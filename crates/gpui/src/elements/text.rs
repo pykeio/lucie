@@ -284,9 +284,9 @@ impl TextLayout {
 				window.with_element_state(&global_id(&text, font_size, scale_factor, Some(&runs)), |state, _| {
 					let mut layout = state.unwrap_or_else(|| {
 						let mut builder = cx.text_system().ranged_builder(&text, font_size, scale_factor, &text_style);
-						let mut layout = Layout::new(); // TODO: would be nice to reuse allocations from dead layouts
-						builder.build_into_from_runs(&mut layout, &text, &runs);
-						Rc::new(RefCell::new(layout))
+						builder.push_runs(&runs);
+						// TODO: would be nice to reuse Layout allocations from dead layouts
+						Rc::new(RefCell::new(builder.build(&text)))
 					});
 
 					let size = {
