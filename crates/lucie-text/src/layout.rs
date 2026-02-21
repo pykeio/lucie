@@ -1,7 +1,7 @@
 use std::ops::Range;
 
-use lucie_common::geometry::{Bounds, Point, ScaledPixels, Size, size};
-use lucie_style::TextAlign;
+use lucie_common::geometry::{Bounds, Point, ScaledPixels, Size, point, px, size};
+use lucie_style::{StrikethroughStyle, TextAlign, UnderlineStyle};
 
 use crate::{
 	TextPainter, TextSystem,
@@ -153,6 +153,29 @@ impl<'a> Line<'a> {
 					let font = text_system.font_cache().get(run.data().font());
 					for glyph in run.positioned_glyphs(origin) {
 						painter.paint_glyph(glyph, &font, run.data(), run.style().brush.color)?;
+					}
+
+					if let Some(underline) = run.style().underline.as_ref() {
+						painter.paint_underline(
+							origin + point(run.x(), run.y() - ScaledPixels(underline.offset.unwrap_or_default())),
+							run.width(),
+							&UnderlineStyle {
+								color: Some(underline.brush.color),
+								thickness: px(underline.size.unwrap_or(1.0)),
+								wavy: underline.brush.wavy
+							}
+						);
+					}
+
+					if let Some(strikethrough) = run.style().strikethrough.as_ref() {
+						painter.paint_strikethrough(
+							origin + point(run.x(), run.y() - ScaledPixels(strikethrough.offset.unwrap_or_default())),
+							run.width(),
+							&StrikethroughStyle {
+								color: Some(strikethrough.brush.color),
+								thickness: px(strikethrough.size.unwrap_or(1.0))
+							}
+						);
 					}
 				}
 				Renderable::InlineBox { .. } => unimplemented!("inline boxes not implemented")

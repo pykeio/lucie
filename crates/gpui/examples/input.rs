@@ -307,20 +307,25 @@ impl EntityInputHandler for TextInput {
 		cx.notify();
 	}
 
-	fn bounds_for_range(&mut self, range_utf16: Range<usize>, bounds: Bounds<Pixels>, _window: &mut Window, _cx: &mut Context<Self>) -> Option<Bounds<Pixels>> {
+	fn bounds_for_range(&mut self, range_utf16: Range<usize>, bounds: Bounds<Pixels>, window: &mut Window, _cx: &mut Context<Self>) -> Option<Bounds<Pixels>> {
 		let last_layout = self.last_layout.as_ref()?;
 		let range = self.range_from_utf16(&range_utf16);
-		let scale_factor = _window.scale_factor();
+		let scale_factor = window.scale_factor();
+		let line_height = window.line_height();
 		let selection_bounds = Selection::from_range(range, last_layout)
 			.bounds(last_layout)
-			.first()?
-			.1
-			.map(|x| x.unscale(scale_factor));
+			.first()
+			.map(|x| x.1.map(|x| x.unscale(scale_factor)))
+			.unwrap_or_else(|| {
+				let mut bounds = Bounds::default();
+				bounds.size.height = line_height;
+				bounds
+			});
 		Some(selection_bounds + bounds.origin)
 	}
 
-	fn character_index_for_point(&mut self, point: gpui::Point<Pixels>, _window: &mut Window, _cx: &mut Context<Self>) -> Option<usize> {
-		let scale_factor = _window.scale_factor();
+	fn character_index_for_point(&mut self, point: gpui::Point<Pixels>, window: &mut Window, _cx: &mut Context<Self>) -> Option<usize> {
+		let scale_factor = window.scale_factor();
 		let line_point = self.last_bounds?.localize(&point)?.scale(scale_factor);
 		let last_layout = self.last_layout.as_ref()?;
 		let utf8_index = last_layout.cursor_at(line_point).index();

@@ -111,7 +111,7 @@ pub(crate) fn style_to_parley(style: &TextStyleRefinement, rem_size: Pixels, mut
 	if let Some(underline_style) = style.underline.as_ref() {
 		underline_brush = Some(Brush {
 			color: underline_style.color.unwrap_or_else(|| black()),
-			wavy: true,
+			wavy: underline_style.wavy,
 			..Default::default()
 		});
 		apply_style(StyleProperty::UnderlineSize(Some(underline_style.thickness.0)));

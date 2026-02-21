@@ -156,9 +156,14 @@ impl<'s> RangedBuilder<'s> {
 				&TextStyleRefinement {
 					font_family: Some(run.font.family.clone()),
 					font_weight: Some(run.font.weight),
+					font_features: Some(run.font.features.clone()),
 					font_fallbacks: run.font.fallbacks.clone(),
+					font_size: Some(run.font_size),
+					font_style: Some(run.font.style),
 					color: Some(run.color),
 					background_color: run.background_color,
+					underline: run.underline,
+					strikethrough: run.strikethrough,
 					..Default::default()
 				}
 			);

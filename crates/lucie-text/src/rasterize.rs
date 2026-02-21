@@ -7,6 +7,7 @@ use crate::{
 	run::RunData
 };
 
+#[derive(Clone)]
 pub struct RasterizedGlyph {
 	pub size: Size<DevicePixels>,
 	pub data: Vec<u8>,
@@ -14,6 +15,25 @@ pub struct RasterizedGlyph {
 	pub is_monochromatic: bool,
 	/// Offset to draw glyph at
 	pub offset: Point<ScaledPixels>
+}
+
+impl RasterizedGlyph {
+	pub fn to_polychromatic(&self) -> RasterizedGlyph {
+		if !self.is_monochromatic {
+			return self.clone();
+		}
+
+		let mut data = Vec::with_capacity(self.data.len() * 4);
+		for px in &self.data {
+			data.extend_from_slice(&[0, 0, 0, *px]);
+		}
+		Self {
+			size: self.size,
+			data,
+			is_monochromatic: false,
+			offset: self.offset
+		}
+	}
 }
 
 pub(crate) fn rasterize_outline_glyph(

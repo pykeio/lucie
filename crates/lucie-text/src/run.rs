@@ -110,6 +110,11 @@ impl<'a> GlyphRun<'a> {
 	}
 
 	#[inline]
+	pub fn width(&self) -> ScaledPixels {
+		ScaledPixels(self.run.advance())
+	}
+
+	#[inline]
 	pub fn style(&self) -> &parley::Style<Brush> {
 		self.run.style()
 	}
