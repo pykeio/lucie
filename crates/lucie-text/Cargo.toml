@@ -20,7 +20,7 @@ smallvec.workspace = true
 log.workspace = true
 either = "1.15"
 
-parley = { git = "https://github.com/pykeio/parley.git", rev = "dba7bf3f96e8134537eb29536878f8a74a15d1b9", default-features = false, features = [ "std", "system" ] }
+parley = { git = "https://github.com/pykeio/parley.git", rev = "74bfe6f970830fe30b8ca9b3b9f9491285b6a465", default-features = false, features = [ "std", "system" ] }
 skrifa = { version = "0.40.0", default-features = false }
 linebender_resource_handle = "0.1.1"
 tiny-skia = { version = "0.11", default-features = false, features = [ "std", "simd" ] }
