@@ -12,7 +12,6 @@ use lucie_common::{
 	geometry::{Bounds, Pixels, Point}
 };
 use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, WhiteSpace};
-use lucie_text::Layout;
 use rapidhash::fast::RapidHasher;
 
 use crate::{

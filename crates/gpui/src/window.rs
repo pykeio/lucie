@@ -3946,7 +3946,7 @@ impl lucie_text::TextPainter for Window {
 	) -> Result<(), Self::Error> {
 		self.invalidator.debug_assert_paint();
 
-		if let Some(AtlasTileWithMetadata { tile, draw_offset }) = self.sprite_atlas.get_or_insert_with(&glyph.key().into(), &mut || {
+		if let Some(AtlasTileWithMetadata { tile, draw_offset }) = self.sprite_atlas.get_or_insert_with(&glyph.key(font.handle()).into(), &mut || {
 			let mut hint_cache = self.text_system.hint_cache();
 			match font.rasterize_glyph(glyph.id, glyph.subpixel_variant, run_data, hint_cache.as_mut()) {
 				Some(rasterized_glyph) => Ok(Some(AtlasTileData {

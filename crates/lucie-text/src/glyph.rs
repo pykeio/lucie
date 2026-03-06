@@ -4,7 +4,7 @@ use lucie_common::geometry::{DevicePixels, Point};
 use parley::GlyphClass;
 use rapidhash::fast::RapidHasher;
 
-use crate::run::RunData;
+use crate::{FontHandle, run::RunData};
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 #[repr(transparent)]
@@ -26,8 +26,9 @@ pub struct GlyphKey(u64);
 impl PositionedGlyph<'_> {
 	#[inline]
 	#[must_use]
-	pub fn key(&self) -> GlyphKey {
+	pub fn key(&self, font: &FontHandle) -> GlyphKey {
 		let mut hasher = RapidHasher::default_const();
+		font.hash(&mut hasher);
 		self.id.hash(&mut hasher);
 		self.run_data.hash(&mut hasher);
 		self.class.hash(&mut hasher);

@@ -9,13 +9,14 @@ use std::{
 use either::Either;
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use rapidhash::RapidHashMap;
-use skrifa::MetadataProvider as _;
+use read_fonts::tables::cpal::ColorRecord;
+use skrifa::{MetadataProvider as _, raw::TableProvider};
 
 use crate::{
 	SubpixelVariant,
 	glyph::GlyphId,
 	hinting::HintCache,
-	rasterize::{RasterizedGlyph, rasterize_outline_glyph},
+	rasterize::{RasterizedGlyph, rasterize_color_glyph, rasterize_outline_glyph},
 	run::RunData
 };
 
@@ -100,7 +101,9 @@ pub struct LoadedFont {
 	font: skrifa::FontRef<'static>,
 	outline_glyphs: skrifa::OutlineGlyphCollection<'static>,
 	color_glyphs: skrifa::color::ColorGlyphCollection<'static>,
+	color_records: Option<&'static [ColorRecord]>,
 	bitmap_glyphs: skrifa::bitmap::BitmapStrikes<'static>,
+	units_per_em: f32,
 
 	// define last so dropped last
 	handle: FontHandle
@@ -110,8 +113,10 @@ impl LoadedFont {
 	pub(crate) fn new(handle: FontHandle) -> Result<Self, skrifa::raw::ReadError> {
 		let font = skrifa::FontRef::from_index(handle.data(), handle.index())?;
 
+		let units_per_em = font.head().map(|h| h.units_per_em()).unwrap_or_default() as f32;
 		let outline_glyphs = font.outline_glyphs();
 		let color_glyphs = font.color_glyphs();
+		let color_records = font.cpal().ok().and_then(|c| c.color_records_array().map(Result::ok).flatten());
 		let bitmap_glyphs = font.bitmap_strikes();
 
 		Ok(Self {
@@ -122,9 +127,15 @@ impl LoadedFont {
 			font: unsafe { mem::transmute(font) },
 			outline_glyphs: unsafe { mem::transmute(outline_glyphs) },
 			color_glyphs: unsafe { mem::transmute(color_glyphs) },
+			color_records: unsafe { mem::transmute(color_records) },
 			bitmap_glyphs: unsafe { mem::transmute(bitmap_glyphs) },
+			units_per_em,
 			handle
 		})
+	}
+
+	pub fn handle(&self) -> &FontHandle {
+		&self.handle
 	}
 
 	pub fn rasterize_glyph(
@@ -136,16 +147,16 @@ impl LoadedFont {
 	) -> Option<RasterizedGlyph> {
 		let id = id.0;
 
-		if let Some(outline) = self.outline_glyphs.get(id) {
-			return rasterize_outline_glyph(outline, subpixel_variant, run_data, &self.handle, &self.outline_glyphs, hint_cache);
-		}
-
 		if let Some(_color) = self.color_glyphs.get(id) {
-			unimplemented!("COLRv0/COLRv1 glyph rasterization not implemented");
+			return rasterize_color_glyph(_color, self.units_per_em, run_data, &self.outline_glyphs, self.color_records.as_ref().unwrap());
 		}
 
 		if let Some(_bitmap) = self.bitmap_glyphs.glyph_for_size(run_data.size(), id) {
 			unimplemented!("Bitmap glyph rasterization not implemented");
+		}
+
+		if let Some(outline) = self.outline_glyphs.get(id) {
+			return rasterize_outline_glyph(outline, subpixel_variant, run_data, &self.handle, &self.outline_glyphs, hint_cache);
 		}
 
 		None
