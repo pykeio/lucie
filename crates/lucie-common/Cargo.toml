@@ -19,6 +19,7 @@ arrayvec.workspace = true
 tracing.workspace = true
 lucie-macros.workspace = true
 derive_more.workspace = true
+rapidhash.workspace = true
 
 [dev-dependencies]
 rand.workspace = true

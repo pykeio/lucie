@@ -14,10 +14,17 @@ workspace = true
 [dependencies]
 lucie-common.workspace = true
 lucie-style.workspace = true
-derive_more.workspace = true
 parking_lot.workspace = true
-itertools.workspace = true
-anyhow.workspace = true
 rapidhash.workspace = true
 smallvec.workspace = true
 log.workspace = true
+either = "1.15"
+
+parley = { git = "https://github.com/pykeio/parley.git", rev = "74bfe6f970830fe30b8ca9b3b9f9491285b6a465", default-features = false, features = [ "std", "system" ] }
+skrifa = { version = "0.40.0", default-features = false, features = [ "std", "autohint_shaping" ] }
+read-fonts = { version = "0.37", default-features = false }
+linebender_resource_handle = "0.1.1"
+tiny-skia = { version = "0.12", default-features = false, features = [ "std", "simd" ] }
+
+[dev-dependencies]
+tiny-skia = { version = "0.12", default-features = false, features = [ "std", "simd", "png-format" ] }

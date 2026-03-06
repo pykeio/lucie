@@ -2,20 +2,13 @@ use std::{
 	cell::RefCell,
 	collections::VecDeque,
 	path::Path,
-	rc::{Rc, Weak},
-	sync::Arc
+	rc::{Rc, Weak}
 };
 
 use anyhow::Result;
 use futures_channel::oneshot;
 use lucie_style::CursorStyle;
-use lucie_text::{NoopTextSystem, PlatformTextSystem};
 use parking_lot::Mutex;
-#[cfg(target_os = "windows")]
-use windows::Win32::{
-	Graphics::Imaging::{CLSID_WICImagingFactory, IWICImagingFactory},
-	System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance}
-};
 
 use crate::{
 	AnyWindowHandle, BackgroundExecutor, ClipboardItem, DummyKeyboardMapper, ForegroundExecutor, Keymap, Platform, PlatformDisplay, PlatformKeyboardLayout,
@@ -34,9 +27,6 @@ pub(crate) struct TestPlatform {
 	#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 	current_primary_item: Mutex<Option<ClipboardItem>>,
 	prompts: RefCell<VecDeque<TestPrompt>>,
-	pub text_system: Arc<dyn PlatformTextSystem>,
-	#[cfg(target_os = "windows")]
-	bitmap_factory: std::mem::ManuallyDrop<IWICImagingFactory>,
 	weak: Weak<Self>
 }
 
@@ -49,14 +39,6 @@ struct TestPrompt {
 
 impl TestPlatform {
 	pub fn new(executor: BackgroundExecutor, foreground_executor: ForegroundExecutor) -> Rc<Self> {
-		#[cfg(target_os = "windows")]
-		let bitmap_factory = unsafe {
-			windows::Win32::System::Ole::OleInitialize(None).expect("unable to initialize Windows OLE");
-			std::mem::ManuallyDrop::new(CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER).expect("Error creating bitmap factory."))
-		};
-
-		let text_system = Arc::new(NoopTextSystem);
-
 		Rc::new_cyclic(|weak| TestPlatform {
 			background_executor: executor,
 			foreground_executor,
@@ -67,10 +49,7 @@ impl TestPlatform {
 			current_clipboard_item: Mutex::new(None),
 			#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 			current_primary_item: Mutex::new(None),
-			weak: weak.clone(),
-			#[cfg(target_os = "windows")]
-			bitmap_factory,
-			text_system
+			weak: weak.clone()
 		})
 	}
 
@@ -138,10 +117,6 @@ impl Platform for TestPlatform {
 
 	fn foreground_executor(&self) -> ForegroundExecutor {
 		self.foreground_executor.clone()
-	}
-
-	fn text_system(&self) -> Arc<dyn PlatformTextSystem> {
-		self.text_system.clone()
 	}
 
 	fn keyboard_layout(&self) -> Box<dyn PlatformKeyboardLayout> {
@@ -246,16 +221,6 @@ impl Platform for TestPlatform {
 
 	fn read_from_clipboard(&self) -> Option<ClipboardItem> {
 		self.current_clipboard_item.lock().clone()
-	}
-}
-
-#[cfg(target_os = "windows")]
-impl Drop for TestPlatform {
-	fn drop(&mut self) {
-		unsafe {
-			std::mem::ManuallyDrop::drop(&mut self.bitmap_factory);
-			windows::Win32::System::Ole::OleUninitialize();
-		}
 	}
 }
 

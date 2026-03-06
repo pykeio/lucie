@@ -38,11 +38,12 @@ use std::{
 
 use lucie_common::{
 	ArenaBox,
-	geometry::{Bounds, Pixels, Point, Size}
+	geometry::{Bounds, Pixels, Point, Size},
+	mix_hashes
 };
 use lucie_style::{Display, Style};
 
-use crate::{App, AvailableSpace, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Window, util::mix_hashes};
+use crate::{App, AvailableSpace, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Window};
 
 /// Implemented by types that participate in laying out and painting the contents of a window.
 /// Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.
@@ -279,6 +280,10 @@ impl GlobalElementId {
 			id = mix_hashes(id, x.as_u64());
 		}
 		Self(id)
+	}
+
+	pub(crate) fn from_raw(hash: u64) -> Self {
+		Self(hash)
 	}
 }
 

@@ -79,7 +79,7 @@ pub use lucie_common::{
 };
 pub use lucie_macros::{AppContext, IntoElement, Render, VisualContext, register_action, test};
 pub use lucie_style::*;
-pub use lucie_text::*;
+pub use lucie_text::{Layout as TextLayout, *};
 pub use path_builder::*;
 pub use platform::*;
 pub use profiler::*;

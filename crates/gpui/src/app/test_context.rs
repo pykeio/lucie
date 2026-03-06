@@ -111,7 +111,7 @@ impl TestAppContext {
 		let platform = TestPlatform::new(background_executor.clone(), foreground_executor.clone());
 		let asset_source = Arc::new(());
 		let http_client = FakeHttpClient::with_404_response();
-		let text_system = Arc::new(TextSystem::new(platform.text_system()));
+		let text_system = Arc::new(TextSystem::new());
 
 		let mut app = App::new_app(platform.clone(), asset_source, http_client);
 		app.borrow_mut().mode = GpuiMode::test();

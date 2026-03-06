@@ -2,9 +2,9 @@ use std::ops::Range;
 
 use gpui::{
 	App, Application, Bounds, ClipboardItem, Context, CursorStyle, ElementId, ElementInputHandler, Entity, EntityInputHandler, FocusHandle, Focusable,
-	GlobalElementId, KeyBinding, Keystroke, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, ShapedLine,
-	SharedString, Style, TextRun, UTF16Selection, UnderlineStyle, Window, WindowBounds, WindowOptions, actions, black, div, fill, hsla, opaque_grey, point,
-	prelude::*, px, relative, rgb, rgba, size, white, yellow
+	GlobalElementId, KeyBinding, Keystroke, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, PaintQuad, Pixels, Point, Selection,
+	SharedString, Style, TextLayout, TextRun, UTF16Selection, UnderlineStyle, Window, WindowBounds, WindowOptions, actions, black, div, fill, hsla,
+	opaque_grey, point, prelude::*, px, relative, rgb, rgba, size, white, yellow
 };
 use unicode_segmentation::*;
 
@@ -35,7 +35,7 @@ struct TextInput {
 	selected_range: Range<usize>,
 	selection_reversed: bool,
 	marked_range: Option<Range<usize>>,
-	last_layout: Option<ShapedLine>,
+	last_layout: Option<TextLayout>,
 	last_bounds: Option<Bounds<Pixels>>,
 	is_selecting: bool
 }
@@ -92,13 +92,13 @@ impl TextInput {
 		self.replace_text_in_range(None, "", window, cx)
 	}
 
-	fn on_mouse_down(&mut self, event: &MouseDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+	fn on_mouse_down(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
 		self.is_selecting = true;
 
 		if event.modifiers.shift {
-			self.select_to(self.index_for_mouse_position(event.position), cx);
+			self.select_to(self.index_for_mouse_position(event.position, window), cx);
 		} else {
-			self.move_to(self.index_for_mouse_position(event.position), cx)
+			self.move_to(self.index_for_mouse_position(event.position, window), cx)
 		}
 	}
 
@@ -106,9 +106,9 @@ impl TextInput {
 		self.is_selecting = false;
 	}
 
-	fn on_mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
+	fn on_mouse_move(&mut self, event: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
 		if self.is_selecting {
-			self.select_to(self.index_for_mouse_position(event.position), cx);
+			self.select_to(self.index_for_mouse_position(event.position, window), cx);
 		}
 	}
 
@@ -143,12 +143,12 @@ impl TextInput {
 		if self.selection_reversed { self.selected_range.start } else { self.selected_range.end }
 	}
 
-	fn index_for_mouse_position(&self, position: Point<Pixels>) -> usize {
+	fn index_for_mouse_position(&self, position: Point<Pixels>, window: &mut Window) -> usize {
 		if self.content.is_empty() {
 			return 0;
 		}
 
-		let (Some(bounds), Some(line)) = (self.last_bounds.as_ref(), self.last_layout.as_ref()) else {
+		let (Some(bounds), Some(layout)) = (self.last_bounds.as_ref(), self.last_layout.as_ref()) else {
 			return 0;
 		};
 		if position.y < bounds.top() {
@@ -157,7 +157,7 @@ impl TextInput {
 		if position.y > bounds.bottom() {
 			return self.content.len();
 		}
-		line.closest_index_for_x(position.x - bounds.left())
+		layout.cursor_at((position - bounds.origin).scale(window.scale_factor())).index()
 	}
 
 	fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
@@ -307,21 +307,28 @@ impl EntityInputHandler for TextInput {
 		cx.notify();
 	}
 
-	fn bounds_for_range(&mut self, range_utf16: Range<usize>, bounds: Bounds<Pixels>, _window: &mut Window, _cx: &mut Context<Self>) -> Option<Bounds<Pixels>> {
+	fn bounds_for_range(&mut self, range_utf16: Range<usize>, bounds: Bounds<Pixels>, window: &mut Window, _cx: &mut Context<Self>) -> Option<Bounds<Pixels>> {
 		let last_layout = self.last_layout.as_ref()?;
 		let range = self.range_from_utf16(&range_utf16);
-		Some(Bounds::from_corners(
-			point(bounds.left() + last_layout.x_for_index(range.start), bounds.top()),
-			point(bounds.left() + last_layout.x_for_index(range.end), bounds.bottom())
-		))
+		let scale_factor = window.scale_factor();
+		let line_height = window.line_height();
+		let selection_bounds = Selection::from_range(range, last_layout)
+			.bounds(last_layout)
+			.first()
+			.map(|x| x.1.map(|x| x.unscale(scale_factor)))
+			.unwrap_or_else(|| {
+				let mut bounds = Bounds::default();
+				bounds.size.height = line_height;
+				bounds
+			});
+		Some(selection_bounds + bounds.origin)
 	}
 
-	fn character_index_for_point(&mut self, point: gpui::Point<Pixels>, _window: &mut Window, _cx: &mut Context<Self>) -> Option<usize> {
-		let line_point = self.last_bounds?.localize(&point)?;
+	fn character_index_for_point(&mut self, point: gpui::Point<Pixels>, window: &mut Window, _cx: &mut Context<Self>) -> Option<usize> {
+		let scale_factor = window.scale_factor();
+		let line_point = self.last_bounds?.localize(&point)?.scale(scale_factor);
 		let last_layout = self.last_layout.as_ref()?;
-
-		assert_eq!(last_layout.text, self.content);
-		let utf8_index = last_layout.index_for_x(point.x - line_point.x)?;
+		let utf8_index = last_layout.cursor_at(line_point).index();
 		Some(self.offset_to_utf16(utf8_index))
 	}
 }
@@ -331,7 +338,7 @@ struct TextElement {
 }
 
 struct PrepaintState {
-	line: Option<ShapedLine>,
+	line: Option<TextLayout>,
 	cursor: Option<PaintQuad>,
 	selection: Option<PaintQuad>
 }
@@ -371,6 +378,7 @@ impl Element for TextElement {
 		let content = input.content.clone();
 		let selected_range = input.selected_range.clone();
 		let cursor = input.cursor_offset();
+		let scale_factor = window.scale_factor();
 		let style = window.text_style();
 
 		let (display_text, text_color) = if content.is_empty() {
@@ -382,6 +390,7 @@ impl Element for TextElement {
 		let run = TextRun {
 			len: display_text.len(),
 			font: style.font(),
+			font_size: style.font_size,
 			color: text_color,
 			background_color: None,
 			underline: None,
@@ -415,24 +424,31 @@ impl Element for TextElement {
 		};
 
 		let font_size = style.font_size.to_pixels(window.rem_size());
-		let line = window.text_system().shape_line(display_text, font_size, &runs, None);
+		let mut layout = {
+			let mut builder = window
+				.text_system()
+				.ranged_builder(&display_text, font_size, window.scale_factor(), &style);
+			builder.push_runs(&runs);
+			builder.build(&display_text)
+		};
+		layout.fit(None);
 
-		let cursor_pos = line.x_for_index(cursor);
+		let cursor_pos = layout.cursor_at_byte(cursor).x(&layout).unscale(scale_factor);
 		let (selection, cursor) = if selected_range.is_empty() {
 			(None, Some(fill(Bounds::new(point(bounds.left() + cursor_pos, bounds.top()), size(px(2.), bounds.bottom() - bounds.top())), gpui::blue())))
 		} else {
-			(
-				Some(fill(
-					Bounds::from_corners(
-						point(bounds.left() + line.x_for_index(selected_range.start), bounds.top()),
-						point(bounds.left() + line.x_for_index(selected_range.end), bounds.bottom())
-					),
-					rgba(0x3311ff30)
-				)),
-				None
-			)
+			let selection_bounds = Selection::from_range(selected_range, &layout)
+				.bounds(&layout)
+				.first()
+				.map(|x| x.1.map(|x| x.unscale(scale_factor)))
+				.unwrap_or_default();
+			(Some(fill(selection_bounds + bounds.origin, rgba(0x3311ff30))), None)
 		};
-		PrepaintState { line: Some(line), cursor, selection }
+		PrepaintState {
+			line: Some(layout),
+			cursor,
+			selection
+		}
 	}
 
 	fn paint(
@@ -444,13 +460,16 @@ impl Element for TextElement {
 		window: &mut Window,
 		cx: &mut App
 	) {
+		let scale_factor = window.scale_factor();
 		let focus_handle = self.input.read(cx).focus_handle.clone();
 		window.handle_input(&focus_handle, ElementInputHandler::new(bounds, self.input.clone()), cx);
 		if let Some(selection) = prepaint.selection.take() {
 			window.paint_quad(selection)
 		}
-		let line = prepaint.line.take().unwrap();
-		line.paint(bounds.origin, window.line_height(), cx.text_system(), window).unwrap();
+		let layout = prepaint.line.take().unwrap();
+		for line in layout.lines() {
+			line.paint(cx.text_system(), window, bounds.origin.scale(scale_factor)).unwrap();
+		}
 
 		if focus_handle.is_focused(window)
 			&& let Some(cursor) = prepaint.cursor.take()
@@ -459,7 +478,7 @@ impl Element for TextElement {
 		}
 
 		self.input.update(cx, |input, _cx| {
-			input.last_layout = Some(line);
+			input.last_layout = Some(layout);
 			input.last_bounds = Some(bounds);
 		});
 	}

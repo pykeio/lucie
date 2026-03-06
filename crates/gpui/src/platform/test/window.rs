@@ -9,9 +9,9 @@ use rapidhash::fast::RapidHashMap;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::{
-	AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTile, DispatchEventResult, GpuSpecs, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler,
-	PlatformWindow, PromptButton, RequestFrameOptions, TestPlatform, TileId, WindowAppearance, WindowBackgroundAppearance, WindowBounds, WindowControlArea,
-	WindowParams
+	AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTextureKind, AtlasTile, AtlasTileData, AtlasTileWithMetadata, DispatchEventResult, GpuSpecs, PlatformAtlas,
+	PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, PromptButton, RequestFrameOptions, TestPlatform, TileId, WindowAppearance,
+	WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowParams
 };
 
 pub(crate) struct TestWindowState {
@@ -279,7 +279,7 @@ impl PlatformWindow for TestWindow {
 
 pub(crate) struct TestAtlasState {
 	next_id: u32,
-	tiles: RapidHashMap<AtlasKey, AtlasTile>
+	tiles: RapidHashMap<AtlasKey, AtlasTileWithMetadata>
 }
 
 pub(crate) struct TestAtlas(Mutex<TestAtlasState>);
@@ -297,15 +297,15 @@ impl PlatformAtlas for TestAtlas {
 	fn get_or_insert_with<'a>(
 		&self,
 		key: &crate::AtlasKey,
-		build: &mut dyn FnMut() -> anyhow::Result<Option<(Size<DevicePixels>, std::borrow::Cow<'a, [u8]>)>>
-	) -> anyhow::Result<Option<crate::AtlasTile>> {
+		build: &mut dyn FnMut() -> anyhow::Result<Option<AtlasTileData<'a>>>
+	) -> anyhow::Result<Option<AtlasTileWithMetadata>> {
 		let mut state = self.0.lock();
 		if let Some(tile) = state.tiles.get(key) {
 			return Ok(Some(tile.clone()));
 		}
 		drop(state);
 
-		let Some((size, _)) = build()? else {
+		let Some(tile_data) = build()? else {
 			return Ok(None);
 		};
 
@@ -317,14 +317,20 @@ impl PlatformAtlas for TestAtlas {
 
 		state.tiles.insert(
 			key.clone(),
-			crate::AtlasTile {
-				texture_id: AtlasTextureId {
-					index: texture_id,
-					kind: crate::AtlasTextureKind::Monochrome
+			crate::AtlasTileWithMetadata {
+				tile: crate::AtlasTile {
+					texture_id: AtlasTextureId {
+						index: texture_id,
+						kind: AtlasTextureKind::Monochrome
+					},
+					tile_id: TileId(tile_id),
+					padding: 0,
+					bounds: Bounds {
+						origin: Point::default(),
+						size: tile_data.size
+					}
 				},
-				tile_id: TileId(tile_id),
-				padding: 0,
-				bounds: Bounds { origin: Point::default(), size }
+				draw_offset: tile_data.draw_offset
 			}
 		);
 

@@ -17,10 +17,10 @@ use futures_channel::oneshot;
 use image::{AnimationDecoder as _, Frame, codecs::gif::GifDecoder};
 use lucie_common::{
 	SharedString,
-	geometry::{Bounds, DevicePixels, Pixels, Point, Size, point, px}
+	geometry::{Bounds, DevicePixels, Pixels, Point, ScaledPixels, Size, point, px}
 };
 use lucie_style::CursorStyle;
-use lucie_text::{PlatformTextSystem, RenderGlyphParams};
+use lucie_text::GlyphKey;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use smallvec::SmallVec;
 
@@ -140,7 +140,6 @@ pub fn guess_compositor() -> &'static str {
 pub(crate) trait Platform: 'static {
 	fn background_executor(&self) -> BackgroundExecutor;
 	fn foreground_executor(&self) -> ForegroundExecutor;
-	fn text_system(&self) -> Arc<dyn PlatformTextSystem>;
 
 	fn run(&self, on_finish_launching: Box<dyn 'static + FnOnce()>);
 	fn quit(&self);
@@ -515,33 +514,13 @@ pub(crate) fn get_gamma_correction_ratios(gamma: f32) -> [f32; 4] {
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub(crate) enum AtlasKey {
-	Glyph(RenderGlyphParams),
+	Glyph(GlyphKey),
 	Svg(RenderSvgParams),
 	Image(RenderImageParams)
 }
 
-impl AtlasKey {
-	#[cfg_attr(
-		all(any(target_os = "linux", target_os = "freebsd"), not(any(feature = "x11", feature = "wayland"))),
-		allow(dead_code)
-	)]
-	pub(crate) fn texture_kind(&self) -> AtlasTextureKind {
-		match self {
-			AtlasKey::Glyph(params) => {
-				if params.is_emoji {
-					AtlasTextureKind::Polychrome
-				} else {
-					AtlasTextureKind::Monochrome
-				}
-			}
-			AtlasKey::Svg(_) => AtlasTextureKind::Monochrome,
-			AtlasKey::Image(_) => AtlasTextureKind::Polychrome
-		}
-	}
-}
-
-impl From<RenderGlyphParams> for AtlasKey {
-	fn from(params: RenderGlyphParams) -> Self {
+impl From<GlyphKey> for AtlasKey {
+	fn from(params: GlyphKey) -> Self {
 		Self::Glyph(params)
 	}
 }
@@ -558,12 +537,15 @@ impl From<RenderImageParams> for AtlasKey {
 	}
 }
 
+pub(crate) struct AtlasTileData<'a> {
+	pub(crate) size: Size<DevicePixels>,
+	pub(crate) data: Cow<'a, [u8]>,
+	pub(crate) texture_kind: AtlasTextureKind,
+	pub(crate) draw_offset: Point<ScaledPixels>
+}
+
 pub(crate) trait PlatformAtlas: Send + Sync {
-	fn get_or_insert_with<'a>(
-		&self,
-		key: &AtlasKey,
-		build: &mut dyn FnMut() -> Result<Option<(Size<DevicePixels>, Cow<'a, [u8]>)>>
-	) -> Result<Option<AtlasTile>>;
+	fn get_or_insert_with<'a>(&self, key: &AtlasKey, build: &mut dyn FnMut() -> Result<Option<AtlasTileData<'a>>>) -> Result<Option<AtlasTileWithMetadata>>;
 	fn remove(&self, key: &AtlasKey);
 }
 
@@ -600,6 +582,12 @@ impl<T> AtlasTextureList<T> {
 	fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut T> {
 		self.textures.iter_mut().flatten()
 	}
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AtlasTileWithMetadata {
+	pub(crate) tile: AtlasTile,
+	pub(crate) draw_offset: Point<ScaledPixels>
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

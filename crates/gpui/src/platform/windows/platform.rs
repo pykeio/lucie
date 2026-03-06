@@ -11,7 +11,6 @@ use std::{
 use anyhow::{Context as _, Result, anyhow};
 use lucie_common::ResultExt;
 use lucie_style::CursorStyle;
-use lucie_text::PlatformTextSystem;
 use parking_lot::RwLock;
 use smallvec::SmallVec;
 use windows::{
@@ -34,7 +33,6 @@ pub(crate) struct WindowsPlatform {
 	icon: HICON,
 	background_executor: BackgroundExecutor,
 	foreground_executor: ForegroundExecutor,
-	text_system: Arc<DirectWriteTextSystem>,
 	windows_version: WindowsVersion,
 	drop_target_helper: IDropTargetHelper,
 	/// Flag to instruct the `VSyncProvider` thread to invalidate the directx devices
@@ -98,7 +96,6 @@ impl WindowsPlatform {
 		let (main_sender, main_receiver) = PriorityQueueReceiver::new();
 		let validation_number = if usize::BITS == 64 { rand::random::<u64>() as usize } else { rand::random::<u32>() as usize };
 		let raw_window_handles = Arc::new(RwLock::new(SmallVec::new()));
-		let text_system = Arc::new(DirectWriteTextSystem::new(&directx_devices).context("Error creating DirectWriteTextSystem")?);
 		register_platform_window_class();
 		let mut context = PlatformWindowCreateContext {
 			inner: None,
@@ -145,7 +142,6 @@ impl WindowsPlatform {
 			icon,
 			background_executor,
 			foreground_executor,
-			text_system,
 			disable_direct_composition,
 			windows_version,
 			drop_target_helper,
@@ -213,7 +209,6 @@ impl WindowsPlatform {
 		let platform_window: SafeHwnd = self.handle.into();
 		let validation_number = self.inner.validation_number;
 		let all_windows = Arc::downgrade(&self.raw_window_handles);
-		let text_system = Arc::downgrade(&self.text_system);
 		let invalidate_devices = self.invalidate_devices.clone();
 
 		std::thread::Builder::new()
@@ -223,7 +218,7 @@ impl WindowsPlatform {
 				loop {
 					vsync_provider.wait_for_vsync();
 					if check_device_lost(&directx_device.device) || invalidate_devices.fetch_and(false, Ordering::Acquire) {
-						if let Err(err) = handle_gpu_device_lost(&mut directx_device, platform_window.as_raw(), validation_number, &all_windows, &text_system) {
+						if let Err(err) = handle_gpu_device_lost(&mut directx_device, platform_window.as_raw(), validation_number, &all_windows) {
 							panic!("Device lost: {err}");
 						}
 					}
@@ -257,10 +252,6 @@ impl Platform for WindowsPlatform {
 
 	fn foreground_executor(&self) -> ForegroundExecutor {
 		self.foreground_executor.clone()
-	}
-
-	fn text_system(&self) -> Arc<dyn PlatformTextSystem> {
-		self.text_system.clone()
 	}
 
 	fn keyboard_layout(&self) -> Box<dyn PlatformKeyboardLayout> {
@@ -633,8 +624,7 @@ fn handle_gpu_device_lost(
 	directx_devices: &mut DirectXDevices,
 	platform_window: HWND,
 	validation_number: usize,
-	all_windows: &std::sync::Weak<RwLock<SmallVec<[SafeHwnd; 4]>>>,
-	text_system: &std::sync::Weak<DirectWriteTextSystem>
+	all_windows: &std::sync::Weak<RwLock<SmallVec<[SafeHwnd; 4]>>>
 ) -> Result<()> {
 	// Here we wait a bit to ensure the system has time to recover from the device lost state.
 	// If we don't wait, the final drawing result will be blank.
@@ -648,9 +638,6 @@ fn handle_gpu_device_lost(
 		SendMessageW(platform_window, WM_GPUI_GPU_DEVICE_LOST, Some(WPARAM(validation_number)), Some(lparam));
 	}
 
-	if let Some(text_system) = text_system.upgrade() {
-		text_system.handle_gpu_lost(&directx_devices)?;
-	}
 	if let Some(all_windows) = all_windows.upgrade() {
 		for window in all_windows.read().iter() {
 			unsafe {

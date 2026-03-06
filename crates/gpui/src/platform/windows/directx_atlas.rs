@@ -10,7 +10,7 @@ use windows::Win32::Graphics::{
 	Dxgi::Common::*
 };
 
-use crate::{AtlasKey, AtlasTextureId, AtlasTextureKind, AtlasTile, PlatformAtlas, platform::AtlasTextureList};
+use crate::{AtlasKey, AtlasTextureId, AtlasTextureKind, AtlasTile, AtlasTileData, AtlasTileWithMetadata, PlatformAtlas, platform::AtlasTextureList};
 
 pub(crate) struct DirectXAtlas(Mutex<DirectXAtlasState>);
 
@@ -19,7 +19,7 @@ struct DirectXAtlasState {
 	device_context: ID3D11DeviceContext,
 	monochrome_textures: AtlasTextureList<DirectXAtlasTexture>,
 	polychrome_textures: AtlasTextureList<DirectXAtlasTexture>,
-	tiles_by_key: RapidHashMap<AtlasKey, AtlasTile>
+	tiles_by_key: RapidHashMap<AtlasKey, AtlasTileWithMetadata>
 }
 
 struct DirectXAtlasTexture {
@@ -62,29 +62,33 @@ impl PlatformAtlas for DirectXAtlas {
 	fn get_or_insert_with<'a>(
 		&self,
 		key: &AtlasKey,
-		build: &mut dyn FnMut() -> anyhow::Result<Option<(Size<DevicePixels>, std::borrow::Cow<'a, [u8]>)>>
-	) -> anyhow::Result<Option<AtlasTile>> {
+		build: &mut dyn FnMut() -> anyhow::Result<Option<AtlasTileData<'a>>>
+	) -> anyhow::Result<Option<AtlasTileWithMetadata>> {
 		let mut lock = self.0.lock();
 		if let Some(tile) = lock.tiles_by_key.get(key) {
 			Ok(Some(tile.clone()))
 		} else {
-			let Some((size, bytes)) = build()? else {
+			let Some(tile_data) = build()? else {
 				return Ok(None);
 			};
 			let tile = lock
-				.allocate(size, key.texture_kind())
+				.allocate(tile_data.size, tile_data.texture_kind)
 				.ok_or_else(|| anyhow::anyhow!("failed to allocate"))?;
 			let texture = lock.texture(tile.texture_id);
-			texture.upload(&lock.device_context, tile.bounds, &bytes);
-			lock.tiles_by_key.insert(key.clone(), tile.clone());
-			Ok(Some(tile))
+			texture.upload(&lock.device_context, tile.bounds, &tile_data.data);
+			let tile_with_meta = AtlasTileWithMetadata {
+				tile,
+				draw_offset: tile_data.draw_offset
+			};
+			lock.tiles_by_key.insert(key.clone(), tile_with_meta.clone());
+			Ok(Some(tile_with_meta))
 		}
 	}
 
 	fn remove(&self, key: &AtlasKey) {
 		let mut lock = self.0.lock();
 
-		let Some(id) = lock.tiles_by_key.remove(key).map(|tile| tile.texture_id) else {
+		let Some(id) = lock.tiles_by_key.remove(key).map(|tile| tile.tile.texture_id) else {
 			return;
 		};
 

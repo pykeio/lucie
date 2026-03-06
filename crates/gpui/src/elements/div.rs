@@ -1558,36 +1558,7 @@ impl Interactivity {
 	}
 
 	#[cfg(debug_assertions)]
-	fn paint_debug_info(&self, global_id: Option<&GlobalElementId>, hitbox: &Hitbox, style: &Style, window: &mut Window, cx: &mut App) {
-		use lucie_style::TextAlign;
-
-		if global_id.is_some() && (style.debug || style.debug_below || cx.has_global::<crate::util::DebugBelow>()) && hitbox.is_hovered(window) {
-			const FONT_SIZE: Pixels = Pixels(10.);
-			let element_id = format!("{:?}", global_id.unwrap());
-			let str_len = element_id.len();
-
-			let render_debug_text = |window: &mut Window| {
-				if let Some(text) = window
-					.text_system()
-					.shape_text(element_id.into(), FONT_SIZE, &[window.text_style().to_run(str_len)], None, None)
-					.ok()
-					.and_then(|mut text| text.pop())
-				{
-					let _ = text.paint(hitbox.origin, FONT_SIZE, TextAlign::Left, None, cx.text_system(), window);
-				}
-			};
-
-			window.with_text_style(
-				Some(lucie_style::TextStyleRefinement {
-					color: Some(color::red()),
-					line_height: Some(FONT_SIZE.into()),
-					background_color: Some(color::white()),
-					..Default::default()
-				}),
-				render_debug_text
-			)
-		}
-	}
+	fn paint_debug_info(&self, global_id: Option<&GlobalElementId>, hitbox: &Hitbox, style: &Style, window: &mut Window, cx: &mut App) {}
 
 	fn paint_mouse_listeners(&mut self, hitbox: &Hitbox, element_state: Option<&mut InteractiveElementState>, window: &mut Window, cx: &mut App) {
 		let is_focused = self
