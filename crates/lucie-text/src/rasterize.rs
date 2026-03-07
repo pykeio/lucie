@@ -184,14 +184,18 @@ impl<'c, 'r> ColorGlyphPen<'c, 'r> {
 		let bounds = self.bounds;
 
 		let (x, y) = (bounds.x(), bounds.y());
-		let (w, h) = ((bounds.width().ceil() * self.scale) as u32, (bounds.height().ceil() * self.scale) as u32);
+		let (w, h) = ((bounds.width() * self.scale).ceil() as u32, (bounds.height() * self.scale).ceil() as u32);
 
 		let mut pixmap = tiny_skia::Pixmap::new(w, h)?;
 		for (paths, paint) in self.fills {
 			let path = paths.last().unwrap();
 			pixmap.fill_path(
 				path,
-				&tiny_skia::Paint { shader: paint, ..Default::default() },
+				&tiny_skia::Paint {
+					shader: paint,
+					force_hq_pipeline: true,
+					..Default::default()
+				},
 				tiny_skia::FillRule::Winding,
 				tiny_skia::Transform::from_translate(-x, -y).post_scale(self.scale, self.scale),
 				None
