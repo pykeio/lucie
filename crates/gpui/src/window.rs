@@ -3949,16 +3949,24 @@ impl lucie_text::TextPainter for Window {
 		if let Some(AtlasTileWithMetadata { tile, draw_offset }) = self.sprite_atlas.get_or_insert_with(&glyph.key(font.handle()).into(), &mut || {
 			let mut hint_cache = self.text_system.hint_cache();
 			match font.rasterize_glyph(glyph.id, glyph.subpixel_variant, run_data, hint_cache.as_mut()) {
-				Some(rasterized_glyph) => Ok(Some(AtlasTileData {
-					size: rasterized_glyph.size,
-					data: Cow::Owned(rasterized_glyph.data),
-					draw_offset: rasterized_glyph.offset.map(|x| ScaledPixels(x.0 as f32)),
-					texture_kind: if rasterized_glyph.is_monochromatic {
-						AtlasTextureKind::Monochrome
-					} else {
-						AtlasTextureKind::Polychrome
+				Some(mut rasterized_glyph) => {
+					if !rasterized_glyph.is_monochromatic {
+						// Convert from RGBA to BGRA.
+						for pixel in rasterized_glyph.data.chunks_exact_mut(4) {
+							pixel.swap(0, 2);
+						}
 					}
-				})),
+					Ok(Some(AtlasTileData {
+						size: rasterized_glyph.size,
+						data: Cow::Owned(rasterized_glyph.data),
+						draw_offset: rasterized_glyph.offset.map(|x| ScaledPixels(x.0 as f32)),
+						texture_kind: if rasterized_glyph.is_monochromatic {
+							AtlasTextureKind::Monochrome
+						} else {
+							AtlasTextureKind::Polychrome
+						}
+					}))
+				}
 				None => Ok(None)
 			}
 		})? {
