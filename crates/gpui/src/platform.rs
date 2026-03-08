@@ -1284,19 +1284,13 @@ pub enum ImageFormat {
 	/// .gif
 	Gif,
 	/// .svg
-	Svg,
-	/// .bmp
-	Bmp,
-	/// .tif or .tiff
-	Tiff,
-	/// .ico
-	Ico
+	Svg
 }
 
 impl ImageFormat {
 	/// Returns an iterator of all supported image formats.
-	pub const fn iter() -> [ImageFormat; 8] {
-		[Self::Png, Self::Jpeg, Self::Webp, Self::Gif, Self::Svg, Self::Bmp, Self::Tiff, Self::Ico]
+	pub const fn iter() -> [ImageFormat; 5] {
+		[Self::Png, Self::Jpeg, Self::Webp, Self::Gif, Self::Svg]
 	}
 
 	/// Returns the mime type for the ImageFormat
@@ -1306,10 +1300,7 @@ impl ImageFormat {
 			ImageFormat::Jpeg => "image/jpeg",
 			ImageFormat::Webp => "image/webp",
 			ImageFormat::Gif => "image/gif",
-			ImageFormat::Svg => "image/svg+xml",
-			ImageFormat::Bmp => "image/bmp",
-			ImageFormat::Tiff => "image/tiff",
-			ImageFormat::Ico => "image/ico"
+			ImageFormat::Svg => "image/svg+xml"
 		}
 	}
 
@@ -1321,9 +1312,6 @@ impl ImageFormat {
 			"image/webp" => Some(Self::Webp),
 			"image/gif" => Some(Self::Gif),
 			"image/svg+xml" => Some(Self::Svg),
-			"image/bmp" => Some(Self::Bmp),
-			"image/tiff" | "image/tif" => Some(Self::Tiff),
-			"image/ico" => Some(Self::Ico),
 			_ => None
 		}
 	}
@@ -1409,9 +1397,6 @@ impl Image {
 			ImageFormat::Png => frames_for_image(&self.bytes, image::ImageFormat::Png)?,
 			ImageFormat::Jpeg => frames_for_image(&self.bytes, image::ImageFormat::Jpeg)?,
 			ImageFormat::Webp => frames_for_image(&self.bytes, image::ImageFormat::WebP)?,
-			ImageFormat::Bmp => frames_for_image(&self.bytes, image::ImageFormat::Bmp)?,
-			ImageFormat::Tiff => frames_for_image(&self.bytes, image::ImageFormat::Tiff)?,
-			ImageFormat::Ico => frames_for_image(&self.bytes, image::ImageFormat::Ico)?,
 			ImageFormat::Svg => {
 				return svg_renderer.render_single_frame(&self.bytes, 1.0, false).map_err(Into::into);
 			}
