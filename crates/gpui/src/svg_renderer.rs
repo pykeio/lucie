@@ -1,7 +1,4 @@
-use std::{
-	hash::Hash,
-	sync::{Arc, LazyLock}
-};
+use std::{hash::Hash, sync::Arc};
 
 use image::Frame;
 use lucie_common::{
@@ -41,28 +38,9 @@ pub enum SvgSize {
 impl SvgRenderer {
 	/// Creates a new SVG renderer with the provided asset source.
 	pub fn new(asset_source: Arc<dyn AssetSource>) -> Self {
-		static FONT_DB: LazyLock<Arc<usvg::fontdb::Database>> = LazyLock::new(|| {
-			let mut db = usvg::fontdb::Database::new();
-			db.load_system_fonts();
-			Arc::new(db)
-		});
-		let default_font_resolver = usvg::FontResolver::default_font_selector();
-		let font_resolver = Box::new(move |font: &usvg::Font, db: &mut Arc<usvg::fontdb::Database>| {
-			if db.is_empty() {
-				*db = FONT_DB.clone();
-			}
-			default_font_resolver(font, db)
-		});
-		let options = usvg::Options {
-			font_resolver: usvg::FontResolver {
-				select_font: font_resolver,
-				select_fallback: usvg::FontResolver::default_fallback_selector()
-			},
-			..Default::default()
-		};
 		Self {
 			asset_source,
-			usvg_options: Arc::new(options)
+			usvg_options: Arc::new(usvg::Options::default())
 		}
 	}
 
