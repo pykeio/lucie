@@ -1515,7 +1515,7 @@ impl Interactivity {
 							window.with_tab_group(tab_group, |window| {
 								if let Some(hitbox) = hitbox {
 									#[cfg(debug_assertions)]
-									self.paint_debug_info(global_id, hitbox, &style, window, cx);
+									self.paint_debug_info(global_id, element_state.as_mut(), hitbox, &style, window, cx);
 
 									if let Some(drag) = cx.active_drag.as_ref() {
 										if let Some(mouse_cursor) = drag.cursor_style {
@@ -1558,7 +1558,60 @@ impl Interactivity {
 	}
 
 	#[cfg(debug_assertions)]
-	fn paint_debug_info(&self, global_id: Option<&GlobalElementId>, hitbox: &Hitbox, style: &Style, window: &mut Window, cx: &mut App) {}
+	fn paint_debug_info(
+		&self,
+		global_id: Option<&GlobalElementId>,
+		element_state: Option<&mut InteractiveElementState>,
+		hitbox: &Hitbox,
+		style: &Style,
+		window: &mut Window,
+		cx: &mut App
+	) {
+		if global_id.is_some() && (style.debug || style.debug_below || cx.has_global::<crate::util::DebugBelow>()) && hitbox.is_hovered(window) {
+			const FONT_SIZE: Pixels = Pixels(10.);
+			let element_id = format!("{:?}", global_id.unwrap());
+
+			let render_debug_text = |window: &mut Window| {
+				let text_system = window.text_system().clone();
+				let scale_factor = window.scale_factor();
+				let build_layout = || {
+					let mut layout = text_system
+						.ranged_builder(
+							&element_id,
+							FONT_SIZE,
+							scale_factor,
+							&lucie_style::TextStyle {
+								color: color::red(),
+								line_height: FONT_SIZE.into(),
+								background_color: Some(color::white()),
+								..Default::default()
+							}
+						)
+						.build(&element_id);
+					layout.fit(None);
+					layout
+				};
+				let layout = if let Some(state) = element_state {
+					state.debug_label.get_or_insert_with(build_layout).clone()
+				} else {
+					build_layout()
+				};
+				for line in layout.lines() {
+					let _ = line.paint(&text_system, window, hitbox.origin.scale(scale_factor));
+				}
+			};
+
+			window.with_text_style(
+				Some(lucie_style::TextStyleRefinement {
+					color: Some(color::red()),
+					line_height: Some(FONT_SIZE.into()),
+					background_color: Some(color::white()),
+					..Default::default()
+				}),
+				render_debug_text
+			)
+		}
+	}
 
 	fn paint_mouse_listeners(&mut self, hitbox: &Hitbox, element_state: Option<&mut InteractiveElementState>, window: &mut Window, cx: &mut App) {
 		let is_focused = self
@@ -2052,7 +2105,9 @@ pub struct InteractiveElementState {
 	pub(crate) hover_state: Option<Rc<RefCell<bool>>>,
 	pub(crate) pending_mouse_down: Option<Rc<RefCell<Option<MouseDownEvent>>>>,
 	pub(crate) scroll_offset: Option<Rc<RefCell<Point<Pixels>>>>,
-	pub(crate) active_tooltip: Option<Rc<RefCell<Option<ActiveTooltip>>>>
+	pub(crate) active_tooltip: Option<Rc<RefCell<Option<ActiveTooltip>>>>,
+	#[cfg(debug_assertions)]
+	pub(crate) debug_label: Option<lucie_text::Layout>
 }
 
 /// Whether or not the element or a group that contains it is clicked by the mouse.
