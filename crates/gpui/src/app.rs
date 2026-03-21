@@ -335,12 +335,7 @@ impl SystemWindowTabController {
 
 	/// Get all tabs in the same window.
 	pub fn tabs(&self, id: WindowId) -> Option<&Vec<SystemWindowTab>> {
-		let tab_group = self
-			.tab_groups
-			.iter()
-			.find_map(|(group, tabs)| tabs.iter().find(|tab| tab.id == id).map(|_| *group))?;
-
-		self.tab_groups.get(&tab_group)
+		self.tab_groups.values().find(|tabs| tabs.iter().any(|tab| tab.id == id))
 	}
 
 	/// Initialize the visibility of the system window tab controller.
@@ -411,7 +406,7 @@ impl SystemWindowTabController {
 	/// Insert a tab into a tab group.
 	pub fn add_tab(cx: &mut App, id: WindowId, tabs: Vec<SystemWindowTab>) {
 		let mut controller = cx.global_mut::<SystemWindowTabController>();
-		let Some(tab) = tabs.clone().into_iter().find(|tab| tab.id == id) else {
+		let Some(tab) = tabs.iter().find(|tab| tab.id == id).cloned() else {
 			return;
 		};
 
@@ -469,12 +464,14 @@ impl SystemWindowTabController {
 			return;
 		};
 
+		let initial_tabs_len = initial_tabs.len();
 		let mut all_tabs = initial_tabs.clone();
-		for tabs in controller.tab_groups.values() {
-			all_tabs.extend(tabs.iter().filter(|tab| !initial_tabs.contains(tab)).cloned());
+
+		for (_, mut tabs) in controller.tab_groups.drain() {
+			tabs.retain(|tab| !all_tabs[..initial_tabs_len].contains(tab));
+			all_tabs.extend(tabs);
 		}
 
-		controller.tab_groups.clear();
 		controller.tab_groups.insert(0, all_tabs);
 	}
 
