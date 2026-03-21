@@ -84,7 +84,8 @@ pub(crate) struct WindowsWindowInner {
 	pub(crate) windows_version: WindowsVersion,
 	pub(crate) validation_number: usize,
 	pub(crate) main_receiver: PriorityQueueReceiver<RunnableVariant>,
-	pub(crate) platform_window_handle: HWND
+	pub(crate) platform_window_handle: HWND,
+	pub(crate) parent_hwnd: Option<HWND>
 }
 
 impl WindowsWindowState {
@@ -231,7 +232,8 @@ impl WindowsWindowInner {
 			validation_number: context.validation_number,
 			main_receiver: context.main_receiver.clone(),
 			platform_window_handle: context.platform_window_handle,
-			system_settings: WindowsSystemSettings::new(context.display)
+			system_settings: WindowsSystemSettings::new(context.display),
+			parent_hwnd: context.parent_hwnd
 		}))
 	}
 
@@ -330,7 +332,8 @@ struct WindowCreateContext {
 	appearance: WindowAppearance,
 	disable_direct_composition: bool,
 	directx_devices: DirectXDevices,
-	invalidate_devices: Arc<AtomicBool>
+	invalidate_devices: Arc<AtomicBool>,
+	parent_hwnd: Option<HWND>
 }
 
 impl WindowsWindow {
@@ -349,6 +352,20 @@ impl WindowsWindow {
 			invalidate_devices
 		} = creation_info;
 		register_window_class(icon);
+		let parent_hwnd = if params.kind == WindowKind::Dialog {
+			let parent_window = unsafe { GetActiveWindow() };
+			if parent_window.is_invalid() {
+				None
+			} else {
+				// Disable the parent window to make this dialog modal
+				unsafe {
+					EnableWindow(parent_window, false).as_bool();
+				};
+				Some(parent_window)
+			}
+		} else {
+			None
+		};
 		let hide_title_bar = params.titlebar.as_ref().map(|titlebar| titlebar.appears_transparent).unwrap_or(true);
 		let window_name = HSTRING::from(
 			params
@@ -372,7 +389,14 @@ impl WindowsWindow {
 				dwstyle |= WS_MINIMIZEBOX;
 			}
 
-			(WS_EX_APPWINDOW, dwstyle)
+			let dwexstyle = if params.kind == WindowKind::Dialog {
+				dwstyle |= WS_POPUP | WS_CAPTION;
+				WS_EX_DLGMODALFRAME
+			} else {
+				WS_EX_APPWINDOW
+			};
+
+			(dwexstyle, dwstyle)
 		};
 		if !disable_direct_composition {
 			dwexstyle |= WS_EX_NOREDIRECTIONBITMAP;
@@ -403,7 +427,8 @@ impl WindowsWindow {
 			appearance,
 			disable_direct_composition,
 			directx_devices,
-			invalidate_devices
+			invalidate_devices,
+			parent_hwnd
 		};
 		let creation_result = unsafe {
 			CreateWindowExW(
@@ -415,7 +440,7 @@ impl WindowsWindow {
 				CW_USEDEFAULT,
 				CW_USEDEFAULT,
 				CW_USEDEFAULT,
-				None,
+				parent_hwnd,
 				None,
 				Some(hinstance.into()),
 				Some(&context as *const _ as *const _)
