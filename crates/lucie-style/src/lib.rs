@@ -1,6 +1,7 @@
 use std::{
 	hash::{Hash, Hasher},
 	iter, mem,
+	num::NonZeroU32,
 	ops::Range
 };
 
@@ -303,7 +304,7 @@ pub enum BorderStyle {
 }
 
 /// How to handle whitespace in text
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum WhiteSpace {
 	/// Normal line wrapping when text overflows the width of the element
 	#[default]
@@ -313,7 +314,7 @@ pub enum WhiteSpace {
 }
 
 /// How to truncate text that overflows the width of the element
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TextOverflow {
 	/// Truncate the text when it doesn't fit, and represent this truncation by displaying the
 	/// provided string.
@@ -381,7 +382,7 @@ pub struct TextStyle {
 	pub text_align: TextAlign,
 
 	/// The number of lines to display before truncating the text
-	pub line_clamp: Option<usize>
+	pub line_clamp: Option<NonZeroU32>
 }
 
 impl Default for TextStyle {

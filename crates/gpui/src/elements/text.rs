@@ -9,7 +9,7 @@ use std::{
 use anyhow::Context as _;
 use lucie_common::{
 	SharedString,
-	geometry::{Bounds, Pixels, Point}
+	geometry::{Bounds, Pixels, Point, ScaledPixels}
 };
 use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, WhiteSpace};
 use rapidhash::fast::RapidHasher;
@@ -262,25 +262,8 @@ impl TextLayout {
 					None
 				};
 
-				let (_truncate_width, _truncation_suffix) = if let Some(text_overflow) = text_style.text_overflow.clone() {
-					let width = known_dimensions.width.or(match available_space.width {
-						crate::AvailableSpace::Definite(x) => match text_style.line_clamp {
-							Some(max_lines) => Some(x * max_lines),
-							None => Some(x)
-						},
-						_ => None
-					});
-
-					match text_overflow {
-						TextOverflow::Truncate(s) => (width, s)
-					}
-				} else {
-					(None, "".into())
-				};
-
-				// TODO: truncation
-
-				window.with_element_state(&global_id(&text, font_size, scale_factor, Some(&runs)), |state, _| {
+				window.with_element_state(&global_id(&text, &text_style, scale_factor, Some(&runs)), |state, _| {
+					let text_system = cx.text_system();
 					let mut layout = state.unwrap_or_else(|| {
 						let mut builder = cx.text_system().ranged_builder(&text, font_size, scale_factor, &text_style);
 						builder.push_runs(&runs);
@@ -288,9 +271,42 @@ impl TextLayout {
 						Rc::new(RefCell::new(builder.build(&text)))
 					});
 
+					{
+						let layout_ref = layout.borrow();
+						if layout_ref.num_lines() > 0 && (wrap_width.is_none() || wrap_width.map(|p| p.scale(scale_factor)) == layout_ref.max_width()) {
+							let size = layout_ref.size().map(|x| Pixels(x.0 / scale_factor));
+							drop(layout_ref);
+							element_state.0.borrow_mut().replace(TextLayoutInner {
+								text: text.clone(),
+								layout: Rc::clone(&layout)
+							});
+
+							return (size, layout);
+						}
+					}
+
 					let size = {
 						let mut layout = layout.borrow_mut();
-						layout.fit(wrap_width.map(|p| p.scale(scale_factor)));
+						if let Some(overflow) = &text_style.text_overflow {
+							match overflow {
+								TextOverflow::Truncate(trunc) => layout.truncate(
+									&*text_system,
+									&text_style,
+									known_dimensions
+										.width
+										.or(match available_space.width {
+											crate::AvailableSpace::Definite(x) => Some(x),
+											_ => None
+										})
+										.map(|p| p.scale(scale_factor))
+										.unwrap_or(ScaledPixels(f32::MAX)),
+									text_style.line_clamp,
+									&trunc
+								)
+							}
+						} else {
+							layout.fit(wrap_width.map(|p| p.scale(scale_factor)));
+						}
 						layout.align(Some(text_style.text_align));
 						layout.size().map(|x| Pixels(x.0 / scale_factor))
 					};
@@ -586,10 +602,13 @@ impl IntoElement for InteractiveText {
 	}
 }
 
-fn global_id(text: &str, font_size: Pixels, scale_factor: f32, runs: Option<&[TextRun]>) -> GlobalElementId {
+fn global_id(text: &str, text_style: &TextStyle, scale_factor: f32, runs: Option<&[TextRun]>) -> GlobalElementId {
 	let mut hasher = const { RapidHasher::new(1282529) };
 	scale_factor.to_bits().hash(&mut hasher);
-	font_size.hash(&mut hasher);
+	text_style.font_size.hash(&mut hasher);
+	text_style.white_space.hash(&mut hasher);
+	text_style.line_clamp.hash(&mut hasher);
+	text_style.text_overflow.hash(&mut hasher);
 	text.hash(&mut hasher);
 	if let Some(runs) = runs {
 		for run in runs {

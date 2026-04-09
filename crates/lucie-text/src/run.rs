@@ -3,14 +3,9 @@ use std::{
 	slice
 };
 
-use lucie_common::geometry::{DevicePixels, Point, ScaledPixels, point};
-use parley::GlyphClass;
+use lucie_common::geometry::{Point, ScaledPixels};
 
-use crate::{
-	font::FontHandle,
-	glyph::{GlyphId, PositionedGlyph, SubpixelVariant},
-	style::Brush
-};
+use crate::{font::FontHandle, glyph::PositionedGlyph, style::Brush};
 
 pub struct Run<'a> {
 	#[expect(unused)]
@@ -121,23 +116,8 @@ impl<'a> GlyphRun<'a> {
 
 	#[inline]
 	pub fn positioned_glyphs<'s>(&'s self, origin: Point<ScaledPixels>) -> impl Iterator<Item = PositionedGlyph<'s>> + 's + Clone {
-		self.run.positioned_glyphs().map(move |glyph| {
-			let (x, y) = (glyph.x + origin.x.0, glyph.y + origin.y.0);
-			let (x, subpixel_variant) = if glyph.class == GlyphClass::Unclassified {
-				SubpixelVariant::from_pos(x)
-			} else {
-				// CJK or other logographic script means there's gonna be a lot of different glyphs, so multiplying that by 4 by
-				// allowing subpixel variants wouldn't be a good idea.
-				(x as i32, SubpixelVariant::Zero)
-			};
-			let y = y as i32;
-			PositionedGlyph {
-				id: GlyphId(skrifa::GlyphId::new(glyph.id)),
-				run_data: &self.data,
-				class: glyph.class,
-				subpixel_variant,
-				origin: point(DevicePixels(x), DevicePixels(y))
-			}
-		})
+		self.run
+			.positioned_glyphs()
+			.map(move |glyph| PositionedGlyph::from_parley(&self.data, glyph, origin))
 	}
 }

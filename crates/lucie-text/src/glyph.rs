@@ -1,6 +1,6 @@
 use std::hash::{Hash, Hasher};
 
-use lucie_common::geometry::{DevicePixels, Point};
+use lucie_common::geometry::{DevicePixels, Point, ScaledPixels, point};
 use parley::GlyphClass;
 use rapidhash::fast::RapidHasher;
 
@@ -16,14 +16,35 @@ pub struct PositionedGlyph<'a> {
 	pub run_data: &'a RunData<'a>,
 	pub class: GlyphClass,
 	pub subpixel_variant: SubpixelVariant,
-	pub origin: Point<DevicePixels>
+	pub origin: Point<DevicePixels>,
+	pub advance: ScaledPixels
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct GlyphKey(u64);
 
-impl PositionedGlyph<'_> {
+impl<'a> PositionedGlyph<'a> {
+	pub(crate) fn from_parley(run_data: &'a RunData, glyph: parley::Glyph, origin: Point<ScaledPixels>) -> Self {
+		let (x, y) = (glyph.x + origin.x.0, glyph.y + origin.y.0);
+		let (x, subpixel_variant) = if glyph.class == GlyphClass::Unclassified {
+			SubpixelVariant::from_pos(x)
+		} else {
+			// CJK or other logographic script means there's gonna be a lot of different glyphs, so multiplying that by 4 by
+			// allowing subpixel variants wouldn't be a good idea.
+			(x as i32, SubpixelVariant::Zero)
+		};
+		let y = y as i32;
+		PositionedGlyph {
+			id: GlyphId(skrifa::GlyphId::new(glyph.id)),
+			run_data,
+			class: glyph.class,
+			subpixel_variant,
+			origin: point(DevicePixels(x), DevicePixels(y)),
+			advance: ScaledPixels(glyph.advance)
+		}
+	}
+
 	#[inline]
 	#[must_use]
 	pub fn key(&self, font: &FontHandle) -> GlyphKey {

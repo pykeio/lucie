@@ -101,28 +101,7 @@ impl TextSystem {
 			let mut builder = unsafe {
 				mem::transmute::<parley::RangedBuilder<'_, Brush>, parley::RangedBuilder<'this, Brush>>(layout.ranged_builder(&mut font, text, dpr, false))
 			};
-			builder.push_default(parley::StyleProperty::OverflowWrap(parley::OverflowWrap::BreakWord));
-			style_to_parley(
-				&TextStyleRefinement {
-					color: Some(base_style.color),
-					font_family: Some(base_style.font_family.clone()),
-					font_features: Some(base_style.font_features.clone()),
-					font_fallbacks: base_style.font_fallbacks.clone(),
-					font_size: Some(base_style.font_size),
-					line_height: Some(base_style.line_height),
-					font_weight: Some(base_style.font_weight),
-					font_style: Some(base_style.font_style),
-					background_color: base_style.background_color,
-					underline: base_style.underline.clone(),
-					strikethrough: base_style.strikethrough.clone(),
-					white_space: Some(base_style.white_space),
-					..Default::default()
-				},
-				rem_size,
-				|property| {
-					builder.push_default(property);
-				}
-			);
+			apply_base_text_style(base_style, rem_size, &mut builder);
 
 			mem::forget((font, layout));
 			builder
@@ -133,6 +112,31 @@ impl TextSystem {
 			_parley_ctx: self.parley_ctx.clone()
 		}
 	}
+}
+
+pub(crate) fn apply_base_text_style(base_style: &TextStyle, rem_size: Pixels, builder: &mut parley::RangedBuilder<Brush>) {
+	builder.push_default(parley::StyleProperty::OverflowWrap(parley::OverflowWrap::BreakWord));
+	style_to_parley(
+		&TextStyleRefinement {
+			color: Some(base_style.color),
+			font_family: Some(base_style.font_family.clone()),
+			font_features: Some(base_style.font_features.clone()),
+			font_fallbacks: base_style.font_fallbacks.clone(),
+			font_size: Some(base_style.font_size),
+			line_height: Some(base_style.line_height),
+			font_weight: Some(base_style.font_weight),
+			font_style: Some(base_style.font_style),
+			background_color: base_style.background_color,
+			underline: base_style.underline.clone(),
+			strikethrough: base_style.strikethrough.clone(),
+			white_space: Some(base_style.white_space),
+			..Default::default()
+		},
+		rem_size,
+		|property| {
+			builder.push_default(property);
+		}
+	);
 }
 
 pub struct RangedBuilder<'ctx> {
@@ -181,9 +185,13 @@ impl<'s> RangedBuilder<'s> {
 	}
 
 	pub fn build_into(self, layout: &mut Layout, text: impl AsRef<str>) {
+		layout.clear();
+
+		let rem_size = self.rem_size;
 		let mut this = ManuallyDrop::new(self);
 		let builder = unsafe { ptr::read(&mut this.builder) };
 		builder.build_into(layout.layout_mut(), text.as_ref());
+		layout.rem_size = rem_size;
 		unsafe { this.release() };
 	}
 

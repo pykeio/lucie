@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use lucie_common::{
 	SharedString,
 	color::Hsla,
@@ -105,14 +107,14 @@ pub trait Styled: Sized {
 	/// Sets the truncate to prevent text from wrapping and truncate overflowing text with an ellipsis (…) if needed.
 	/// [Docs](https://tailwindcss.com/docs/text-overflow#truncate)
 	fn truncate(self) -> Self {
-		self.overflow_hidden().whitespace_nowrap().text_ellipsis()
+		self.overflow_hidden().text_ellipsis()
 	}
 
 	/// Sets number of lines to show before truncating the text.
 	/// [Docs](https://tailwindcss.com/docs/line-clamp)
-	fn line_clamp(mut self, lines: usize) -> Self {
+	fn line_clamp(mut self, lines: u32) -> Self {
 		let text_style = self.text_style();
-		text_style.line_clamp = Some(lines);
+		text_style.line_clamp = NonZeroU32::new(lines);
 		self.overflow_hidden()
 	}
 
