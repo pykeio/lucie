@@ -316,9 +316,12 @@ pub enum WhiteSpace {
 /// How to truncate text that overflows the width of the element
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TextOverflow {
-	/// Truncate the text when it doesn't fit, and represent this truncation by displaying the
-	/// provided string.
-	Truncate(SharedString)
+	/// Truncate the text at the end when it doesn't fit, and represent this truncation by displaying the
+	/// provided string ("hello wor...")
+	Truncate(SharedString),
+	/// Truncate the text at the start when it doesn't fit, and represent this truncation by displaying the
+	/// provided string ("...llo world")
+	TruncateStart(SharedString)
 }
 
 /// How to align text within the element

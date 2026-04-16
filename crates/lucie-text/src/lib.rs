@@ -29,7 +29,8 @@ pub use self::{
 	layout::{Layout, Line},
 	rasterize::RasterizedGlyph,
 	run::{GlyphRun, Renderable, Run, RunData},
-	select::{Affinity, Cursor, Selection}
+	select::{Affinity, Cursor, Selection},
+	style::TruncateFrom
 };
 use crate::style::{Brush, style_to_parley};
 

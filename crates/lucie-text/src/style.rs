@@ -7,6 +7,13 @@ use lucie_common::{
 use lucie_style::TextStyleRefinement;
 use parley::{FontFamily, FontFamilyName, FontFeature, GenericFamily, StyleProperty, setting::Tag};
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TruncateFrom {
+	#[default]
+	End,
+	Start
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Brush {
 	/// The color of the text/strikethrough/underline.

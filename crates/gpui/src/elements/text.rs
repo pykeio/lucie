@@ -12,6 +12,7 @@ use lucie_common::{
 	geometry::{Bounds, Pixels, Point, ScaledPixels}
 };
 use lucie_style::{CursorStyle, HighlightStyle, TextOverflow, TextRun, TextStyle, WhiteSpace};
+use lucie_text::TruncateFrom;
 use rapidhash::fast::RapidHasher;
 
 use crate::{
@@ -288,22 +289,26 @@ impl TextLayout {
 					let size = {
 						let mut layout = layout.borrow_mut();
 						if let Some(overflow) = &text_style.text_overflow {
-							match overflow {
-								TextOverflow::Truncate(trunc) => layout.truncate(
-									&*text_system,
-									&text_style,
-									known_dimensions
-										.width
-										.or(match available_space.width {
-											crate::AvailableSpace::Definite(x) => Some(x),
-											_ => None
-										})
-										.map(|p| p.scale(scale_factor))
-										.unwrap_or(ScaledPixels(f32::MAX)),
-									text_style.line_clamp,
-									&trunc
-								)
-							}
+							let (affix, from) = match overflow {
+								TextOverflow::Truncate(affix) => (affix, TruncateFrom::End),
+								TextOverflow::TruncateStart(affix) => (affix, TruncateFrom::Start)
+							};
+
+							layout.truncate(
+								&*text_system,
+								&text_style,
+								known_dimensions
+									.width
+									.or(match available_space.width {
+										crate::AvailableSpace::Definite(x) => Some(x),
+										_ => None
+									})
+									.map(|p| p.scale(scale_factor))
+									.unwrap_or(ScaledPixels(f32::MAX)),
+								text_style.line_clamp,
+								affix,
+								from
+							);
 						} else {
 							layout.fit(wrap_width.map(|p| p.scale(scale_factor)));
 						}

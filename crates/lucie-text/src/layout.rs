@@ -7,13 +7,19 @@ use crate::{
 	TextPainter, TextSystem, apply_base_text_style,
 	run::{GlyphRun, Renderable, Run},
 	select::Cursor,
-	style::Brush
+	style::{Brush, TruncateFrom}
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum ShapeMode {
-	Fit { wrap_width: Option<ScaledPixels> },
-	Truncate { max_width: ScaledPixels, line_clamp: Option<NonZeroU32> }
+	Fit {
+		wrap_width: Option<ScaledPixels>
+	},
+	Truncate {
+		max_width: ScaledPixels,
+		line_clamp: Option<NonZeroU32>,
+		from: TruncateFrom
+	}
 }
 
 impl ShapeMode {
@@ -108,10 +114,18 @@ impl Layout {
 		self.shape_mode = Some(ShapeMode::Fit { wrap_width: max_width });
 	}
 
-	pub fn truncate(&mut self, text_system: &TextSystem, base_style: &TextStyle, max_width: ScaledPixels, line_clamp: Option<NonZeroU32>, truncate_text: &str) {
+	pub fn truncate(
+		&mut self,
+		text_system: &TextSystem,
+		base_style: &TextStyle,
+		max_width: ScaledPixels,
+		line_clamp: Option<NonZeroU32>,
+		affix: &str,
+		from: TruncateFrom
+	) {
 		if let Some(shape_mode) = &self.shape_mode
-			&& *shape_mode == (ShapeMode::Truncate { max_width, line_clamp })
-			&& self.truncation.as_ref().is_none_or(|tr| tr.text == truncate_text)
+			&& *shape_mode == (ShapeMode::Truncate { max_width, line_clamp, from })
+			&& self.truncation.as_ref().is_none_or(|tr| tr.affix == affix)
 		{
 			return;
 		}
@@ -120,7 +134,8 @@ impl Layout {
 
 		if let Some(ShapeMode::Truncate {
 			max_width: old_max_width,
-			line_clamp: old_line_clamp
+			line_clamp: old_line_clamp,
+			..
 		}) = self.shape_mode
 			&& (max_width == old_max_width && line_clamp == old_line_clamp)
 		{
@@ -135,7 +150,7 @@ impl Layout {
 		}
 		breaker.break_remaining(f32::MAX);
 
-		self.shape_mode = Some(ShapeMode::Truncate { max_width, line_clamp });
+		self.shape_mode = Some(ShapeMode::Truncate { max_width, line_clamp, from });
 
 		if self.width() > max_width {
 			self.truncation.get_or_insert_with(Truncation::default).update(
@@ -143,7 +158,8 @@ impl Layout {
 				base_style,
 				line_clamp,
 				max_width,
-				truncate_text,
+				affix,
+				from,
 				self.rem_size,
 				self.layout.scale(),
 				&self.layout
@@ -192,9 +208,11 @@ impl Layout {
 
 #[derive(Default, Clone)]
 struct Truncation {
-	text: String,
+	affix: String,
 	line: u32,
 	item: Option<u32>,
+	from: TruncateFrom,
+	start_advance: ScaledPixels,
 	rem_size: Pixels,
 	scale: f32,
 	layout: parley::Layout<Brush>
@@ -217,66 +235,107 @@ impl Truncation {
 		base_style: &TextStyle,
 		line_clamp: Option<NonZeroU32>,
 		max_width: ScaledPixels,
-		truncate_text: &str,
+		affix: &str,
+		from: TruncateFrom,
 		rem_size: Pixels,
 		scale: f32,
 		layout: &parley::Layout<Brush>
 	) {
-		if truncate_text != self.text || self.rem_size != rem_size || self.scale != scale {
-			self.update_layout(text_system, base_style, truncate_text, rem_size, scale);
+		if affix != self.affix || self.rem_size != rem_size || self.scale != scale {
+			self.update_layout(text_system, base_style, affix, rem_size, scale);
 		}
 
 		let truncate_width = self.layout.width();
 
 		self.line = line_clamp.map_or(1, |x| x.get()) - 1;
+		self.from = from;
+		self.item = None;
+		self.start_advance = ScaledPixels(0.0);
+
 		let Some(line) = layout.lines().nth(self.line as usize) else {
 			return;
 		};
 
-		let mut width = 0.0;
-		let mut item_idx = 0;
-		for item in line.items() {
-			match item {
-				parley::PositionedLayoutItem::GlyphRun(run) => {
-					for glyph in run.glyphs() {
-						if width + truncate_width < max_width.0 {
-							self.item = Some(item_idx);
+		match self.from {
+			TruncateFrom::End => {
+				let mut width = 0.0;
+				let mut item_idx = 0;
+				for item in line.items() {
+					match item {
+						parley::PositionedLayoutItem::GlyphRun(run) => {
+							for glyph in run.glyphs() {
+								if width + truncate_width < max_width.0 {
+									self.item = Some(item_idx);
+								}
+
+								width += glyph.advance;
+								item_idx += 1;
+
+								if width.floor() > max_width.0 {
+									return;
+								}
+							}
 						}
+						parley::PositionedLayoutItem::InlineBox(b) => {
+							if width + truncate_width < max_width.0 {
+								self.item = Some(item_idx);
+							}
 
-						width += glyph.advance;
-						item_idx += 1;
+							width += b.width;
+							item_idx += 1;
 
-						if width.floor() > max_width.0 {
-							return;
+							if width.floor() > max_width.0 {
+								return;
+							}
 						}
 					}
 				}
-				parley::PositionedLayoutItem::InlineBox(b) => {
-					if width + truncate_width < max_width.0 {
-						self.item = Some(item_idx);
+				self.item = None;
+			}
+			TruncateFrom::Start => {
+				let mut item_widths: Vec<f32> = Vec::new();
+				for item in line.items() {
+					match item {
+						parley::PositionedLayoutItem::GlyphRun(run) => {
+							for glyph in run.glyphs() {
+								item_widths.push(glyph.advance);
+							}
+						}
+						parley::PositionedLayoutItem::InlineBox(b) => {
+							item_widths.push(b.width);
+						}
 					}
+				}
 
-					width += b.width;
-					item_idx += 1;
+				let available = max_width.0 - truncate_width;
+				let total: f32 = item_widths.iter().sum();
+				let mut skipped = 0.0;
 
-					if width.floor() > max_width.0 {
+				for (idx, &w) in item_widths.iter().enumerate() {
+					if total - skipped <= available {
+						self.item = Some(idx as u32);
+						self.start_advance = ScaledPixels(skipped);
 						return;
 					}
+					skipped += w;
 				}
+
+				self.item = None;
+				self.start_advance = ScaledPixels(0.0);
 			}
 		}
-		self.item = None;
 	}
 
-	fn update_layout(&mut self, text_system: &TextSystem, base_style: &TextStyle, truncate_text: &str, rem_size: Pixels, scale: f32) {
+	fn update_layout(&mut self, text_system: &TextSystem, base_style: &TextStyle, affix: &str, rem_size: Pixels, scale: f32) {
 		let mut layout = text_system.parley_ctx.layout.lock();
 		let mut font = text_system.parley_ctx.font.lock();
 
-		let mut builder = layout.ranged_builder(&mut *font, truncate_text, scale, false);
+		let mut builder = layout.ranged_builder(&mut *font, affix, scale, false);
 		apply_base_text_style(base_style, rem_size, &mut builder);
-		builder.build_into(&mut self.layout, truncate_text);
+		builder.build_into(&mut self.layout, affix);
 		self.layout.break_all_lines(None);
 
+		self.affix = affix.to_owned();
 		self.rem_size = rem_size;
 		self.scale = scale;
 	}
@@ -329,46 +388,88 @@ impl<'a> Line<'a> {
 
 	pub fn paint<P: TextPainter>(&self, text_system: &TextSystem, painter: &mut P, origin: Point<ScaledPixels>) -> Result<(), P::Error> {
 		let mut painter = painter.create_layer(Bounds::new(origin, size(self.width(), self.height())));
+
+		let is_start_truncation = self.truncation.as_ref().is_some_and(|t| t.from == TruncateFrom::Start);
+		if is_start_truncation
+			&& let Some(truncation) = self.truncation
+			&& truncation.item().is_some()
+			&& let Some(truncation_run) = truncation.run()
+		{
+			let font = text_system.font_cache().get(&truncation_run.data().font());
+			let affix_origin = Point {
+				x: origin.x,
+				y: origin.y + ScaledPixels(self.line.metrics().line_height * self.idx as f32)
+			};
+			for glyph in truncation_run.positioned_glyphs(affix_origin) {
+				painter.paint_glyph(glyph, &font, truncation_run.data(), truncation_run.style().brush.color)?;
+			}
+		}
+
+		let render_origin = if is_start_truncation {
+			let (trunc_width, skip_advance) = self
+				.truncation
+				.map(|t| (ScaledPixels(t.layout.width()), t.start_advance))
+				.unwrap_or((ScaledPixels(0.0), ScaledPixels(0.0)));
+			Point {
+				x: origin.x + trunc_width - skip_advance,
+				y: origin.y
+			}
+		} else {
+			origin
+		};
+
 		let mut item_idx = 0;
-		let mut truncated = false;
 		let mut advance = ScaledPixels(0.0);
+		let mut truncated = false;
+
 		'outer: for renderable in self.renderables() {
 			match renderable {
 				Renderable::GlyphRun(run) => {
 					let font = text_system.font_cache().get(run.data().font());
-					for glyph in run.positioned_glyphs(origin) {
-						if self.truncation.as_ref().is_some_and(|t| t.item().is_some_and(|i| i == item_idx)) {
-							truncated = true;
-							break 'outer;
+					let mut run_rendered_any = false;
+
+					for glyph in run.positioned_glyphs(render_origin) {
+						if !is_start_truncation {
+							if self.truncation.as_ref().is_some_and(|t| t.item().is_some_and(|i| i == item_idx)) {
+								truncated = true;
+								break 'outer;
+							}
+						} else {
+							if self.truncation.as_ref().is_some_and(|t| t.item().is_some_and(|i| item_idx < i)) {
+								item_idx += 1;
+								continue;
+							}
 						}
 
 						item_idx += 1;
 						advance += glyph.advance;
-
+						run_rendered_any = true;
 						painter.paint_glyph(glyph, &font, run.data(), run.style().brush.color)?;
 					}
 
-					if let Some(underline) = run.style().underline.as_ref() {
-						painter.paint_underline(
-							origin + point(run.x(), run.y() - ScaledPixels(underline.offset.unwrap_or_default())),
-							run.width(),
-							&UnderlineStyle {
-								color: Some(underline.brush.color),
-								thickness: px(underline.size.unwrap_or(1.0)),
-								wavy: underline.brush.wavy
-							}
-						);
-					}
+					if !is_start_truncation || run_rendered_any {
+						if let Some(underline) = run.style().underline.as_ref() {
+							painter.paint_underline(
+								render_origin + point(run.x(), run.y() - ScaledPixels(underline.offset.unwrap_or_default())),
+								run.width(),
+								&UnderlineStyle {
+									color: Some(underline.brush.color),
+									thickness: px(underline.size.unwrap_or(1.0)),
+									wavy: underline.brush.wavy
+								}
+							);
+						}
 
-					if let Some(strikethrough) = run.style().strikethrough.as_ref() {
-						painter.paint_strikethrough(
-							origin + point(run.x(), run.y() - ScaledPixels(strikethrough.offset.unwrap_or_default())),
-							run.width(),
-							&StrikethroughStyle {
-								color: Some(strikethrough.brush.color),
-								thickness: px(strikethrough.size.unwrap_or(1.0))
-							}
-						);
+						if let Some(strikethrough) = run.style().strikethrough.as_ref() {
+							painter.paint_strikethrough(
+								render_origin + point(run.x(), run.y() - ScaledPixels(strikethrough.offset.unwrap_or_default())),
+								run.width(),
+								&StrikethroughStyle {
+									color: Some(strikethrough.brush.color),
+									thickness: px(strikethrough.size.unwrap_or(1.0))
+								}
+							);
+						}
 					}
 				}
 				Renderable::InlineBox { .. } => unimplemented!("inline boxes not implemented")
@@ -380,11 +481,11 @@ impl<'a> Line<'a> {
 			&& let Some(truncation_run) = truncation.run()
 		{
 			let font = text_system.font_cache().get(&truncation_run.data().font());
-			let origin = Point {
+			let affix_origin = Point {
 				x: origin.x + advance,
 				y: origin.y + ScaledPixels(self.line.metrics().line_height * self.idx as f32)
 			};
-			for glyph in truncation_run.positioned_glyphs(origin) {
+			for glyph in truncation_run.positioned_glyphs(affix_origin) {
 				painter.paint_glyph(glyph, &font, truncation_run.data(), truncation_run.style().brush.color)?;
 			}
 		}

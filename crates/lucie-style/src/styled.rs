@@ -70,10 +70,16 @@ pub trait Styled: Sized {
 		self
 	}
 
-	/// Sets the truncate overflowing text with an ellipsis (…) if needed.
+	/// Sets the truncate overflowing text with an ellipsis (…) at the end if needed.
 	/// [Docs](https://tailwindcss.com/docs/text-overflow#ellipsis)
 	fn text_ellipsis(mut self) -> Self {
 		self.text_style().text_overflow = Some(TextOverflow::Truncate(ELLIPSIS));
+		self
+	}
+
+	/// Sets the truncate overflowing text with an ellipsis (…) at the start if needed.
+	fn text_ellipsis_start(mut self) -> Self {
+		self.text_style().text_overflow = Some(TextOverflow::TruncateStart(ELLIPSIS));
 		self
 	}
 
