@@ -1675,7 +1675,6 @@ impl Interactivity {
 
 		if self.hover_style.is_some() || self.base_style.mouse_cursor.is_some() || cx.active_drag.is_some() && !self.drag_over_styles.is_empty() {
 			let hitbox = hitbox.clone();
-			let was_hovered = hitbox.is_hovered(window);
 			let hover_state = self
 				.hover_style
 				.as_ref()
@@ -1683,6 +1682,7 @@ impl Interactivity {
 			let current_view = window.current_view();
 			window.on_mouse_event(move |_: &MouseMoveEvent, phase, window, cx| {
 				let hovered = hitbox.is_hovered(window);
+				let was_hovered = hover_state.as_ref().is_some_and(|state| state.borrow().element);
 				if phase == DispatchPhase::Capture && hovered != was_hovered {
 					if let Some(hover_state) = &hover_state {
 						hover_state.borrow_mut().element = hovered;
@@ -1695,12 +1695,10 @@ impl Interactivity {
 		if let Some(group_hover) = self.group_hover_style.as_ref() {
 			if let Some(group_hitbox_id) = GroupHitboxes::get(&group_hover.group, cx) {
 				let hover_state = element_state.as_ref().and_then(|element| element.hover_state.as_ref()).cloned();
-
-				let was_group_hovered = group_hitbox_id.is_hovered(window);
 				let current_view = window.current_view();
-
 				window.on_mouse_event(move |_: &MouseMoveEvent, phase, window, cx| {
 					let group_hovered = group_hitbox_id.is_hovered(window);
+					let was_group_hovered = hover_state.as_ref().is_some_and(|state| state.borrow().group);
 					if phase == DispatchPhase::Capture && group_hovered != was_group_hovered {
 						if let Some(hover_state) = &hover_state {
 							hover_state.borrow_mut().group = group_hovered;
