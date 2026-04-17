@@ -535,6 +535,7 @@ impl GpuiMode {
 /// You need a reference to an `App` to access the state of a [Entity].
 pub struct App {
 	pub(crate) this: Weak<AppCell>,
+	pub(crate) liveness: std::sync::Arc<()>,
 	pub(crate) platform: Rc<dyn Platform>,
 	pub(crate) mode: GpuiMode,
 	text_system: Arc<TextSystem>,
@@ -599,6 +600,7 @@ impl App {
 		let app = Rc::new_cyclic(|this| AppCell {
 			app: RefCell::new(App {
 				this: this.clone(),
+				liveness: std::sync::Arc::new(()),
 				platform: platform.clone(),
 				text_system,
 				mode: GpuiMode::Production,
@@ -1219,6 +1221,7 @@ impl App {
 	pub fn to_async(&self) -> AsyncApp {
 		AsyncApp {
 			app: self.this.clone(),
+			liveness_token: Arc::downgrade(&self.liveness),
 			background_executor: self.background_executor.clone(),
 			foreground_executor: self.foreground_executor.clone()
 		}

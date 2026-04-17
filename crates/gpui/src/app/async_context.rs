@@ -17,6 +17,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AsyncApp {
 	pub(crate) app: Weak<AppCell>,
+	pub(crate) liveness_token: std::sync::Weak<()>,
 	pub(crate) background_executor: BackgroundExecutor,
 	pub(crate) foreground_executor: ForegroundExecutor
 }
@@ -156,7 +157,8 @@ impl AsyncApp {
 		R: 'static
 	{
 		let mut cx = self.clone();
-		self.foreground_executor.spawn(async move { f(&mut cx).await })
+		self.foreground_executor
+			.spawn_context(self.liveness_token.clone(), async move { f(&mut cx).await })
 	}
 
 	/// Determine whether global state of the specified type has been assigned.
@@ -284,7 +286,8 @@ impl AsyncWindowContext {
 		R: 'static
 	{
 		let mut cx = self.clone();
-		self.foreground_executor.spawn(async move { f(&mut cx).await })
+		self.foreground_executor
+			.spawn_context(self.app.liveness_token.clone(), async move { f(&mut cx).await })
 	}
 
 	/// Present a platform dialog.
