@@ -9,6 +9,8 @@ extern crate self as gpui;
 
 #[macro_use]
 mod action;
+#[cfg(doc)]
+pub mod _ownership_and_data_flow;
 mod app;
 mod asset_cache;
 mod assets;
@@ -39,9 +41,8 @@ pub mod test;
 mod util;
 mod view;
 mod window;
-
-#[cfg(doc)]
-pub mod _ownership_and_data_flow;
+#[cfg(all(windows, feature = "windows-manifest"))]
+mod windows_manifest;
 
 /// Do not touch, here be dragons for use by gpui_macros and such.
 #[doc(hidden)]

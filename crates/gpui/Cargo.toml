@@ -246,7 +246,6 @@ reqwest_client = { workspace = true, features = ["test-support"] }
 unicode-segmentation.workspace = true
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
-embed-resource = "3.0"
 windows-registry = "0.5"
 
 [target.'cfg(target_os = "macos")'.build-dependencies]
