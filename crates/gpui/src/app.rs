@@ -53,6 +53,10 @@ pub use self::entity_map::*;
 mod test_context;
 #[cfg(any(test, feature = "test-support"))]
 pub use self::test_context::*;
+#[cfg(any(test, feature = "test-support"))]
+mod visual_test_context;
+#[cfg(any(test, feature = "test-support"))]
+pub use self::visual_test_context::*;
 
 /// The duration for which futures returned from [Context::on_app_quit] can run before the application fully quits.
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(100);

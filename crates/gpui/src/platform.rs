@@ -14,6 +14,8 @@ use std::{
 use anyhow::Result;
 use async_task::Runnable;
 use futures_channel::oneshot;
+#[cfg(any(test, feature = "test-support"))]
+use image::RgbaImage;
 use image::{AnimationDecoder as _, Frame, codecs::gif::GifDecoder};
 use lucie_common::{
 	SharedString,
@@ -442,6 +444,11 @@ pub(crate) trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
 	#[cfg(any(test, feature = "test-support"))]
 	fn as_test(&mut self) -> Option<&mut TestWindow> {
 		None
+	}
+
+	#[cfg(any(test, feature = "test-support"))]
+	fn render_to_image(&self, _scene: &Scene) -> Result<RgbaImage> {
+		anyhow::bail!("render_to_image not implemented for this platform")
 	}
 }
 
