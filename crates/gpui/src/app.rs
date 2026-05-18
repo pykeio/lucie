@@ -139,14 +139,16 @@ impl Application {
 		#[cfg(any(test, feature = "test-support"))]
 		log::info!("GPUI was compiled in test mode");
 
-		Self(App::new_app(current_platform(false), Arc::new(()), Arc::new(NullHttpClient)))
+		let liveness = Arc::new(());
+		Self(App::new_app(current_platform(false, Arc::downgrade(&liveness)), liveness, Arc::new(()), Arc::new(NullHttpClient)))
 	}
 
 	/// Build an app in headless mode. This prevents opening windows,
 	/// but makes it possible to run an application in an context like
 	/// SSH, where GUI applications are not allowed.
 	pub fn headless() -> Self {
-		Self(App::new_app(current_platform(true), Arc::new(()), Arc::new(NullHttpClient)))
+		let liveness = Arc::new(());
+		Self(App::new_app(current_platform(true, Arc::downgrade(&liveness)), liveness, Arc::new(()), Arc::new(NullHttpClient)))
 	}
 
 	/// Assign
@@ -539,7 +541,7 @@ impl GpuiMode {
 /// You need a reference to an `App` to access the state of a [Entity].
 pub struct App {
 	pub(crate) this: Weak<AppCell>,
-	pub(crate) liveness: std::sync::Arc<()>,
+	pub(crate) _liveness: Arc<()>,
 	pub(crate) platform: Rc<dyn Platform>,
 	pub(crate) mode: GpuiMode,
 	text_system: Arc<TextSystem>,
@@ -591,7 +593,7 @@ pub struct App {
 
 impl App {
 	#[allow(clippy::new_ret_no_self)]
-	pub(crate) fn new_app(platform: Rc<dyn Platform>, asset_source: Arc<dyn AssetSource>, http_client: Arc<dyn HttpClient>) -> Rc<AppCell> {
+	pub(crate) fn new_app(platform: Rc<dyn Platform>, liveness: Arc<()>, asset_source: Arc<dyn AssetSource>, http_client: Arc<dyn HttpClient>) -> Rc<AppCell> {
 		let executor = platform.background_executor();
 		let foreground_executor = platform.foreground_executor();
 		assert!(executor.is_main_thread(), "must construct App on main thread");
@@ -604,7 +606,7 @@ impl App {
 		let app = Rc::new_cyclic(|this| AppCell {
 			app: RefCell::new(App {
 				this: this.clone(),
-				liveness: std::sync::Arc::new(()),
+				_liveness: liveness,
 				platform: platform.clone(),
 				text_system,
 				mode: GpuiMode::Production,
@@ -1225,7 +1227,6 @@ impl App {
 	pub fn to_async(&self) -> AsyncApp {
 		AsyncApp {
 			app: self.this.clone(),
-			liveness_token: Arc::downgrade(&self.liveness),
 			background_executor: self.background_executor.clone(),
 			foreground_executor: self.foreground_executor.clone()
 		}

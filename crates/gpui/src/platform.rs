@@ -70,39 +70,41 @@ pub(crate) use windows::*;
 
 /// Returns a background executor for the current platform.
 pub fn background_executor() -> BackgroundExecutor {
-	current_platform(true).background_executor()
+	// For standalone background executor, use a dead liveness since there's no App.
+	// Weak::new() creates a weak reference that always returns None on upgrade.
+	current_platform(true, std::sync::Weak::new()).background_executor()
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn current_platform(headless: bool) -> Rc<dyn Platform> {
-	Rc::new(MacPlatform::new(headless))
+pub(crate) fn current_platform(headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
+	Rc::new(MacPlatform::new(headless, liveness))
 }
 
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-pub(crate) fn current_platform(headless: bool) -> Rc<dyn Platform> {
+pub(crate) fn current_platform(headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
 	#[cfg(feature = "x11")]
 	use anyhow::Context as _;
 
 	if headless {
-		return Rc::new(HeadlessClient::new());
+		return Rc::new(HeadlessClient::new(liveness));
 	}
 
 	match guess_compositor() {
 		#[cfg(feature = "wayland")]
-		"Wayland" => Rc::new(WaylandClient::new()),
+		"Wayland" => Rc::new(WaylandClient::new(liveness)),
 
 		#[cfg(feature = "x11")]
-		"X11" => Rc::new(X11Client::new().context("Failed to initialize X11 client.").unwrap()),
+		"X11" => Rc::new(X11Client::new(liveness).context("Failed to initialize X11 client.").unwrap()),
 
-		"Headless" => Rc::new(HeadlessClient::new()),
+		"Headless" => Rc::new(HeadlessClient::new(liveness)),
 		_ => unreachable!()
 	}
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn current_platform(_headless: bool) -> Rc<dyn Platform> {
+pub(crate) fn current_platform(_headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
 	Rc::new(
-		WindowsPlatform::new()
+		WindowsPlatform::new(liveness)
 			.inspect_err(|err| show_error("Failed to launch", err.to_string()))
 			.unwrap()
 	)
@@ -459,7 +461,7 @@ pub struct RunnableMeta {
 	/// Location of the runnable
 	pub location: &'static core::panic::Location<'static>,
 	/// Weak reference to check if the app is still alive before running this task
-	pub app: Option<std::sync::Weak<()>>
+	pub liveness: Option<std::sync::Weak<()>>
 }
 
 impl std::fmt::Debug for RunnableMeta {
@@ -474,7 +476,7 @@ impl std::fmt::Debug for RunnableMeta {
 impl RunnableMeta {
 	/// Returns true if the app is still alive (or if no app tracking is configured).
 	pub fn is_app_alive(&self) -> bool {
-		match &self.app {
+		match &self.liveness {
 			Some(weak) => weak.strong_count() > 0,
 			None => true
 		}
