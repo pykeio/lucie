@@ -83,7 +83,7 @@ pub(crate) struct WindowsWindowInner {
 	pub(crate) executor: ForegroundExecutor,
 	pub(crate) windows_version: WindowsVersion,
 	pub(crate) validation_number: usize,
-	pub(crate) main_receiver: PriorityQueueReceiver<RunnableVariant>,
+	pub(crate) main_receiver: PriorityQueueReceiver<Runnable>,
 	pub(crate) platform_window_handle: HWND,
 	pub(crate) parent_hwnd: Option<HWND>
 }
@@ -327,7 +327,7 @@ struct WindowCreateContext {
 	windows_version: WindowsVersion,
 	drop_target_helper: IDropTargetHelper,
 	validation_number: usize,
-	main_receiver: PriorityQueueReceiver<RunnableVariant>,
+	main_receiver: PriorityQueueReceiver<Runnable>,
 	platform_window_handle: HWND,
 	appearance: WindowAppearance,
 	disable_direct_composition: bool,

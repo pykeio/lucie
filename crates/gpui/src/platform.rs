@@ -12,7 +12,6 @@ use std::{
 };
 
 use anyhow::Result;
-use async_task::Runnable;
 use futures_channel::oneshot;
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
@@ -458,6 +457,7 @@ pub(crate) trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
 /// be considered part of our public API.
 #[doc(hidden)]
 pub struct RunnableMeta {
+	pub priority: Priority,
 	/// Location of the runnable
 	pub location: &'static core::panic::Location<'static>,
 	/// Weak reference to check if the app is still alive before running this task
@@ -467,6 +467,7 @@ pub struct RunnableMeta {
 impl std::fmt::Debug for RunnableMeta {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("RunnableMeta")
+			.field("priority", &self.priority)
 			.field("location", &self.location)
 			.field("app_alive", &self.is_app_alive())
 			.finish()
@@ -484,9 +485,58 @@ impl RunnableMeta {
 }
 
 #[doc(hidden)]
-pub enum RunnableVariant {
-	Meta(Runnable<RunnableMeta>),
-	Compat(Runnable)
+pub enum Runnable {
+	Meta(async_task::Runnable<RunnableMeta>),
+	Compat(async_task::Runnable)
+}
+
+impl Runnable {
+	fn run_and_profile(self) -> Instant {
+		if self.app_dropped() {
+			return Instant::now();
+		}
+
+		let mut timing = TaskTiming {
+			location: self.location().unwrap_or(core::panic::Location::caller()),
+			start: Instant::now(),
+			end: None
+		};
+
+		crate::profiler::add_task_timing(timing);
+		self.run_unprofiled();
+		timing.end = Some(Instant::now());
+		crate::profiler::add_task_timing(timing);
+		timing.start
+	}
+
+	fn app_dropped(&self) -> bool {
+		match self {
+			Runnable::Meta(runnable) => !runnable.metadata().is_app_alive(),
+			Runnable::Compat(_) => false
+		}
+	}
+
+	fn location(&self) -> Option<&'static core::panic::Location<'static>> {
+		match self {
+			Runnable::Meta(runnable) => runnable.metadata().location.into(),
+			Runnable::Compat(_) => None
+		}
+	}
+
+	fn run_unprofiled(self) {
+		self.priority().set_as_default_for_spawns();
+		match self {
+			Runnable::Meta(r) => r.run(),
+			Runnable::Compat(r) => r.run()
+		};
+	}
+
+	fn priority(&self) -> Priority {
+		match self {
+			Runnable::Meta(r) => r.metadata().priority,
+			Runnable::Compat(r) => Priority::Medium
+		}
+	}
 }
 
 /// This type is public so that our test macro can generate and use it, but it should not
@@ -496,9 +546,9 @@ pub trait PlatformDispatcher: Send + Sync {
 	fn get_all_timings(&self) -> Vec<ThreadTaskTimings>;
 	fn get_current_thread_timings(&self) -> Vec<TaskTiming>;
 	fn is_main_thread(&self) -> bool;
-	fn dispatch(&self, runnable: RunnableVariant, label: Option<TaskLabel>, priority: Priority);
-	fn dispatch_on_main_thread(&self, runnable: RunnableVariant, priority: Priority);
-	fn dispatch_after(&self, duration: Duration, runnable: RunnableVariant);
+	fn dispatch(&self, runnable: Runnable, label: Option<TaskLabel>);
+	fn dispatch_on_main_thread(&self, runnable: Runnable);
+	fn dispatch_after(&self, duration: Duration, runnable: Runnable);
 	fn spawn_realtime(&self, priority: RealtimePriority, f: Box<dyn FnOnce() + Send>);
 
 	fn now(&self) -> Instant {

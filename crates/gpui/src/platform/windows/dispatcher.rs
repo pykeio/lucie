@@ -18,20 +18,20 @@ use windows::{
 };
 
 use crate::{
-	GLOBAL_THREAD_TIMINGS, HWND, PlatformDispatcher, Priority, PriorityQueueSender, RealtimePriority, RunnableVariant, SafeHwnd, THREAD_TIMINGS, TaskLabel,
+	GLOBAL_THREAD_TIMINGS, HWND, PlatformDispatcher, Priority, PriorityQueueSender, RealtimePriority, Runnable, SafeHwnd, THREAD_TIMINGS, TaskLabel,
 	TaskTiming, ThreadTaskTimings, WM_GPUI_TASK_DISPATCHED_ON_MAIN_THREAD, profiler
 };
 
 pub(crate) struct WindowsDispatcher {
 	pub(crate) wake_posted: AtomicBool,
-	main_sender: PriorityQueueSender<RunnableVariant>,
+	main_sender: PriorityQueueSender<Runnable>,
 	main_thread_id: ThreadId,
 	pub(crate) platform_window_handle: SafeHwnd,
 	validation_number: usize
 }
 
 impl WindowsDispatcher {
-	pub(crate) fn new(main_sender: PriorityQueueSender<RunnableVariant>, platform_window_handle: HWND, validation_number: usize) -> Self {
+	pub(crate) fn new(main_sender: PriorityQueueSender<Runnable>, platform_window_handle: HWND, validation_number: usize) -> Self {
 		let main_thread_id = current().id();
 		let platform_window_handle = platform_window_handle.into();
 
@@ -44,11 +44,11 @@ impl WindowsDispatcher {
 		}
 	}
 
-	fn dispatch_on_threadpool(&self, priority: WorkItemPriority, runnable: RunnableVariant) {
+	fn dispatch_on_threadpool(&self, runnable: Runnable, priority: WorkItemPriority) {
 		let handler = {
-			let mut task_wrapper = Some(runnable);
+			let mut runnable = Some(runnable);
 			WorkItemHandler::new(move |_| {
-				Self::execute_runnable(task_wrapper.take().unwrap());
+				runnable.take().expect("Takes FnMut but only runs once").run_and_profile();
 				Ok(())
 			})
 		};
@@ -56,49 +56,15 @@ impl WindowsDispatcher {
 		ThreadPool::RunWithPriorityAsync(&handler, priority).log_err();
 	}
 
-	fn dispatch_on_threadpool_after(&self, runnable: RunnableVariant, duration: Duration) {
+	fn dispatch_on_threadpool_after(&self, runnable: Runnable, duration: Duration) {
 		let handler = {
-			let mut task_wrapper = Some(runnable);
+			let mut runnable = Some(runnable);
 			TimerElapsedHandler::new(move |_| {
-				Self::execute_runnable(task_wrapper.take().unwrap());
+				runnable.take().expect("Takes FnMut but only runs once").run_and_profile();
 				Ok(())
 			})
 		};
 		ThreadPoolTimer::CreateTimer(&handler, duration.into()).log_err();
-	}
-
-	#[inline(always)]
-	pub(crate) fn execute_runnable(runnable: RunnableVariant) {
-		let start = Instant::now();
-
-		let mut timing = match runnable {
-			RunnableVariant::Meta(runnable) => {
-				let location = runnable.metadata().location;
-				let timing = TaskTiming { location, start, end: None };
-				profiler::add_task_timing(timing);
-
-				runnable.run();
-
-				timing
-			}
-			RunnableVariant::Compat(runnable) => {
-				let timing = TaskTiming {
-					location: core::panic::Location::caller(),
-					start,
-					end: None
-				};
-				profiler::add_task_timing(timing);
-
-				runnable.run();
-
-				timing
-			}
-		};
-
-		let end = Instant::now();
-		timing.end = Some(end);
-
-		profiler::add_task_timing(timing);
 	}
 }
 
@@ -126,22 +92,22 @@ impl PlatformDispatcher for WindowsDispatcher {
 		current().id() == self.main_thread_id
 	}
 
-	fn dispatch(&self, runnable: RunnableVariant, label: Option<TaskLabel>, priority: Priority) {
-		let priority = match priority {
+	fn dispatch(&self, runnable: Runnable, label: Option<TaskLabel>) {
+		let priority = match runnable.priority() {
 			Priority::Realtime(_) => unreachable!(),
 			Priority::High => WorkItemPriority::High,
 			Priority::Medium => WorkItemPriority::Normal,
 			Priority::Low => WorkItemPriority::Low
 		};
-		self.dispatch_on_threadpool(priority, runnable);
+		self.dispatch_on_threadpool(runnable, priority);
 
 		if let Some(label) = label {
 			log::debug!("TaskLabel: {label:?}");
 		}
 	}
 
-	fn dispatch_on_main_thread(&self, runnable: RunnableVariant, priority: Priority) {
-		match self.main_sender.send(priority, runnable) {
+	fn dispatch_on_main_thread(&self, runnable: Runnable) {
+		match self.main_sender.send(runnable.priority(), runnable) {
 			Ok(_) => {
 				if !self.wake_posted.swap(true, Ordering::AcqRel) {
 					unsafe {
@@ -169,7 +135,7 @@ impl PlatformDispatcher for WindowsDispatcher {
 		}
 	}
 
-	fn dispatch_after(&self, duration: Duration, runnable: RunnableVariant) {
+	fn dispatch_after(&self, duration: Duration, runnable: Runnable) {
 		self.dispatch_on_threadpool_after(runnable, duration);
 	}
 

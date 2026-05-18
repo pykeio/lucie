@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 use rand::prelude::*;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 
-use crate::{PlatformDispatcher, Priority, RunnableVariant, TaskLabel};
+use crate::{PlatformDispatcher, Priority, Runnable, TaskLabel};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TestDispatcherId(usize);
@@ -28,10 +28,10 @@ pub struct TestDispatcher {
 
 struct TestDispatcherState {
 	random: StdRng,
-	foreground: RapidHashMap<TestDispatcherId, VecDeque<RunnableVariant>>,
-	background: Vec<RunnableVariant>,
-	deprioritized_background: Vec<RunnableVariant>,
-	delayed: Vec<(Duration, RunnableVariant)>,
+	foreground: RapidHashMap<TestDispatcherId, VecDeque<Runnable>>,
+	background: Vec<Runnable>,
+	deprioritized_background: Vec<Runnable>,
+	delayed: Vec<(Duration, Runnable)>,
 	start_time: Instant,
 	time: Duration,
 	is_main_thread: bool,
@@ -172,17 +172,9 @@ impl TestDispatcher {
 		drop(state);
 
 		// todo(localcc): add timings to tests
-		match runnable {
-			RunnableVariant::Meta(runnable) => {
-				if !runnable.metadata().is_app_alive() {
-					drop(runnable);
-					self.state.lock().is_main_thread = was_main_thread;
-					return true;
-				}
-				runnable.run()
-			}
-			RunnableVariant::Compat(runnable) => runnable.run()
-		};
+		if !runnable.app_dropped() {
+			runnable.run_unprofiled();
+		}
 
 		self.state.lock().is_main_thread = was_main_thread;
 
@@ -284,7 +276,7 @@ impl PlatformDispatcher for TestDispatcher {
 		state.start_time + state.time
 	}
 
-	fn dispatch(&self, runnable: RunnableVariant, label: Option<TaskLabel>, _priority: Priority) {
+	fn dispatch(&self, runnable: Runnable, label: Option<TaskLabel>) {
 		{
 			let mut state = self.state.lock();
 			if label.is_some_and(|label| state.deprioritized_task_labels.contains(&label)) {
@@ -296,12 +288,12 @@ impl PlatformDispatcher for TestDispatcher {
 		self.unpark_all();
 	}
 
-	fn dispatch_on_main_thread(&self, runnable: RunnableVariant, _priority: Priority) {
+	fn dispatch_on_main_thread(&self, runnable: Runnable) {
 		self.state.lock().foreground.entry(self.id).or_default().push_back(runnable);
 		self.unpark_all();
 	}
 
-	fn dispatch_after(&self, duration: std::time::Duration, runnable: RunnableVariant) {
+	fn dispatch_after(&self, duration: std::time::Duration, runnable: Runnable) {
 		let mut state = self.state.lock();
 		let next_time = state.time + duration;
 		let ix = match state.delayed.binary_search_by_key(&next_time, |e| e.0) {

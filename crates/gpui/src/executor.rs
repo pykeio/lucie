@@ -1,4 +1,5 @@
 use std::{
+	cell::Cell,
 	fmt::Debug,
 	marker::PhantomData,
 	mem::{self, ManuallyDrop},
@@ -15,7 +16,6 @@ use std::{
 	time::{Duration, Instant}
 };
 
-use async_task::Runnable;
 use futures_channel::mpsc;
 use futures_lite::FutureExt as _;
 use futures_util::StreamExt as _;
@@ -24,7 +24,7 @@ use parking_lot::{Condvar, Mutex};
 use rand::rngs::StdRng;
 use waker_fn::waker_fn;
 
-use crate::{PlatformDispatcher, RunnableMeta, RunnableVariant, TaskTiming, profiler};
+use crate::{PlatformDispatcher, Runnable, RunnableMeta, TaskTiming, profiler};
 
 /// A pointer to the executor that is currently running,
 /// for spawning background tasks.
@@ -60,6 +60,10 @@ pub enum RealtimePriority {
 	Other
 }
 
+thread_local! {
+	static CURRENT_TASKS_PRIORITY: Cell<Priority> = const { Cell::new(Priority::Medium) };
+}
+
 /// Task priority
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
@@ -83,6 +87,16 @@ pub enum Priority {
 }
 
 impl Priority {
+	/// Sets the priority any spawn call from the runnable about to be run will use
+	pub(crate) fn set_as_default_for_spawns(&self) {
+		CURRENT_TASKS_PRIORITY.set(*self);
+	}
+
+	/// Returns the priority from the currently running task
+	pub fn inherit() -> Self {
+		CURRENT_TASKS_PRIORITY.get()
+	}
+
 	#[allow(dead_code)]
 	pub(crate) const fn probability(&self) -> u32 {
 		match self {
@@ -300,13 +314,17 @@ impl BackgroundExecutor {
 
 		let (runnable, task) = unsafe {
 			async_task::Builder::new()
-				.metadata(RunnableMeta { location, liveness: None })
+				.metadata(RunnableMeta {
+					location,
+					liveness: None,
+					priority: Priority::inherit()
+				})
 				.spawn_unchecked(
 					move |_| async {
 						let _notify_guard = NotifyOnDrop(pair);
 						future.await
 					},
-					move |runnable| dispatcher.dispatch(RunnableVariant::Meta(runnable), None, Priority::default())
+					move |runnable| dispatcher.dispatch(Runnable::Meta(runnable), None)
 				)
 		};
 		runnable.schedule();
@@ -328,7 +346,7 @@ impl BackgroundExecutor {
 		let dispatcher = self.dispatcher.clone();
 		let (runnable, task) = if let Priority::Realtime(realtime) = priority {
 			let location = core::panic::Location::caller();
-			let (mut tx, rx) = flume::bounded::<Runnable<RunnableMeta>>(1);
+			let (mut tx, rx) = flume::bounded::<async_task::Runnable<RunnableMeta>>(1);
 
 			dispatcher.spawn_realtime(
 				realtime,
@@ -348,17 +366,19 @@ impl BackgroundExecutor {
 				})
 			);
 
-			async_task::Builder::new().metadata(RunnableMeta { location, liveness: None }).spawn(
-				move |_| future,
-				move |runnable| {
-					let _ = tx.send(runnable);
-				}
-			)
+			async_task::Builder::new()
+				.metadata(RunnableMeta { location, liveness: None, priority })
+				.spawn(
+					move |_| future,
+					move |runnable| {
+						let _ = tx.send(runnable);
+					}
+				)
 		} else {
 			let location = core::panic::Location::caller();
 			async_task::Builder::new()
-				.metadata(RunnableMeta { location, liveness: None })
-				.spawn(move |_| future, move |runnable| dispatcher.dispatch(RunnableVariant::Meta(runnable), label, priority))
+				.metadata(RunnableMeta { location, liveness: None, priority })
+				.spawn(move |_| future, move |runnable| dispatcher.dispatch(Runnable::Meta(runnable), label))
 		};
 
 		runnable.schedule();
@@ -576,10 +596,14 @@ impl BackgroundExecutor {
 		}
 		let location = core::panic::Location::caller();
 		let (runnable, task) = async_task::Builder::new()
-			.metadata(RunnableMeta { location, liveness: None })
+			.metadata(RunnableMeta {
+				location,
+				liveness: None,
+				priority: Priority::inherit()
+			})
 			.spawn(move |_| async move {}, {
 				let dispatcher = self.dispatcher.clone();
-				move |runnable| dispatcher.dispatch_after(duration, RunnableVariant::Meta(runnable))
+				move |runnable| dispatcher.dispatch_after(duration, Runnable::Meta(runnable))
 			});
 		runnable.schedule();
 		Task(TaskState::Spawned(task))
@@ -686,7 +710,8 @@ impl ForegroundExecutor {
 		}
 	}
 
-	/// Enqueues the given Task to run on the main thread at some point in the future.
+	/// Enqueues the given Task to run on the main thread at some point in the future. The task inherits the priority of
+	/// the caller; see [`Self::spawn_with_priority`] to override.
 	#[track_caller]
 	pub fn spawn<R>(&self, future: impl Future<Output = R> + 'static) -> Task<R>
 	where
@@ -722,8 +747,12 @@ impl ForegroundExecutor {
 		) -> Task<R> {
 			let (runnable, task) = spawn_local_with_source_location(
 				future,
-				move |runnable| dispatcher.dispatch_on_main_thread(RunnableVariant::Meta(runnable), priority),
-				RunnableMeta { location, liveness: Some(liveness) }
+				move |runnable| dispatcher.dispatch_on_main_thread(Runnable::Meta(runnable)),
+				RunnableMeta {
+					location,
+					liveness: Some(liveness),
+					priority
+				}
 			);
 			runnable.schedule();
 			Task(TaskState::Spawned(task))
@@ -737,7 +766,7 @@ impl ForegroundExecutor {
 /// Copy-modified from:
 /// <https://github.com/smol-rs/async-task/blob/ca9dbe1db9c422fd765847fa91306e30a6bb58a9/src/runnable.rs#L405>
 #[track_caller]
-fn spawn_local_with_source_location<Fut, S, M>(future: Fut, schedule: S, metadata: M) -> (Runnable<M>, async_task::Task<Fut::Output, M>)
+fn spawn_local_with_source_location<Fut, S, M>(future: Fut, schedule: S, metadata: M) -> (async_task::Runnable<M>, async_task::Task<Fut::Output, M>)
 where
 	Fut: Future + 'static,
 	Fut::Output: 'static,
