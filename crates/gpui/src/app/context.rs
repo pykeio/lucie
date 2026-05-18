@@ -624,8 +624,6 @@ impl<T> Context<'_, T> {
 }
 
 impl<T> AppContext for Context<'_, T> {
-	type Result<U> = U;
-
 	#[inline]
 	fn new<U: 'static>(&mut self, build_entity: impl FnOnce(&mut Context<U>) -> U) -> Entity<U> {
 		self.app.new(build_entity)
@@ -637,7 +635,7 @@ impl<T> AppContext for Context<'_, T> {
 	}
 
 	#[inline]
-	fn insert_entity<U: 'static>(&mut self, reservation: Reservation<U>, build_entity: impl FnOnce(&mut Context<U>) -> U) -> Self::Result<Entity<U>> {
+	fn insert_entity<U: 'static>(&mut self, reservation: Reservation<U>, build_entity: impl FnOnce(&mut Context<U>) -> U) -> Entity<U> {
 		self.app.insert_entity(reservation, build_entity)
 	}
 
@@ -647,7 +645,7 @@ impl<T> AppContext for Context<'_, T> {
 	}
 
 	#[inline]
-	fn as_mut<'a, E>(&'a mut self, handle: &Entity<E>) -> Self::Result<super::GpuiBorrow<'a, E>>
+	fn as_mut<'a, E>(&'a mut self, handle: &Entity<E>) -> super::GpuiBorrow<'a, E>
 	where
 		E: 'static
 	{
@@ -655,7 +653,7 @@ impl<T> AppContext for Context<'_, T> {
 	}
 
 	#[inline]
-	fn read_entity<U, R>(&self, handle: &Entity<U>, read: impl FnOnce(&U, &App) -> R) -> Self::Result<R>
+	fn read_entity<U, R>(&self, handle: &Entity<U>, read: impl FnOnce(&U, &App) -> R) -> R
 	where
 		U: 'static
 	{
@@ -687,7 +685,7 @@ impl<T> AppContext for Context<'_, T> {
 	}
 
 	#[inline]
-	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> Self::Result<R>
+	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R
 	where
 		G: Global
 	{

@@ -15,7 +15,7 @@ use parking_lot::Mutex;
 use rand::prelude::*;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 
-use crate::{PlatformDispatcher, Priority, Runnable, TaskLabel};
+use crate::{PlatformDispatcher, Runnable, TaskLabel};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TestDispatcherId(usize);

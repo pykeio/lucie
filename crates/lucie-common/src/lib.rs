@@ -34,7 +34,7 @@ pub use self::{
 	bounds_tree::BoundsTree,
 	defer::{Deferred, defer},
 	ref_scope::RefScope,
-	result_ext::{Flatten, LogLevel, ResultExt},
+	result_ext::{LogLevel, ResultExt},
 	shared_string::SharedString,
 	shared_uri::SharedUri
 };

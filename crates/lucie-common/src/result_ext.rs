@@ -2,27 +2,6 @@ use std::{fmt, panic::Location};
 
 pub use tracing::Level as LogLevel;
 
-/// `Result::flatten` for Rust 1.88.
-pub trait Flatten<T, E> {
-	/// Converts from `Result<Result<T, E2>, E>` to `Result<T, E>`.
-	fn flatten(self) -> Result<T, E>;
-}
-
-impl<T, E, E2> Flatten<T, E> for Result<Result<T, E>, E2>
-where
-	E: From<E2>
-{
-	fn flatten(self) -> Result<T, E> {
-		self?
-	}
-}
-
-impl<T, E> Flatten<T, E> for Result<T, E> {
-	fn flatten(self) -> Result<T, E> {
-		self
-	}
-}
-
 pub trait ResultExt<E> {
 	type Ok;
 

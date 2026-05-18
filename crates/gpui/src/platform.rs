@@ -534,7 +534,7 @@ impl Runnable {
 	fn priority(&self) -> Priority {
 		match self {
 			Runnable::Meta(r) => r.metadata().priority,
-			Runnable::Compat(r) => Priority::Medium
+			Runnable::Compat(_) => Priority::Medium
 		}
 	}
 }

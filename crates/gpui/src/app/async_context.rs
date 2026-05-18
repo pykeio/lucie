@@ -1,6 +1,9 @@
-use std::{future::Future, rc::Weak};
+use std::{
+	future::Future,
+	rc::{Rc, Weak}
+};
 
-use anyhow::{Context as _, anyhow};
+use anyhow::Context as _;
 use derive_more::{Deref, DerefMut};
 use futures_channel::oneshot;
 
@@ -12,8 +15,10 @@ use crate::{
 
 /// An async-friendly version of [App] with a static lifetime so it can be held across `await` points in async code.
 /// You're provided with an instance when calling [App::spawn], and you can also create one with [App::to_async].
-/// Internally, this holds a weak reference to an `App`, so its methods are fallible to protect against cases where the
-/// [App] is dropped.
+///
+/// Internally, this holds a weak reference to an `App`. Its methods theoretically panic if the app has been dropped,
+/// but this shouldn't happen in practice when using `cx.spawn()` as the executor ensures the app is alive before
+/// running each task.
 #[derive(Clone)]
 pub struct AsyncApp {
 	pub(crate) app: Weak<AppCell>,
@@ -21,47 +26,51 @@ pub struct AsyncApp {
 	pub(crate) foreground_executor: ForegroundExecutor
 }
 
+impl AsyncApp {
+	fn app(&self) -> Rc<AppCell> {
+		self.app.upgrade().expect("app was released before async operation completed")
+	}
+}
+
 impl AppContext for AsyncApp {
-	type Result<T> = Result<T>;
-
-	fn new<T: 'static>(&mut self, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Self::Result<Entity<T>> {
-		let app = self.app.upgrade().context("app was released")?;
+	fn new<T: 'static>(&mut self, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Entity<T> {
+		let app = self.app();
 		let mut app = app.borrow_mut();
-		Ok(app.new(build_entity))
+		app.new(build_entity)
 	}
 
-	fn reserve_entity<T: 'static>(&mut self) -> Result<Reservation<T>> {
-		let app = self.app.upgrade().context("app was released")?;
+	fn reserve_entity<T: 'static>(&mut self) -> Reservation<T> {
+		let app = self.app();
 		let mut app = app.borrow_mut();
-		Ok(app.reserve_entity())
+		app.reserve_entity()
 	}
 
-	fn insert_entity<T: 'static>(&mut self, reservation: Reservation<T>, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Result<Entity<T>> {
-		let app = self.app.upgrade().context("app was released")?;
+	fn insert_entity<T: 'static>(&mut self, reservation: Reservation<T>, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Entity<T> {
+		let app = self.app();
 		let mut app = app.borrow_mut();
-		Ok(app.insert_entity(reservation, build_entity))
+		app.insert_entity(reservation, build_entity)
 	}
 
-	fn update_entity<T: 'static, R>(&mut self, handle: &Entity<T>, update: impl FnOnce(&mut T, &mut Context<T>) -> R) -> Self::Result<R> {
-		let app = self.app.upgrade().context("app was released")?;
+	fn update_entity<T: 'static, R>(&mut self, handle: &Entity<T>, update: impl FnOnce(&mut T, &mut Context<T>) -> R) -> R {
+		let app = self.app();
 		let mut app = app.borrow_mut();
-		Ok(app.update_entity(handle, update))
+		app.update_entity(handle, update)
 	}
 
-	fn as_mut<'a, T>(&'a mut self, _handle: &Entity<T>) -> Self::Result<super::GpuiBorrow<'a, T>>
+	fn as_mut<'a, T>(&'a mut self, _handle: &Entity<T>) -> super::GpuiBorrow<'a, T>
 	where
 		T: 'static
 	{
-		Err(anyhow!("Cannot as_mut with an async context. Try calling update() first"))
+		panic!("Cannot as_mut with an async context. Try calling update() first")
 	}
 
-	fn read_entity<T, R>(&self, handle: &Entity<T>, callback: impl FnOnce(&T, &App) -> R) -> Self::Result<R>
+	fn read_entity<T, R>(&self, handle: &Entity<T>, callback: impl FnOnce(&T, &App) -> R) -> R
 	where
 		T: 'static
 	{
-		let app = self.app.upgrade().context("app was released")?;
+		let app = self.app();
 		let lock = app.borrow();
-		Ok(lock.read_entity(handle, callback))
+		lock.read_entity(handle, callback)
 	}
 
 	fn update_window<T, F>(&mut self, window: AnyWindowHandle, f: F) -> Result<T>
@@ -89,23 +98,22 @@ impl AppContext for AsyncApp {
 		self.background_executor.spawn(future)
 	}
 
-	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> Self::Result<R>
+	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R
 	where
 		G: Global
 	{
-		let app = self.app.upgrade().context("app was released")?;
+		let app = self.app();
 		let mut lock = app.borrow_mut();
-		Ok(lock.update(|this| this.read_global(callback)))
+		lock.update(|this| this.read_global(callback))
 	}
 }
 
 impl AsyncApp {
 	/// Schedules all windows in the application to be redrawn.
-	pub fn refresh(&self) -> Result<()> {
-		let app = self.app.upgrade().context("app was released")?;
+	pub fn refresh(&self) {
+		let app = self.app();
 		let mut lock = app.borrow_mut();
 		lock.refresh_windows();
-		Ok(())
 	}
 
 	/// Get an executor which can be used to spawn futures in the background.
@@ -119,23 +127,23 @@ impl AsyncApp {
 	}
 
 	/// Invoke the given function in the context of the app, then flush any effects produced during its invocation.
-	pub fn update<R>(&self, f: impl FnOnce(&mut App) -> R) -> Result<R> {
-		let app = self.app.upgrade().context("app was released")?;
+	pub fn update<R>(&self, f: impl FnOnce(&mut App) -> R) -> R {
+		let app = self.app();
 		let mut lock = app.borrow_mut();
-		Ok(lock.update(f))
+		lock.update(f)
 	}
 
 	/// Arrange for the given callback to be invoked whenever the given entity emits an event of a given type.
 	/// The callback is provided a handle to the emitting entity and a reference to the emitted event.
-	pub fn subscribe<T, Event>(&mut self, entity: &Entity<T>, mut on_event: impl FnMut(Entity<T>, &Event, &mut App) + 'static) -> Result<Subscription>
+	pub fn subscribe<T, Event>(&mut self, entity: &Entity<T>, mut on_event: impl FnMut(Entity<T>, &Event, &mut App) + 'static) -> Subscription
 	where
 		T: 'static + EventEmitter<Event>,
 		Event: 'static
 	{
-		let app = self.app.upgrade().context("app was released")?;
+		let app = self.app();
 		let mut lock = app.borrow_mut();
 		let subscription = lock.subscribe(entity, on_event);
-		Ok(subscription)
+		subscription
 	}
 
 	/// Open a window with the given options based on the root view returned by the given function.
@@ -143,7 +151,7 @@ impl AsyncApp {
 	where
 		V: 'static + Render
 	{
-		let app = self.app.upgrade().context("app was released")?;
+		let app = self.app();
 		let mut lock = app.borrow_mut();
 		lock.open_window(options, build_root_view)
 	}
@@ -161,20 +169,20 @@ impl AsyncApp {
 
 	/// Determine whether global state of the specified type has been assigned.
 	/// Returns an error if the `App` has been dropped.
-	pub fn has_global<G: Global>(&self) -> Result<bool> {
-		let app = self.app.upgrade().context("app was released")?;
+	pub fn has_global<G: Global>(&self) -> bool {
+		let app = self.app();
 		let app = app.borrow_mut();
-		Ok(app.has_global::<G>())
+		app.has_global::<G>()
 	}
 
 	/// Reads the global state of the specified type, passing it to the given callback.
 	///
 	/// Panics if no global state of the specified type has been assigned.
 	/// Returns an error if the `App` has been dropped.
-	pub fn read_global<G: Global, R>(&self, read: impl FnOnce(&G, &App) -> R) -> Result<R> {
-		let app = self.app.upgrade().context("app was released")?;
+	pub fn read_global<G: Global, R>(&self, read: impl FnOnce(&G, &App) -> R) -> R {
+		let app = self.app();
 		let app = app.borrow_mut();
-		Ok(read(app.global(), &app))
+		read(app.global(), &app)
 	}
 
 	/// Reads the global state of the specified type, passing it to the given callback.
@@ -184,31 +192,28 @@ impl AsyncApp {
 	///
 	/// Returns an error if no state of the specified type has been assigned the `App` has been dropped.
 	pub fn try_read_global<G: Global, R>(&self, read: impl FnOnce(&G, &App) -> R) -> Option<R> {
-		let app = self.app.upgrade()?;
+		let app = self.app();
 		let app = app.borrow_mut();
 		Some(read(app.try_global()?, &app))
 	}
 
 	/// Reads the global state of the specified type, passing it to the given callback.
 	/// A default value is assigned if a global of this type has not yet been assigned.
-	///
-	/// # Errors
-	/// If the app has ben dropped this returns an error.
-	pub fn try_read_default_global<G: Global + Default, R>(&self, read: impl FnOnce(&G, &App) -> R) -> Result<R> {
-		let app = self.app.upgrade().context("app was released")?;
+	pub fn try_read_default_global<G: Global + Default, R>(&self, read: impl FnOnce(&G, &App) -> R) -> R {
+		let app = self.app();
 		let mut app = app.borrow_mut();
 		app.update(|cx| {
 			cx.default_global::<G>();
 		});
-		Ok(read(app.try_global().context("app was released")?, &app))
+		read(app.global(), &app)
 	}
 
 	/// A convenience method for [`App::update_global`](BorrowAppContext::update_global)
 	/// for updating the global state of the specified type.
-	pub fn update_global<G: Global, R>(&self, update: impl FnOnce(&mut G, &mut App) -> R) -> Result<R> {
-		let app = self.app.upgrade().context("app was released")?;
+	pub fn update_global<G: Global, R>(&self, update: impl FnOnce(&mut G, &mut App) -> R) -> R {
+		let app = self.app();
 		let mut app = app.borrow_mut();
-		Ok(app.update(|cx| cx.update_global(update)))
+		app.update(|cx| cx.update_global(update))
 	}
 
 	/// Run something using this entity and cx, when the returned struct is dropped
@@ -301,36 +306,33 @@ impl AsyncWindowContext {
 }
 
 impl AppContext for AsyncWindowContext {
-	type Result<T> = Result<T>;
-
-	fn new<T>(&mut self, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Result<Entity<T>>
+	fn new<T>(&mut self, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Entity<T>
 	where
 		T: 'static
 	{
-		self.app.update_window(self.window, |_, _, cx| cx.new(build_entity))
+		self.app.new(build_entity)
 	}
 
-	fn reserve_entity<T: 'static>(&mut self) -> Result<Reservation<T>> {
-		self.app.update_window(self.window, |_, _, cx| cx.reserve_entity())
+	fn reserve_entity<T: 'static>(&mut self) -> Reservation<T> {
+		self.app.reserve_entity()
 	}
 
-	fn insert_entity<T: 'static>(&mut self, reservation: Reservation<T>, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Self::Result<Entity<T>> {
-		self.app
-			.update_window(self.window, |_, _, cx| cx.insert_entity(reservation, build_entity))
+	fn insert_entity<T: 'static>(&mut self, reservation: Reservation<T>, build_entity: impl FnOnce(&mut Context<T>) -> T) -> Entity<T> {
+		self.app.insert_entity(reservation, build_entity)
 	}
 
-	fn update_entity<T: 'static, R>(&mut self, handle: &Entity<T>, update: impl FnOnce(&mut T, &mut Context<T>) -> R) -> Result<R> {
-		self.app.update_window(self.window, |_, _, cx| cx.update_entity(handle, update))
+	fn update_entity<T: 'static, R>(&mut self, handle: &Entity<T>, update: impl FnOnce(&mut T, &mut Context<T>) -> R) -> R {
+		self.app.update_entity(handle, update)
 	}
 
-	fn as_mut<'a, T>(&'a mut self, _: &Entity<T>) -> Self::Result<super::GpuiBorrow<'a, T>>
+	fn as_mut<'a, T>(&'a mut self, _: &Entity<T>) -> super::GpuiBorrow<'a, T>
 	where
 		T: 'static
 	{
-		Err(anyhow!("Cannot use as_mut() from an async context, call `update`"))
+		panic!("Cannot use as_mut() from an async context, call `update`")
 	}
 
-	fn read_entity<T, R>(&self, handle: &Entity<T>, read: impl FnOnce(&T, &App) -> R) -> Self::Result<R>
+	fn read_entity<T, R>(&self, handle: &Entity<T>, read: impl FnOnce(&T, &App) -> R) -> R
 	where
 		T: 'static
 	{
@@ -358,7 +360,7 @@ impl AppContext for AsyncWindowContext {
 		self.app.background_executor.spawn(future)
 	}
 
-	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> Result<R>
+	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R
 	where
 		G: Global
 	{
@@ -367,6 +369,8 @@ impl AppContext for AsyncWindowContext {
 }
 
 impl VisualContext for AsyncWindowContext {
+	type Result<T> = Result<T>;
+
 	fn window_handle(&self) -> AnyWindowHandle {
 		self.window
 	}

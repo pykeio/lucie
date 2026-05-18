@@ -1,4 +1,4 @@
-use lucie_common::{ResultExt as _, SharedString};
+use lucie_common::SharedString;
 
 use crate::{Action, App, Platform};
 
@@ -237,19 +237,28 @@ pub(crate) fn init_app_menus(platform: &dyn Platform, cx: &App) {
 	platform.on_will_open_app_menu(Box::new({
 		let cx = cx.to_async();
 		move || {
-			cx.update(|cx| cx.clear_pending_keystrokes()).ok();
+			if let Some(app) = cx.app.upgrade() {
+				app.borrow_mut().update(|cx| cx.clear_pending_keystrokes());
+			}
 		}
 	}));
 
 	platform.on_validate_app_menu_command(Box::new({
 		let cx = cx.to_async();
-		move |action| cx.update(|cx| cx.is_action_available(action)).unwrap_or(false)
+		move |action| {
+			cx.app
+				.upgrade()
+				.map(|app| app.borrow_mut().update(|cx| cx.is_action_available(action)))
+				.unwrap_or(false)
+		}
 	}));
 
 	platform.on_app_menu_action(Box::new({
 		let cx = cx.to_async();
 		move |action| {
-			cx.update(|cx| cx.dispatch_action(action)).log_err();
+			if let Some(app) = cx.app.upgrade() {
+				app.borrow_mut().update(|cx| cx.dispatch_action(action));
+			}
 		}
 	}));
 }

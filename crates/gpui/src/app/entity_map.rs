@@ -16,7 +16,7 @@ use std::{
 
 use anyhow::{Context as _, Result};
 use derive_more::{Deref, DerefMut};
-use lucie_common::{Flatten, atomic_incr_if_not_zero};
+use lucie_common::atomic_incr_if_not_zero;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
 #[cfg(any(test, feature = "leak-detection"))]
 use rapidhash::fast::RapidHashMap;
@@ -398,24 +398,24 @@ impl<T: 'static> Entity<T> {
 
 	/// Read the entity referenced by this handle with the given function.
 	#[inline]
-	pub fn read_with<R, C: AppContext>(&self, cx: &C, f: impl FnOnce(&T, &App) -> R) -> C::Result<R> {
+	pub fn read_with<R, C: AppContext>(&self, cx: &C, f: impl FnOnce(&T, &App) -> R) -> R {
 		cx.read_entity(self, f)
 	}
 
 	/// Updates the entity referenced by this handle with the given function.
 	#[inline]
-	pub fn update<R, C: AppContext>(&self, cx: &mut C, update: impl FnOnce(&mut T, &mut Context<T>) -> R) -> C::Result<R> {
+	pub fn update<R, C: AppContext>(&self, cx: &mut C, update: impl FnOnce(&mut T, &mut Context<T>) -> R) -> R {
 		cx.update_entity(self, update)
 	}
 
 	/// Updates the entity referenced by this handle with the given function.
 	#[inline]
-	pub fn as_mut<'a, C: AppContext>(&self, cx: &'a mut C) -> C::Result<GpuiBorrow<'a, T>> {
+	pub fn as_mut<'a, C: AppContext>(&self, cx: &'a mut C) -> GpuiBorrow<'a, T> {
 		cx.as_mut(self)
 	}
 
 	/// Updates the entity referenced by this handle with the given function.
-	pub fn write<C: AppContext>(&self, cx: &mut C, value: T) -> C::Result<()> {
+	pub fn write<C: AppContext>(&self, cx: &mut C, value: T) {
 		self.update(cx, |entity, cx| {
 			*entity = value;
 			cx.notify();
@@ -697,10 +697,10 @@ impl<T: 'static> WeakEntity<T> {
 	/// been released.
 	pub fn update<C, R>(&self, cx: &mut C, update: impl FnOnce(&mut T, &mut Context<T>) -> R) -> Result<R>
 	where
-		C: AppContext,
-		Result<C::Result<R>>: Flatten<R, anyhow::Error>
+		C: AppContext
 	{
-		Flatten::flatten(self.upgrade().context("entity released").map(|this| cx.update_entity(&this, update)))
+		let entity = self.upgrade().context("entity released")?;
+		Ok(cx.update_entity(&entity, update))
 	}
 
 	/// Updates the entity referenced by this handle with the given function if
@@ -708,13 +708,11 @@ impl<T: 'static> WeakEntity<T> {
 	/// Returns an error if the entity has been released.
 	pub fn update_in<C, R>(&self, cx: &mut C, update: impl FnOnce(&mut T, &mut Window, &mut Context<T>) -> R) -> Result<R>
 	where
-		C: VisualContext,
-		Result<C::Result<R>>: Flatten<R, anyhow::Error>
+		C: VisualContext
 	{
 		let window = cx.window_handle();
-		let this = self.upgrade().context("entity released")?;
-
-		Flatten::flatten(window.update(cx, |_, window, cx| this.update(cx, |entity, cx| update(entity, window, cx))))
+		let entity = self.upgrade().context("entity released")?;
+		window.update(cx, |_, window, cx| entity.update(cx, |entity, cx| update(entity, window, cx)))
 	}
 
 	/// Reads the entity referenced by this handle with the given function if
@@ -722,10 +720,10 @@ impl<T: 'static> WeakEntity<T> {
 	/// been released.
 	pub fn read_with<C, R>(&self, cx: &C, read: impl FnOnce(&T, &App) -> R) -> Result<R>
 	where
-		C: AppContext,
-		Result<C::Result<R>>: Flatten<R, anyhow::Error>
+		C: AppContext
 	{
-		Flatten::flatten(self.upgrade().context("entity released").map(|this| cx.read_entity(&this, read)))
+		let entity = self.upgrade().context("entity released")?;
+		Ok(cx.read_entity(&entity, read))
 	}
 
 	/// Create a new weak entity that can never be upgraded.

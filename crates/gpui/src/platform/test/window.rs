@@ -3,13 +3,13 @@ use std::{
 	sync::{self, Arc}
 };
 
-use lucie_common::geometry::{Bounds, DevicePixels, Pixels, Point, Size};
+use lucie_common::geometry::{Bounds, Pixels, Point, Size};
 use parking_lot::Mutex;
 use rapidhash::fast::RapidHashMap;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 use crate::{
-	AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTextureKind, AtlasTile, AtlasTileData, AtlasTileWithMetadata, DispatchEventResult, GpuSpecs, PlatformAtlas,
+	AnyWindowHandle, AtlasKey, AtlasTextureId, AtlasTextureKind, AtlasTileData, AtlasTileWithMetadata, DispatchEventResult, GpuSpecs, PlatformAtlas,
 	PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, PromptButton, RequestFrameOptions, TestPlatform, TileId, WindowAppearance,
 	WindowBackgroundAppearance, WindowBounds, WindowControlArea, WindowParams
 };
