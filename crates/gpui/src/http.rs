@@ -1,6 +1,6 @@
 //! Types for HTTP requests, used for remote images
 
-#[cfg(feature = "test-support")]
+#[cfg(any(test, feature = "test-support"))]
 use std::{any::type_name, fmt};
 use std::{
 	io::{Cursor, Read},
@@ -222,7 +222,7 @@ pub trait HttpClient: 'static + Send + Sync {
 	}
 
 	/// Internal use
-	#[cfg(feature = "test-support")]
+	#[cfg(any(test, feature = "test-support"))]
 	#[allow(private_interfaces)]
 	fn as_fake(&self) -> &FakeHttpClient {
 		panic!("called as_fake on {}", type_name::<Self>())
@@ -264,7 +264,7 @@ impl HttpClient for HttpClientWithProxy {
 		self.proxy.as_ref()
 	}
 
-	#[cfg(feature = "test-support")]
+	#[cfg(any(test, feature = "test-support"))]
 	#[allow(private_interfaces)]
 	fn as_fake(&self) -> &FakeHttpClient {
 		self.client.as_fake()
@@ -330,7 +330,7 @@ impl HttpClient for HttpClientWithUrl {
 		self.client.proxy.as_ref()
 	}
 
-	#[cfg(feature = "test-support")]
+	#[cfg(any(test, feature = "test-support"))]
 	#[allow(private_interfaces)]
 	fn as_fake(&self) -> &FakeHttpClient {
 		self.client.as_fake()
@@ -366,23 +366,23 @@ impl HttpClient for BlockedHttpClient {
 		None
 	}
 
-	#[cfg(feature = "test-support")]
+	#[cfg(any(test, feature = "test-support"))]
 	#[allow(private_interfaces)]
 	fn as_fake(&self) -> &FakeHttpClient {
 		panic!("called as_fake on {}", type_name::<Self>())
 	}
 }
 
-#[cfg(feature = "test-support")]
+#[cfg(any(test, feature = "test-support"))]
 type FakeHttpHandler = Arc<dyn Fn(Request<AsyncBody>) -> BoxFuture<'static, anyhow::Result<Response<AsyncBody>>> + Send + Sync + 'static>;
 
-#[cfg(feature = "test-support")]
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) struct FakeHttpClient {
 	handler: Mutex<Option<FakeHttpHandler>>,
 	user_agent: HeaderValue
 }
 
-#[cfg(feature = "test-support")]
+#[cfg(any(test, feature = "test-support"))]
 impl FakeHttpClient {
 	pub(crate) fn create<Fut, F>(handler: F) -> Arc<HttpClientWithUrl>
 	where
@@ -407,14 +407,14 @@ impl FakeHttpClient {
 	}
 }
 
-#[cfg(feature = "test-support")]
+#[cfg(any(test, feature = "test-support"))]
 impl fmt::Debug for FakeHttpClient {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("FakeHttpClient").finish()
 	}
 }
 
-#[cfg(feature = "test-support")]
+#[cfg(any(test, feature = "test-support"))]
 impl HttpClient for FakeHttpClient {
 	fn send(&self, req: Request<AsyncBody>) -> BoxFuture<'static, anyhow::Result<Response<AsyncBody>>> {
 		((self.handler.lock().as_ref().unwrap())(req)) as _
