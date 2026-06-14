@@ -12,7 +12,7 @@ use anyhow::anyhow;
 use bytes::{BufMut, Bytes, BytesMut};
 use futures_io::AsyncRead;
 use futures_util::{FutureExt as _, Stream, TryStreamExt as _, future::BoxFuture};
-use gpui::http::{AsyncBody, AsyncBodyInner, HttpClient, Response, Uri, http};
+use lucie::http::{AsyncBody, AsyncBodyInner, HttpClient, Response, Uri, http};
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue};
 
@@ -243,7 +243,7 @@ impl HttpClient for ReqwestClient {
 
 #[cfg(test)]
 mod tests {
-	use gpui::http::{HttpClient, Uri};
+	use lucie::http::{HttpClient, Uri};
 
 	use crate::ReqwestClient;
 

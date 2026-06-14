@@ -16,5 +16,5 @@ doctest = false
 lucie-common.workspace = true
 
 anyhow.workspace = true
-gpui.workspace = true
+lucie.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }

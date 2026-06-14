@@ -17,7 +17,7 @@ pub fn derive_action(input: TokenStream) -> TokenStream {
 	derive_action::derive_action(input)
 }
 
-/// This can be used to register an action with the GPUI runtime when you want to manually implement
+/// This can be used to register an action with the Lucie runtime when you want to manually implement
 /// the `Action` trait. Typically you should use the `Action` derive macro or `actions!` macro
 /// instead.
 #[proc_macro]
@@ -44,11 +44,11 @@ pub fn derive_render(input: TokenStream) -> TokenStream {
 /// Failure to add the attribute causes a compile error:
 ///
 /// ```compile_fail
-/// # #[macro_use] extern crate gpui_macros;
-/// # #[macro_use] extern crate gpui;
+/// # #[macro_use] extern crate lucie_macros;
+/// # #[macro_use] extern crate lucie;
 /// #[derive(AppContext)]
 /// struct MyContext<'a> {
-///     app: &'a mut gpui::App
+///     app: &'a mut lucie::App
 /// }
 /// ```
 #[proc_macro_derive(AppContext, attributes(app))]
@@ -64,24 +64,24 @@ pub fn derive_app_context(input: TokenStream) -> TokenStream {
 /// Failure to add both attributes causes a compile error:
 ///
 /// ```compile_fail
-/// # #[macro_use] extern crate gpui_macros;
-/// # #[macro_use] extern crate gpui;
+/// # #[macro_use] extern crate lucie_macros;
+/// # #[macro_use] extern crate lucie;
 /// #[derive(VisualContext)]
 /// struct MyContext<'a, 'b> {
 ///     #[app]
-///     app: &'a mut gpui::App,
-///     window: &'b mut gpui::Window
+///     app: &'a mut lucie::App,
+///     window: &'b mut lucie::Window
 /// }
 /// ```
 ///
 /// ```compile_fail
-/// # #[macro_use] extern crate gpui_macros;
-/// # #[macro_use] extern crate gpui;
+/// # #[macro_use] extern crate lucie_macros;
+/// # #[macro_use] extern crate lucie;
 /// #[derive(VisualContext)]
 /// struct MyContext<'a, 'b> {
-///     app: &'a mut gpui::App,
+///     app: &'a mut lucie::App,
 ///     #[window]
-///     window: &'b mut gpui::Window
+///     window: &'b mut lucie::Window
 /// }
 /// ```
 #[proc_macro_derive(VisualContext, attributes(window, app))]
@@ -149,7 +149,7 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 	styles::box_shadow_style_methods(input)
 }
 
-/// `#[gpui::test]` can be used to annotate test functions that run with GPUI support.
+/// `#[lucie::test]` can be used to annotate test functions that run with Lucie support.
 ///
 /// It supports both synchronous and asynchronous tests, and can provide you with
 /// as many `TestAppContext` instances as you need.
@@ -157,7 +157,7 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 /// test harness (`cargo test` or `cargo-nextest`).
 ///
 /// ```
-/// #[gpui::test]
+/// #[lucie::test]
 /// async fn test_foo(mut cx: &TestAppContext) {}
 /// ```
 ///
@@ -169,19 +169,19 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 ///
 /// # Arguments
 ///
-/// - `#[gpui::test]` with no arguments runs once with the seed `0` or `SEED` env var if set.
-/// - `#[gpui::test(seed = 10)]` runs once with the seed `10`.
-/// - `#[gpui::test(seeds(10, 20, 30))]` runs three times with seeds `10`, `20`, and `30`.
-/// - `#[gpui::test(iterations = 5)]` runs five times, providing as seed the values in the range `0..5`.
-/// - `#[gpui::test(retries = 3)]` runs up to four times if it fails to try and make it pass.
-/// - `#[gpui::test(on_failure = "crate::test::report_failure")]` will call the specified function after the tests fail
+/// - `#[lucie::test]` with no arguments runs once with the seed `0` or `SEED` env var if set.
+/// - `#[lucie::test(seed = 10)]` runs once with the seed `10`.
+/// - `#[lucie::test(seeds(10, 20, 30))]` runs three times with seeds `10`, `20`, and `30`.
+/// - `#[lucie::test(iterations = 5)]` runs five times, providing as seed the values in the range `0..5`.
+/// - `#[lucie::test(retries = 3)]` runs up to four times if it fails to try and make it pass.
+/// - `#[lucie::test(on_failure = "crate::test::report_failure")]` will call the specified function after the tests fail
 ///   so that you can write out more detail about the failure.
 ///
 /// You can combine `iterations = ...` with `seeds(...)`:
-/// - `#[gpui::test(iterations = 5, seed = 10)]` is equivalent to `#[gpui::test(seeds(0, 1, 2, 3, 4, 10))]`.
-/// - `#[gpui::test(iterations = 5, seeds(10, 20, 30)]` is equivalent to `#[gpui::test(seeds(0, 1, 2, 3, 4, 10, 20,
+/// - `#[lucie::test(iterations = 5, seed = 10)]` is equivalent to `#[lucie::test(seeds(0, 1, 2, 3, 4, 10))]`.
+/// - `#[lucie::test(iterations = 5, seeds(10, 20, 30)]` is equivalent to `#[lucie::test(seeds(0, 1, 2, 3, 4, 10, 20,
 ///   30))]`.
-/// - `#[gpui::test(seeds(10, 20, 30), iterations = 5]` is equivalent to `#[gpui::test(seeds(0, 1, 2, 3, 4, 10, 20,
+/// - `#[lucie::test(seeds(10, 20, 30), iterations = 5]` is equivalent to `#[lucie::test(seeds(0, 1, 2, 3, 4, 10, 20,
 ///   30))]`.
 ///
 /// # Environment Variables

@@ -5,13 +5,13 @@ extend-exclude = [
     ".git/",
 
     # Windows likes its abbreviations.
-    "crates/gpui/src/platform/windows/directx_renderer.rs",
-    "crates/gpui/src/platform/windows/events.rs",
-    "crates/gpui/src/platform/windows/direct_write.rs",
-    "crates/gpui/src/platform/windows/window.rs",
+    "crates/lucie/src/platform/windows/directx_renderer.rs",
+    "crates/lucie/src/platform/windows/events.rs",
+    "crates/lucie/src/platform/windows/direct_write.rs",
+    "crates/lucie/src/platform/windows/window.rs",
 
     # macOS APIs
-    "crates/gpui/src/platform/mac/dispatcher.rs",
+    "crates/lucie/src/platform/mac/dispatcher.rs",
 ]
 
 [default]

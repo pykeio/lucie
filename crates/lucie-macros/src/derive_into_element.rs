@@ -8,14 +8,14 @@ pub fn derive_into_element(input: TokenStream) -> TokenStream {
 	let (impl_generics, type_generics, where_clause) = ast.generics.split_for_impl();
 
 	let r#gen = quote! {
-		impl #impl_generics gpui::IntoElement for #type_name #type_generics
+		impl #impl_generics lucie::IntoElement for #type_name #type_generics
 		#where_clause
 		{
-			type Element = gpui::Component<Self>;
+			type Element = lucie::Component<Self>;
 
 			#[track_caller]
 			fn into_element(self) -> Self::Element {
-				gpui::Component::new(self)
+				lucie::Component::new(self)
 			}
 		}
 	};

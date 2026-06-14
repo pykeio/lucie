@@ -124,7 +124,7 @@ fn generate_test_function(
 							continue;
 						}
 						Some("BackgroundExecutor") => {
-							inner_fn_args.extend(quote!(gpui::BackgroundExecutor::new(std::sync::Arc::new(dispatcher.clone()),),));
+							inner_fn_args.extend(quote!(lucie::BackgroundExecutor::new(std::sync::Arc::new(dispatcher.clone()),),));
 							continue;
 						}
 						_ => {}
@@ -136,7 +136,7 @@ fn generate_test_function(
 					if let Some("TestAppContext") = last_segment.map(|s| s.ident.to_string()).as_deref() {
 						let cx_varname = format_ident!("cx_{}", ix);
 						cx_vars.extend(quote!(
-							let mut #cx_varname = gpui::TestAppContext::build(
+							let mut #cx_varname = lucie::TestAppContext::build(
 								dispatcher.clone(),
 								Some(stringify!(#outer_fn_name)),
 							);
@@ -161,12 +161,12 @@ fn generate_test_function(
 			fn #outer_fn_name() {
 				#inner_fn
 
-				gpui::run_test(
+				lucie::run_test(
 					#num_iterations,
 					&[#seeds],
 					#max_retries,
 					&mut |dispatcher, _seed| {
-						let executor = gpui::BackgroundExecutor::new(std::sync::Arc::new(dispatcher.clone()));
+						let executor = lucie::BackgroundExecutor::new(std::sync::Arc::new(dispatcher.clone()));
 						#cx_vars
 						executor.block_test(#inner_fn_name(#inner_fn_args));
 						#cx_teardowns
@@ -199,7 +199,7 @@ fn generate_test_function(
 							let cx_varname = format_ident!("cx_{}", ix);
 							let cx_varname_lock = format_ident!("cx_{}_lock", ix);
 							cx_vars.extend(quote!(
-								let mut #cx_varname = gpui::TestAppContext::build(
+								let mut #cx_varname = lucie::TestAppContext::build(
 								   dispatcher.clone(),
 								   Some(stringify!(#outer_fn_name))
 								);
@@ -217,7 +217,7 @@ fn generate_test_function(
 						Some("TestAppContext") => {
 							let cx_varname = format_ident!("cx_{}", ix);
 							cx_vars.extend(quote!(
-								let mut #cx_varname = gpui::TestAppContext::build(
+								let mut #cx_varname = lucie::TestAppContext::build(
 									dispatcher.clone(),
 									Some(stringify!(#outer_fn_name))
 								);
@@ -244,7 +244,7 @@ fn generate_test_function(
 			fn #outer_fn_name() {
 				#inner_fn
 
-				gpui::run_test(
+				lucie::run_test(
 					#num_iterations,
 					&[#seeds],
 					#max_retries,

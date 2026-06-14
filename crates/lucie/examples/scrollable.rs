@@ -1,0 +1,51 @@
+use lucie::{App, Application, Context, Window, WindowBounds, WindowOptions, div, prelude::*, px, size};
+
+struct Scrollable {}
+
+impl Render for Scrollable {
+	fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+		div()
+			.size_full()
+			.id("vertical")
+			.p_4()
+			.overflow_scroll()
+			.bg(lucie::white())
+			.child("Example for test 2 way scroll in nested layout")
+			.child(
+				div()
+					.h(px(5000.))
+					.border_1()
+					.border_color(lucie::blue())
+					.bg(lucie::blue().opacity(0.05))
+					.p_4()
+					.child(
+						div().mb_5().w_full().id("horizontal").overflow_scroll().child(
+							div()
+								.w(px(2000.))
+								.h(px(150.))
+								.bg(lucie::green().opacity(0.1))
+								.hover(|this| this.bg(lucie::green().opacity(0.2)))
+								.border_1()
+								.border_color(lucie::green())
+								.p_4()
+								.child("Scroll Horizontal")
+						)
+					)
+					.child("Scroll Vertical")
+			)
+	}
+}
+
+fn main() {
+	Application::new().run(|cx: &mut App| {
+		cx.open_window(
+			WindowOptions {
+				window_bounds: Some(WindowBounds::centered(size(px(500.), px(500.0)), cx)),
+				..Default::default()
+			},
+			|_, cx| cx.new(|_| Scrollable {})
+		)
+		.unwrap();
+		cx.activate(true);
+	});
+}

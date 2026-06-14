@@ -20,7 +20,7 @@ anyhow.workspace = true
 bytes.workspace = true
 futures-io.workspace = true
 futures-util.workspace = true
-gpui = { workspace = true, default-features = false }
+lucie = { workspace = true, default-features = false }
 serde.workspace = true
 log.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
@@ -28,4 +28,4 @@ regex.workspace = true
 reqwest.workspace = true
 
 [dev-dependencies]
-gpui.workspace = true
+lucie.workspace = true

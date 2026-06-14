@@ -111,7 +111,7 @@ pub(crate) fn derive_action(input: TokenStream) -> TokenStream {
 		quote! { Ok(Box::new(Self)) }
 	} else {
 		let error_msg = format!("{} cannot be built from JSON", full_name);
-		quote! { Err(gpui::private::anyhow::anyhow!(#error_msg)) }
+		quote! { Err(lucie::private::anyhow::anyhow!(#error_msg)) }
 	};
 
 	let deprecated_aliases_fn_body = if deprecated_aliases.is_empty() {
@@ -143,7 +143,7 @@ pub(crate) fn derive_action(input: TokenStream) -> TokenStream {
 	TokenStream::from(quote! {
 		#registration
 
-		impl gpui::Action for #struct_name {
+		impl lucie::Action for #struct_name {
 			fn name(&self) -> &'static str {
 				#full_name
 			}
@@ -155,18 +155,18 @@ pub(crate) fn derive_action(input: TokenStream) -> TokenStream {
 				#full_name
 			}
 
-			fn partial_eq(&self, action: &dyn gpui::Action) -> bool {
+			fn partial_eq(&self, action: &dyn lucie::Action) -> bool {
 				action
 					.as_any()
 					.downcast_ref::<Self>()
 					.map_or(false, |a| self == a)
 			}
 
-			fn boxed_clone(&self) -> Box<dyn gpui::Action> {
+			fn boxed_clone(&self) -> Box<dyn lucie::Action> {
 				Box::new(self.clone())
 			}
 
-			fn build(_data: Option<&mut [u8]>) -> gpui::Result<Box<dyn gpui::Action>> {
+			fn build(_data: Option<&mut [u8]>) -> lucie::Result<Box<dyn lucie::Action>> {
 				#build_fn_body
 			}
 

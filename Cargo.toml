@@ -5,11 +5,12 @@ members = [
     "crates/lucie-macros",
 	"crates/lucie-style",
 	"crates/lucie-text",
-    "crates/gpui",
+    "crates/lucie",
     "crates/gpui_tokio",
     "crates/media",
     "crates/reqwest_client",
 ]
+default-members = ["crates/lucie"]
 
 [workspace.package]
 version = "0.0.0"
@@ -30,7 +31,7 @@ lucie-common = { path = "crates/lucie-common" }
 lucie-macros = { path = "crates/lucie-macros" }
 lucie-style = { path = "crates/lucie-style" }
 lucie-text = { path = "crates/lucie-text" }
-gpui = { path = "crates/gpui", default-features = false }
+lucie = { path = "crates/lucie", default-features = false }
 gpui_tokio = { path = "crates/gpui_tokio" }
 media = { path = "crates/media" }
 reqwest_client = { path = "crates/reqwest_client" }
