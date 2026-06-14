@@ -74,12 +74,12 @@ impl Layout {
 	}
 
 	pub fn align(&mut self, alignment: Option<TextAlign>) {
-		let Some(shape_mode) = &self.shape_mode else {
+		if self.shape_mode.is_none() {
 			panic!("layout must be fit/truncated before align")
-		};
+		}
+
 		if alignment != self.alignment || self.needs_realign {
 			self.layout.align(
-				shape_mode.max_width().map(|x| x.0),
 				match alignment {
 					Some(TextAlign::Left) | None => parley::Alignment::Start,
 					Some(TextAlign::Center) => parley::Alignment::Center,
@@ -143,8 +143,10 @@ impl Layout {
 		}
 
 		let mut breaker = self.layout.break_lines();
+		breaker.state_mut().set_layout_max_advance(max_width.0);
 		for _ in 0..line_clamp.map_or(1, |x| x.get()) - 1 {
-			if breaker.break_next(max_width.0).is_none() {
+			breaker.state_mut().set_line_max_advance(max_width.0);
+			if breaker.break_next().is_none() {
 				break;
 			}
 		}

@@ -179,6 +179,7 @@ impl<'s> RangedBuilder<'s> {
 	pub fn push_inline_box(&mut self, id: u64, char_index: usize, size: Size<ScaledPixels>) {
 		self.builder.push_inline_box(parley::InlineBox {
 			id,
+			kind: parley::InlineBoxKind::InFlow,
 			index: char_index,
 			width: size.width.0,
 			height: size.height.0
