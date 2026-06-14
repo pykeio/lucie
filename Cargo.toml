@@ -60,6 +60,7 @@ core-video = { version = "0.4.3", features = ["metal"] }
 ctor = { version = "0.6", default-features = false, features = [ "proc_macro" ]}
 derive_more = "0.99.17"
 env_logger = "0.11"
+fastrand = "2.4.1"
 futures-core = { version = "0.3", default-features = false, features = [ "std" ] }
 futures-util = { version = "0.3", default-features = false, features = [ "std", "io" ] }
 futures-channel = { version = "0.3", default-features = false, features = [ "std" ] }
@@ -110,7 +111,6 @@ parking_lot = "0.12.1"
 proc-macro2 = "1.0.93"
 profiling = "1"
 quote = "1.0.9"
-rand = "0.9"
 rayon = "1.8"
 regex = "1.5"
 reqwest = { version = "0.12", features = [ "stream" ] }

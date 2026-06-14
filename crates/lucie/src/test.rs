@@ -28,8 +28,6 @@ use std::{
 	panic::{self, RefUnwindSafe}
 };
 
-use rand::prelude::*;
-
 use crate::TestDispatcher;
 
 /// Run the given test function with the configured parameters.
@@ -51,7 +49,7 @@ pub fn run_test(
 				eprintln!("seed = {seed}");
 			}
 			let result = panic::catch_unwind(|| {
-				let dispatcher = TestDispatcher::new(StdRng::seed_from_u64(seed));
+				let dispatcher = TestDispatcher::new(fastrand::Rng::with_seed(seed));
 				test_fn(dispatcher, seed);
 			});
 

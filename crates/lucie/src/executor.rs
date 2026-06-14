@@ -20,8 +20,6 @@ use futures_channel::mpsc;
 use futures_lite::FutureExt as _;
 use futures_util::StreamExt as _;
 use parking_lot::{Condvar, Mutex};
-#[cfg(any(test, feature = "test-support"))]
-use rand::rngs::StdRng;
 use waker_fn::waker_fn;
 
 use crate::{PlatformDispatcher, Runnable, RunnableMeta, TaskTiming, profiler};
@@ -674,7 +672,7 @@ impl BackgroundExecutor {
 
 	/// in tests, returns the rng used by the dispatcher and seeded by the `SEED` environment variable
 	#[cfg(any(test, feature = "test-support"))]
-	pub fn rng(&self) -> StdRng {
+	pub fn rng(&self) -> fastrand::Rng {
 		self.dispatcher.as_test().unwrap().rng()
 	}
 
@@ -875,7 +873,7 @@ impl Drop for Scope<'_> {
 mod test {
 	use std::cell::RefCell;
 
-	use rand::SeedableRng;
+	use fastrand::Rng;
 
 	use super::*;
 	use crate::{App, TestDispatcher, TestPlatform, http::FakeHttpClient};
@@ -883,7 +881,7 @@ mod test {
 	/// Helper to create test infrastructure.
 	/// Returns (dispatcher, background_executor, app) where app's foreground_executor has liveness.
 	fn create_test_app() -> (TestDispatcher, BackgroundExecutor, Rc<crate::AppCell>) {
-		let dispatcher = TestDispatcher::new(StdRng::seed_from_u64(0));
+		let dispatcher = TestDispatcher::new(Rng::with_seed(0));
 		let arc_dispatcher = Arc::new(dispatcher.clone());
 		// Create liveness for task cancellation
 		let liveness = std::sync::Arc::new(());

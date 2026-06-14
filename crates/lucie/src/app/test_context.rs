@@ -1,11 +1,11 @@
 use std::{cell::RefCell, future::Future, ops::Deref, rc::Rc, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, bail};
+use fastrand::Rng;
 use futures_channel::{mpsc, oneshot};
 use futures_util::{Stream, StreamExt};
 use lucie_common::geometry::{Bounds, Pixels, Point, Size};
 use lucie_text::TextSystem;
-use rand::{SeedableRng, rngs::StdRng};
 
 use crate::{
 	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace, BackgroundExecutor, BorrowAppContext, Capslock, ClipboardItem,
@@ -134,7 +134,7 @@ impl TestAppContext {
 
 	/// Create a single TestAppContext, for non-multi-client tests
 	pub fn single() -> Self {
-		let dispatcher = TestDispatcher::new(StdRng::seed_from_u64(0));
+		let dispatcher = TestDispatcher::new(Rng::with_seed(0));
 		Self::build(dispatcher, None)
 	}
 

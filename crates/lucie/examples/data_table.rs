@@ -36,41 +36,40 @@ pub struct Quote {
 
 impl Quote {
 	pub fn random() -> Self {
-		use rand::Rng;
-		let mut rng = rand::rng();
+		let mut rng = fastrand::Rng::new();
 		// simulate a base price in a realistic range
-		let prev_close = rng.random_range(100.0..200.0);
-		let change = rng.random_range(-5.0..5.0);
+		let prev_close = 100.0 + rng.f64() * 200.0;
+		let change = (rng.f64() * 10.0) - 5.0;
 		let last_done = prev_close + change;
-		let open = prev_close + rng.random_range(-3.0..3.0);
-		let high = (prev_close + rng.random_range::<f64, _>(0.0..10.0)).max(open);
-		let low = (prev_close - rng.random_range::<f64, _>(0.0..10.0)).min(open);
-		let timestamp = Duration::from_secs(rng.random_range(0..86400));
-		let volume = rng.random_range(1_000_000..100_000_000);
+		let open = prev_close + (rng.f64() * 6.0) - 3.0;
+		let high = (prev_close + rng.f64() * 10.0).max(open);
+		let low = (prev_close - rng.f64() * 10.0).min(open);
+		let timestamp = Duration::from_secs(rng.u64(0..86400));
+		let volume = rng.i64(1_000_000..100_000_000);
 		let turnover = last_done * volume as f64;
 		let symbol = {
 			let mut ticker = String::new();
-			if rng.random_bool(0.5) {
-				ticker.push_str(&format!("{:03}.{}", rng.random_range(100..1000), rng.random_range(0..10)));
+			if rng.bool() {
+				ticker.push_str(&format!("{:03}.{}", rng.usize(100..1000), rng.usize(0..10)));
 			} else {
-				ticker.push_str(&format!("{}{}", rng.random_range('A'..='Z'), rng.random_range('A'..='Z')));
+				ticker.push_str(&format!("{}{}", rng.char('A'..='Z'), rng.char('A'..='Z')));
 			}
-			ticker.push_str(&format!(".{}", rng.random_range('A'..='Z')));
+			ticker.push_str(&format!(".{}", rng.char('A'..='Z')));
 			ticker
 		};
-		let name = format!("{} {} - #{}", symbol, rng.random_range(1..100), rng.random_range(10000..100000));
-		let ttm = rng.random_range(0.0..10.0);
-		let market_cap = rng.random_range(1_000_000.0..10_000_000.0);
-		let float_cap = market_cap + rng.random_range(1_000.0..10_000.0);
-		let shares = rng.random_range(100.0..1000.0);
+		let name = format!("{} {} - #{}", symbol, rng.usize(1..100), rng.usize(10000..100000));
+		let ttm = rng.f64() * 10.0;
+		let market_cap = 1_000_000.0 + rng.f64() * 10_000_000.0;
+		let float_cap = market_cap + 1_000.0 + rng.f64() * 9_000.0;
+		let shares = 100.0 + rng.f64() * 900.0;
 		let pb = market_cap / shares;
 		let pe = market_cap / shares;
 		let eps = market_cap / shares;
-		let dividend = rng.random_range(0.0..10.0);
-		let dividend_yield = rng.random_range(0.0..10.0);
-		let dividend_per_share = rng.random_range(0.0..10.0);
-		let dividend_date = SharedString::new(format!("{}-{}-{}", rng.random_range(2000..2023), rng.random_range(1..12), rng.random_range(1..28)));
-		let dividend_payment = rng.random_range(0.0..10.0);
+		let dividend = rng.f64() * 10.0;
+		let dividend_yield = rng.f64() * 10.0;
+		let dividend_per_share = rng.f64() * 10.0;
+		let dividend_date = SharedString::new(format!("{}-{}-{}", rng.usize(2000..2023), rng.usize(1..12), rng.usize(1..28)));
+		let dividend_payment = rng.f64() * 10.0;
 
 		Self {
 			name: name.into(),

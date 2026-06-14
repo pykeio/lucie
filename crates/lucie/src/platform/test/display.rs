@@ -14,7 +14,11 @@ impl TestDisplay {
 	pub fn new() -> Self {
 		TestDisplay {
 			id: DisplayId(1),
-			uuid: rand::random(),
+			uuid: {
+				let mut u = [0; 16];
+				fastrand::fill(&mut u);
+				u
+			},
 			bounds: Bounds::from_corners(Point::default(), Point::new(px(1920.), px(1080.)))
 		}
 	}

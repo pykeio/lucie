@@ -5,7 +5,7 @@ use std::{
 	sync::{Arc, atomic::AtomicUsize}
 };
 
-use rand::{Rng, SeedableRng, rngs::SmallRng};
+use fastrand::Rng;
 
 use crate::Priority;
 
@@ -95,7 +95,7 @@ impl<T> Drop for PriorityQueueSender<T> {
 
 pub(crate) struct PriorityQueueReceiver<T> {
 	state: Arc<PriorityQueueState<T>>,
-	rand: SmallRng,
+	rand: Rng,
 	disconnected: bool
 }
 
@@ -104,7 +104,7 @@ impl<T> Clone for PriorityQueueReceiver<T> {
 		self.state.receiver_count.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
 		Self {
 			state: Arc::clone(&self.state),
-			rand: SmallRng::seed_from_u64(0),
+			rand: Rng::with_seed(0),
 			disconnected: self.disconnected
 		}
 	}
@@ -140,7 +140,7 @@ impl<T> PriorityQueueReceiver<T> {
 
 		let receiver = PriorityQueueReceiver {
 			state,
-			rand: SmallRng::seed_from_u64(0),
+			rand: Rng::with_seed(0),
 			disconnected: false
 		};
 
@@ -206,7 +206,7 @@ impl<T> PriorityQueueReceiver<T> {
 		let mut mass = high + medium + low; //%
 
 		if !queues.high_priority.is_empty() {
-			let flip = self.rand.random_ratio(P::High.probability(), mass);
+			let flip = self.rand.f32() < (P::High.probability() as f32 / mass as f32);
 			if flip {
 				return Ok(queues.high_priority.pop_front());
 			}
@@ -214,7 +214,7 @@ impl<T> PriorityQueueReceiver<T> {
 		}
 
 		if !queues.medium_priority.is_empty() {
-			let flip = self.rand.random_ratio(P::Medium.probability(), mass);
+			let flip = self.rand.f32() < (P::Medium.probability() as f32 / mass as f32);
 			if flip {
 				return Ok(queues.medium_priority.pop_front());
 			}
@@ -222,7 +222,7 @@ impl<T> PriorityQueueReceiver<T> {
 		}
 
 		if !queues.low_priority.is_empty() {
-			let flip = self.rand.random_ratio(P::Low.probability(), mass);
+			let flip = self.rand.f32() < (P::Low.probability() as f32 / mass as f32);
 			if flip {
 				return Ok(queues.low_priority.pop_front());
 			}

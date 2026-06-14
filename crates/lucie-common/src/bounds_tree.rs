@@ -354,7 +354,6 @@ where
 #[cfg(test)]
 mod tests {
 	use lucie_common::geometry::{Bounds, Point, Size};
-	use rand::{Rng, SeedableRng};
 
 	use super::*;
 
@@ -403,16 +402,16 @@ mod tests {
 		for seed in 1..=1000 {
 			// let seed = 44;
 			let mut tree = BoundsTree::default();
-			let mut rng = rand::rngs::StdRng::seed_from_u64(seed as u64);
+			let mut rng = fastrand::Rng::with_seed(seed as u64);
 			let mut expected_quads: Vec<(Bounds<f32>, u32)> = Vec::new();
 
 			// Insert a random number of random AABBs into the tree.
-			let num_bounds = rng.random_range(1..=max_bounds);
+			let num_bounds = rng.usize(1..=max_bounds) + 1;
 			for _ in 0..num_bounds {
-				let min_x: f32 = rng.random_range(-100.0..100.0);
-				let min_y: f32 = rng.random_range(-100.0..100.0);
-				let width: f32 = rng.random_range(0.0..50.0);
-				let height: f32 = rng.random_range(0.0..50.0);
+				let min_x: f32 = (rng.f32() * 200.) - 100.;
+				let min_y: f32 = (rng.f32() * 200.) - 100.;
+				let width: f32 = rng.f32() * 50.;
+				let height: f32 = rng.f32() * 50.;
 				let bounds = Bounds {
 					origin: Point { x: min_x, y: min_y },
 					size: Size { width, height }

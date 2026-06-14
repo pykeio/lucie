@@ -106,7 +106,7 @@ num_cpus = "1.13"
 parking = "2.0.0"
 parking_lot.workspace = true
 profiling.workspace = true
-rand.workspace = true
+fastrand.workspace = true
 raw-window-handle = "0.6"
 resvg = { version = "0.47.0", default-features = false }
 usvg = { version = "0.47.0", default-features = false }
@@ -154,7 +154,7 @@ objc2-metal = { version = "0.3", optional = true }
 mach2.workspace = true
 #TODO: replace with "objc2"
 metal.workspace = true
-flume = "0.11"
+flume = "0.12"
 semver.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "macos"))'.dependencies]
@@ -162,7 +162,7 @@ pathfinder_geometry = "0.5"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 # Always used
-flume = "0.11"
+flume = "0.12"
 oo7 = { version = "0.5.0", default-features = false, features = [
     "async-std",
     "native_crypto",
@@ -228,20 +228,17 @@ xim = { git = "https://github.com/zed-industries/xim-rs.git", rev = "16f35a2c881
 x11-clipboard = { version = "0.9.3", optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-flume = "0.11"
-rand.workspace = true
+flume = "0.12"
 windows.workspace = true
 windows-core.workspace = true
 windows-numerics = "0.2"
 windows-registry = "0.5"
-dunce = "1.0"
 
 [dev-dependencies]
 backtrace.workspace = true
 env_logger.workspace = true
 # http_client = { workspace = true, features = ["test-support"] }
 lyon = { version = "1.0", features = ["extra"] }
-rand.workspace = true
 reqwest_client = { workspace = true, features = ["test-support"] }
 unicode-segmentation.workspace = true
 

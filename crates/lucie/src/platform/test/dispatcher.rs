@@ -9,10 +9,10 @@ use std::{
 };
 
 use backtrace::Backtrace;
+use fastrand::Rng;
 use lucie_common::post_inc;
 use parking::Unparker;
 use parking_lot::Mutex;
-use rand::prelude::*;
 use rapidhash::fast::{RapidHashMap, RapidHashSet};
 
 use crate::{PlatformDispatcher, Runnable, TaskLabel};
@@ -27,7 +27,7 @@ pub struct TestDispatcher {
 }
 
 struct TestDispatcherState {
-	random: StdRng,
+	random: Rng,
 	foreground: RapidHashMap<TestDispatcherId, VecDeque<Runnable>>,
 	background: Vec<Runnable>,
 	deprioritized_background: Vec<Runnable>,
@@ -45,7 +45,7 @@ struct TestDispatcherState {
 }
 
 impl TestDispatcher {
-	pub fn new(random: StdRng) -> Self {
+	pub fn new(random: Rng) -> Self {
 		let state = TestDispatcherState {
 			random,
 			foreground: RapidHashMap::default(),
@@ -117,7 +117,7 @@ impl TestDispatcher {
 		}
 
 		YieldNow {
-			count: self.state.lock().random.random_range(0..10)
+			count: self.state.lock().random.usize(0..10)
 		}
 	}
 
@@ -146,23 +146,27 @@ impl TestDispatcher {
 			if deprioritized_background_len == 0 {
 				return false;
 			}
-			let ix = state.random.random_range(0..deprioritized_background_len);
+			let ix = state.random.usize(0..deprioritized_background_len);
 			main_thread = false;
 			runnable = state.deprioritized_background.swap_remove(ix);
 		} else {
-			main_thread = state.random.random_ratio(foreground_len as u32, (foreground_len + background_len) as u32);
+			main_thread = state.random.f32() < (foreground_len as f32 / (foreground_len + background_len) as f32);
 			if main_thread {
 				let state = &mut *state;
 				runnable = state
-					.foreground
-					.values_mut()
-					.filter(|runnables| !runnables.is_empty())
-					.choose(&mut state.random)
+					.random
+					.choice(
+						state
+							.foreground
+							.values_mut()
+							.filter(|runnables| !runnables.is_empty())
+							.collect::<Vec<_>>()
+					)
 					.unwrap()
 					.pop_front()
 					.unwrap();
 			} else {
-				let ix = state.random.random_range(0..background_len);
+				let ix = state.random.usize(0..background_len);
 				runnable = state.background.swap_remove(ix);
 			};
 		};
@@ -224,7 +228,7 @@ impl TestDispatcher {
 		})
 	}
 
-	pub fn rng(&self) -> StdRng {
+	pub fn rng(&self) -> Rng {
 		self.state.lock().random.clone()
 	}
 
@@ -235,7 +239,7 @@ impl TestDispatcher {
 	pub fn gen_block_on_ticks(&self) -> usize {
 		let mut lock = self.state.lock();
 		let block_on_ticks = lock.block_on_ticks.clone();
-		lock.random.random_range(block_on_ticks)
+		lock.random.usize(block_on_ticks)
 	}
 
 	pub fn unpark_all(&self) {
