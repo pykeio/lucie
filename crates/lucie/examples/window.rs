@@ -241,7 +241,7 @@ impl Render for WindowDemo {
 				// Restore the application after 3 seconds
 				window
 					.spawn(cx, async move |cx| {
-						smol::Timer::after(std::time::Duration::from_secs(3)).await;
+						cx.background_executor().timer(std::time::Duration::from_secs(3)).await;
 						cx.update(|_, cx| {
 							cx.activate(false);
 						})

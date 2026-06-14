@@ -84,7 +84,6 @@ pub use profiler::*;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub(crate) use queue::{PriorityQueueReceiver, PriorityQueueSender};
 pub use scene::*;
-pub use smol::Timer;
 pub use subscription::*;
 pub use svg_renderer::*;
 pub(crate) use tab_stop::TabStopMap;
