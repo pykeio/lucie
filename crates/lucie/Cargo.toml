@@ -90,7 +90,7 @@ derive_more.workspace = true
 etagere = "0.3"
 futures-core.workspace = true
 futures-util.workspace = true
-tokio = { workspace = true, features = [ "rt", "rt-multi-thread", "time", "sync" ] }
+tokio = { workspace = true, features = [ "rt", "rt-multi-thread", "time", "sync", "io-util" ] }
 tokio-stream = { workspace = true }
 image.workspace = true
 inventory = "0.3.19"
