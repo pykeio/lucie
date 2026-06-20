@@ -20,7 +20,6 @@ use anyhow::{Context as _, Result, anyhow};
 #[cfg(target_os = "macos")]
 use core_video::pixel_buffer::CVPixelBuffer;
 use derive_more::{Deref, DerefMut};
-use futures_channel::oneshot;
 use futures_util::FutureExt;
 use itertools::{
 	FoldWhile::{Continue, Done},
@@ -43,6 +42,7 @@ use rapidhash::{
 use raw_window_handle::{HandleError, HasDisplayHandle, HasWindowHandle};
 use slotmap::SlotMap;
 use smallvec::SmallVec;
+use tokio::sync::oneshot;
 
 use crate::{
 	Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Asset, AsyncWindowContext, AtlasTextureKind, AtlasTileData,

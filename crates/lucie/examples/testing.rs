@@ -267,7 +267,7 @@ mod tests {
 		cx.executor().allow_parking();
 
 		// Simulate an external system (like a file system) with an OS thread
-		let (tx, rx) = futures_channel::oneshot::channel();
+		let (tx, rx) = tokio::sync::oneshot::channel();
 		std::thread::spawn(move || {
 			std::thread::sleep(std::time::Duration::from_millis(5));
 			tx.send(42).ok();

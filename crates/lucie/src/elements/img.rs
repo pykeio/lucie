@@ -10,7 +10,6 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use futures_util::AsyncReadExt;
 use image::{
 	AnimationDecoder, DynamicImage, Frame, ImageError, ImageFormat, Rgba,
 	codecs::{gif::GifDecoder, webp::WebPDecoder}
@@ -22,6 +21,7 @@ use lucie_common::{
 use lucie_style::{ObjectFit, StyleRefinement, Styled};
 use smallvec::SmallVec;
 use thiserror::Error;
+use tokio::io::AsyncReadExt as _;
 
 use super::{Stateful, StatefulInteractiveElement};
 use crate::{

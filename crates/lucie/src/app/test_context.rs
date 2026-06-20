@@ -2,16 +2,17 @@ use std::{cell::RefCell, future::Future, ops::Deref, rc::Rc, sync::Arc, time::Du
 
 use anyhow::{anyhow, bail};
 use fastrand::Rng;
-use futures_channel::{mpsc, oneshot};
 use futures_util::{Stream, StreamExt};
 use lucie_common::geometry::{Bounds, Pixels, Point, Size};
 use lucie_text::TextSystem;
+use tokio::sync::{mpsc, oneshot};
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
 	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace, BackgroundExecutor, BorrowAppContext, Capslock, ClipboardItem,
 	DrawPhase, Drawable, Element, Empty, EventEmitter, ForegroundExecutor, Global, InputEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton,
 	MouseDownEvent, MouseMoveEvent, MouseUpEvent, Platform, Render, Result, Task, TestDispatcher, TestPlatform, TestWindow, VisualContext, Window,
-	WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, http::FakeHttpClient
+	WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, http::FakeHttpClient, util::Race
 };
 
 /// A TestAppContext is provided to tests created with `#[lucie::test]`, it provides
@@ -420,18 +421,18 @@ impl TestAppContext {
 
 	/// Returns a stream of notifications whenever the Entity is updated.
 	pub fn notifications<T: 'static>(&mut self, entity: &Entity<T>) -> impl Stream<Item = ()> + use<T> {
-		let (tx, rx) = mpsc::unbounded();
+		let (tx, rx) = mpsc::unbounded_channel();
 		self.update(|cx| {
 			cx.observe(entity, {
 				let tx = tx.clone();
 				move |_, _| {
-					let _ = tx.unbounded_send(());
+					let _ = tx.send(());
 				}
 			})
 			.detach();
-			cx.observe_release(entity, move |_, _| tx.close_channel()).detach()
+			cx.observe_release(entity, move |_, _| drop(tx)).detach()
 		});
-		rx
+		UnboundedReceiverStream::new(rx)
 	}
 
 	/// Returns a stream of events emitted by the given Entity.
@@ -439,11 +440,11 @@ impl TestAppContext {
 	where
 		Evt: 'static + Clone
 	{
-		let (tx, rx) = mpsc::unbounded();
+		let (tx, rx) = mpsc::unbounded_channel();
 		entity
 			.update(self, |_, cx: &mut Context<T>| {
 				cx.subscribe(entity, move |_entity, _handle, event, _cx| {
-					let _ = tx.unbounded_send(event.clone());
+					let _ = tx.send(event.clone());
 				})
 			})
 			.detach();
@@ -456,21 +457,22 @@ impl TestAppContext {
 		let timer = self.executor().timer(Duration::from_secs(3));
 		let mut notifications = self.notifications(entity);
 
-		use futures_lite::FutureExt as _;
 		use futures_util::FutureExt as _;
 
-		async {
-			loop {
-				if entity.update(self, &mut predicate) {
-					return Ok(());
-				}
+		Race::new(
+			async {
+				loop {
+					if entity.update(self, &mut predicate) {
+						return Ok(());
+					}
 
-				if notifications.next().await.is_none() {
-					bail!("entity dropped")
+					if notifications.next().await.is_none() {
+						bail!("entity dropped")
+					}
 				}
-			}
-		}
-		.race(timer.map(|_| Err(anyhow!("condition timed out"))))
+			},
+			timer.map(|_| Err(anyhow!("condition timed out")))
+		)
 		.await
 		.unwrap();
 	}
@@ -563,7 +565,7 @@ impl<V> Entity<V> {
 				}
 
 				cx.borrow().background_executor().start_waiting();
-				rx.next().await.expect("view dropped with pending condition");
+				rx.recv().await.expect("view dropped with pending condition");
 				cx.borrow().background_executor().finish_waiting();
 			}
 

@@ -248,13 +248,13 @@ impl ToTaffy<taffy::style::Style> for Style {
 
 		fn to_grid_repeat<T: taffy::style::CheapCloneStr>(unit: &Option<u16>) -> Vec<taffy::GridTemplateComponent<T>> {
 			// grid-template-columns: repeat(<number>, minmax(0, 1fr));
-			unit.map(|count| vec![repeat(count, vec![minmax(length(0.0), fr(1.0))])])
+			unit.map(|count| vec![repeat(count, vec![minmax(length(0.0_f32), fr(1.0_f32))])])
 				.unwrap_or_default()
 		}
 
 		fn to_grid_repeat_min_content<T: taffy::style::CheapCloneStr>(unit: &Option<u16>) -> Vec<taffy::GridTemplateComponent<T>> {
 			// grid-template-columns: repeat(<number>, minmax(min-content, 1fr));
-			unit.map(|count| vec![repeat(count, vec![minmax(min_content(), fr(1.0))])])
+			unit.map(|count| vec![repeat(count, vec![minmax(min_content(), fr(1.0_f32))])])
 				.unwrap_or_default()
 		}
 
@@ -335,28 +335,28 @@ fn overflow_to_taffy(overflow: lucie_style::Overflow) -> taffy::style::Overflow 
 #[inline]
 fn align_to_taffy(align: lucie_style::AlignContent) -> taffy::style::AlignContent {
 	match align {
-		lucie_style::AlignContent::Start => taffy::style::AlignContent::Start,
-		lucie_style::AlignContent::End => taffy::style::AlignContent::End,
-		lucie_style::AlignContent::FlexStart => taffy::style::AlignContent::FlexStart,
-		lucie_style::AlignContent::FlexEnd => taffy::style::AlignContent::FlexEnd,
-		lucie_style::AlignContent::Center => taffy::style::AlignContent::Center,
-		lucie_style::AlignContent::Stretch => taffy::style::AlignContent::Stretch,
-		lucie_style::AlignContent::SpaceBetween => taffy::style::AlignContent::SpaceBetween,
-		lucie_style::AlignContent::SpaceEvenly => taffy::style::AlignContent::SpaceEvenly,
-		lucie_style::AlignContent::SpaceAround => taffy::style::AlignContent::SpaceAround
+		lucie_style::AlignContent::Start => taffy::style::AlignContent::START,
+		lucie_style::AlignContent::End => taffy::style::AlignContent::END,
+		lucie_style::AlignContent::FlexStart => taffy::style::AlignContent::FLEX_START,
+		lucie_style::AlignContent::FlexEnd => taffy::style::AlignContent::FLEX_END,
+		lucie_style::AlignContent::Center => taffy::style::AlignContent::CENTER,
+		lucie_style::AlignContent::Stretch => taffy::style::AlignContent::STRETCH,
+		lucie_style::AlignContent::SpaceBetween => taffy::style::AlignContent::SPACE_BETWEEN,
+		lucie_style::AlignContent::SpaceEvenly => taffy::style::AlignContent::SPACE_EVENLY,
+		lucie_style::AlignContent::SpaceAround => taffy::style::AlignContent::SPACE_AROUND
 	}
 }
 
 #[inline]
 fn items_to_taffy(items: lucie_style::AlignItems) -> taffy::style::AlignItems {
 	match items {
-		lucie_style::AlignItems::Start => taffy::style::AlignItems::Start,
-		lucie_style::AlignItems::End => taffy::style::AlignItems::End,
-		lucie_style::AlignItems::FlexStart => taffy::style::AlignItems::FlexStart,
-		lucie_style::AlignItems::FlexEnd => taffy::style::AlignItems::FlexEnd,
-		lucie_style::AlignItems::Center => taffy::style::AlignItems::Center,
-		lucie_style::AlignItems::Baseline => taffy::style::AlignItems::Baseline,
-		lucie_style::AlignItems::Stretch => taffy::style::AlignItems::Stretch
+		lucie_style::AlignItems::Start => taffy::style::AlignItems::START,
+		lucie_style::AlignItems::End => taffy::style::AlignItems::END,
+		lucie_style::AlignItems::FlexStart => taffy::style::AlignItems::FLEX_START,
+		lucie_style::AlignItems::FlexEnd => taffy::style::AlignItems::FLEX_END,
+		lucie_style::AlignItems::Center => taffy::style::AlignItems::CENTER,
+		lucie_style::AlignItems::Baseline => taffy::style::AlignItems::BASELINE,
+		lucie_style::AlignItems::Stretch => taffy::style::AlignItems::STRETCH
 	}
 }
 

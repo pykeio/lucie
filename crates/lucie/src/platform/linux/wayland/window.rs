@@ -7,7 +7,7 @@ use std::{
 };
 
 use blade_graphics as gpu;
-use futures_channel::oneshot::Receiver;
+use tokio::sync::oneshot::Receiver;
 use rapidhash::fast::RapidHashMap;
 use raw_window_handle as rwh;
 use wayland_backend::client::ObjectId;

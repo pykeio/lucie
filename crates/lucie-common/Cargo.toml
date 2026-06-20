@@ -15,7 +15,7 @@ workspace = true
 test-support = []
 
 [dependencies]
-arrayvec.workspace = true
+arrayvec = "0.7.4"
 tracing.workspace = true
 lucie-macros.workspace = true
 derive_more.workspace = true

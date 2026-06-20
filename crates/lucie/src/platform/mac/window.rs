@@ -25,7 +25,7 @@ use cocoa::{
 };
 use core_graphics::display::{CGDirectDisplayID, CGPoint, CGRect};
 use ctor::ctor;
-use futures_channel::oneshot;
+use tokio::sync::oneshot;
 use lucie_common::{ResultExt as _, SharedString};
 use objc::{
 	class,

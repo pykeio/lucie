@@ -11,13 +11,13 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use futures_channel::oneshot::{self, Receiver};
 use lucie_common::{
 	ResultExt,
 	geometry::{Bounds, DevicePixels, Pixels, Point, Size, bounds, size}
 };
 use raw_window_handle as rwh;
 use smallvec::SmallVec;
+use tokio::sync::oneshot::{self, Receiver};
 use windows::{
 	Win32::{
 		Foundation::*,

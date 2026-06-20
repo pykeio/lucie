@@ -14,5 +14,4 @@ workspace = true
 [dependencies]
 lucie-common.workspace = true
 lucie-macros.workspace = true
-derive_more.workspace = true
 smallvec.workspace = true

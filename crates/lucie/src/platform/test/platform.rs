@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::Result;
-use futures_channel::oneshot;
+use tokio::sync::oneshot;
 use lucie_style::CursorStyle;
 use parking_lot::Mutex;
 

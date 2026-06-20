@@ -40,46 +40,27 @@ reqwest_client = { path = "crates/reqwest_client" }
 # External crates
 #
 
-circular-buffer = "1.0"
 anyhow = "1.0.86"
-arrayvec = "0.7.4"
-ashpd = { version = "0.11", default-features = false, features = ["async-std"] }
-async-task = "4.7"
-backtrace = "0.3"
-bitflags = "2.6.0"
 blade-graphics = { version = "0.7.0" }
 blade-macros = { version = "0.3.0" }
 blade-util = { version = "0.3.0" }
 bytes = "1.0"
-cfg-if = "1.0.3"
 cocoa = "=0.26.0"
 cocoa-foundation = "=0.2.0"
 core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.4.3", features = ["metal"] }
-ctor = { version = "0.6", default-features = false, features = [ "proc_macro" ]}
 derive_more = "0.99.17"
-env_logger = "0.11"
 fastrand = "2.4.1"
 futures-core = { version = "0.3", default-features = false, features = [ "std" ] }
-futures-util = { version = "0.3", default-features = false, features = [ "std", "io" ] }
-futures-channel = { version = "0.3", default-features = false, features = [ "std" ] }
-futures-io = { version = "0.3", default-features = false, features = [ "std" ] }
-futures-lite = "2.6"
-heck = "0.5"
-hex = "0.4.3"
-inventory = "0.3.19"
+futures-util = { version = "0.3", default-features = false, features = [ "std" ] }
 http = "1.1"
 http-body = "1.0"
 image = { version = "0.25.1", default-features = false, features = [ "gif", "jpeg", "png", "webp" ] }
-indexmap = "2.7.0"
-itertools = "0.14.0"
-libc = "0.2"
 log = "0.4"
 mach2 = "0.5"
 metal = "0.29"
 naga = { version = "25.0", features = ["wgsl-in"] }
-nix = "0.29"
 objc = "0.2"
 objc2-foundation = { version = "=0.3.1", default-features = false, features = [
     "NSArray",
@@ -106,31 +87,12 @@ objc2-foundation = { version = "=0.3.1", default-features = false, features = [
     "objc2-core-foundation",
     "std"
 ] }
-open = "5.0.0"
 parking_lot = "0.12.1"
-proc-macro2 = "1.0.93"
-profiling = "1"
-quote = "1.0.9"
-rayon = "1.8"
-regex = "1.5"
-reqwest = { version = "0.12", features = [ "stream" ] }
-rustc-hash = "2.1.0"
 rapidhash = "4.1"
-rustls = { version = "0.23.26" }
-rustls-platform-verifier = "0.5.0"
-schemars = { version = "1.0", features = ["indexmap2"] }
-semver = "1.0"
-serde = { version = "1.0.221", features = ["derive", "rc"] }
-serde_json = { version = "1.0.144", features = ["preserve_order", "raw_value"] }
-sha2 = "0.10"
-slotmap = "1.0.6"
 smallvec = { version = "1.6", features = [ "union", "const_new", "const_generics" ] }
-stacksafe = "0.1"
-syn = { version = "2.0", features = [ "full", "extra-traits", "visit-mut" ] }
-thiserror = "2.0.12"
 tokio = { version = "1.48", default-features = false }
+tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false, features = [ "std" ] }
-unicode-segmentation = "1.10"
 windows-core = "0.61"
 
 [workspace.dependencies.windows]

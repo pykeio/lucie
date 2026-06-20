@@ -30,7 +30,6 @@ use core_foundation::{
 	string::{CFString, CFStringRef}
 };
 use ctor::ctor;
-use futures_channel::oneshot;
 use itertools::Itertools;
 use lucie_common::ResultExt as _;
 use objc::{
@@ -42,6 +41,7 @@ use objc::{
 };
 use parking_lot::Mutex;
 use semver::Version;
+use tokio::sync::oneshot;
 
 use super::{
 	BoolExt, MacKeyboardLayout, MacKeyboardMapper,

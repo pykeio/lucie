@@ -12,7 +12,7 @@ use std::{
 };
 
 use anyhow::Result;
-use futures_channel::oneshot;
+use tokio::sync::oneshot;
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
 use image::{AnimationDecoder as _, Frame, codecs::gif::GifDecoder};

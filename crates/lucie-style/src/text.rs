@@ -1,17 +1,17 @@
 use std::{
 	fmt::{self, Display},
 	hash::{Hash, Hasher},
+	str::FromStr,
 	sync::Arc
 };
 
-use derive_more::{Add, FromStr, Sub};
 use lucie_common::{SharedString, color::Hsla, geometry::AbsoluteLength};
 
 use crate::{StrikethroughStyle, UnderlineStyle};
 
 /// The degree of blackness or stroke thickness of a font. This value ranges from 100.0 to 900.0,
 /// with 400.0 as normal.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Add, Sub, FromStr)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct FontWeight(pub f32);
 
 impl Display for FontWeight {
@@ -23,6 +23,14 @@ impl Display for FontWeight {
 impl From<f32> for FontWeight {
 	fn from(weight: f32) -> Self {
 		FontWeight(weight)
+	}
+}
+
+impl FromStr for FontWeight {
+	type Err = <f32 as FromStr>::Err;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(FontWeight(f32::from_str(s)?))
 	}
 }
 

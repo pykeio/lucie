@@ -15,7 +15,7 @@ use std::{
 
 use anyhow::{Context as _, anyhow};
 use calloop::LoopSignal;
-use futures_channel::oneshot;
+use tokio::sync::oneshot;
 use lucie_common::ResultExt as _;
 #[cfg(any(feature = "wayland", feature = "x11"))]
 use xkbcommon::xkb::{self, Keycode, Keysym, State};

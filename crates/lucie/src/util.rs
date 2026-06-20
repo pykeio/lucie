@@ -1,3 +1,8 @@
+use std::{
+	pin::Pin,
+	task::{Context, Poll}
+};
+
 use lucie_common::{
 	color::{BackgroundTag, Hsla},
 	geometry::{Bounds, Edges, Pixels, Point, point}
@@ -133,5 +138,49 @@ pub fn overflow_mask(style: &Style, bounds: Bounds<Pixels>, rem_size: Pixels) ->
 
 			Some(ContentMask { bounds })
 		}
+	}
+}
+
+pin_project_lite::pin_project! {
+	pub struct Race<F1, F2> {
+		#[pin]
+		fut1: F1,
+		#[pin]
+		fut2: F2,
+		rng: fastrand::Rng
+	}
+}
+
+impl<T, F1: Future<Output = T>, F2: Future<Output = T>> Race<F1, F2> {
+	pub fn new(fut1: F1, fut2: F2) -> Self {
+		Self {
+			fut1,
+			fut2,
+			rng: fastrand::Rng::new()
+		}
+	}
+}
+
+impl<T, F1: Future<Output = T>, F2: Future<Output = T>> Future for Race<F1, F2> {
+	type Output = T;
+
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		let this = self.project();
+		if this.rng.bool() {
+			if let Poll::Ready(v) = this.fut1.poll(cx) {
+				return Poll::Ready(v);
+			}
+			if let Poll::Ready(v) = this.fut2.poll(cx) {
+				return Poll::Ready(v);
+			}
+		} else {
+			if let Poll::Ready(v) = this.fut2.poll(cx) {
+				return Poll::Ready(v);
+			}
+			if let Poll::Ready(v) = this.fut1.poll(cx) {
+				return Poll::Ready(v);
+			}
+		}
+		Poll::Pending
 	}
 }

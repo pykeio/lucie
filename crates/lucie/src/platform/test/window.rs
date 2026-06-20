@@ -164,7 +164,7 @@ impl PlatformWindow for TestWindow {
 		msg: &str,
 		detail: Option<&str>,
 		answers: &[PromptButton]
-	) -> Option<futures_channel::oneshot::Receiver<usize>> {
+	) -> Option<tokio::sync::oneshot::Receiver<usize>> {
 		Some(self.0.lock().platform.upgrade().expect("platform dropped").prompt(msg, detail, answers))
 	}
 

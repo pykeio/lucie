@@ -1142,7 +1142,7 @@ impl PlatformWindow for X11Window {
 		self.0.state.borrow_mut().input_handler.take()
 	}
 
-	fn prompt(&self, _level: PromptLevel, _msg: &str, _detail: Option<&str>, _answers: &[PromptButton]) -> Option<futures_channel::oneshot::Receiver<usize>> {
+	fn prompt(&self, _level: PromptLevel, _msg: &str, _detail: Option<&str>, _answers: &[PromptButton]) -> Option<tokio::sync::oneshot::Receiver<usize>> {
 		None
 	}
 

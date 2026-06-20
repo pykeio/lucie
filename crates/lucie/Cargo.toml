@@ -24,7 +24,7 @@ test-support = [
     "wayland",
     "x11",
 ]
-leak-detection = ["backtrace"]
+leak-detection = ["dep:backtrace"]
 runtime_shaders = []
 macos-blade = [
     "blade-graphics",
@@ -84,34 +84,32 @@ lucie-text.workspace = true
 
 anyhow.workspace = true
 async-task = "4.7"
-backtrace = { workspace = true, optional = true }
-bitflags = { workspace = true, optional = true }
+backtrace = { version = "0.3", optional = true }
 bytemuck = { version = "1", optional = true }
 derive_more.workspace = true
-etagere = "0.2"
+etagere = "0.3"
 futures-core.workspace = true
 futures-util.workspace = true
-futures-channel.workspace = true
-futures-io.workspace = true
-futures-lite.workspace = true
 tokio = { workspace = true, features = [ "rt", "rt-multi-thread", "time", "sync" ] }
+tokio-stream = { workspace = true }
 image.workspace = true
-inventory.workspace = true
-itertools.workspace = true
+inventory = "0.3.19"
+itertools = "0.15"
 log.workspace = true
 num_cpus = "1.13"
 parking = "2.0.0"
 parking_lot.workspace = true
-profiling.workspace = true
+profiling = "1"
+pin-project-lite = "0.2"
 fastrand.workspace = true
 raw-window-handle = "0.6"
 resvg = { version = "0.47.0", default-features = false }
 usvg = { version = "0.47.0", default-features = false }
 rapidhash.workspace = true
-slotmap.workspace = true
+slotmap = "1.0.6"
 smallvec.workspace = true
-stacksafe.workspace = true
-taffy = { version = "0.9", default-features = false, features = [
+stacksafe = "1.0"
+taffy = { version = "0.11", default-features = false, features = [
 	"std",
 	"taffy_tree",
 	"flexbox",
@@ -119,12 +117,11 @@ taffy = { version = "0.9", default-features = false, features = [
 	"block_layout",
 	"content_size"
 ] }
-thiserror.workspace = true
+thiserror = "2.0.12"
 waker-fn = "1.2.0"
 lyon_tessellation = "1.0"
 lyon_algorithms = "1.0"
-libc.workspace = true
-circular-buffer.workspace = true
+circular-buffer = "1.0"
 bytes.workspace = true
 http.workspace = true
 http-body.workspace = true
@@ -138,7 +135,7 @@ core-foundation-sys.workspace = true
 core-graphics = "0.24"
 core-video.workspace = true
 core-text = "21"
-ctor.workspace = true
+ctor = { version = "0.6", default-features = false, features = [ "proc_macro" ]}
 # WARNING: If you change this, you must also publish a new version of zed-font-kit to crates.io
 font-kit = { git = "https://github.com/zed-industries/font-kit", rev = "110523127440aefb11ce0cf280ae7c5071337ec5", package = "zed-font-kit", version = "0.14.1-zed", optional = true }
 foreign-types = "0.5"
@@ -151,13 +148,14 @@ mach2.workspace = true
 #TODO: replace with "objc2"
 metal.workspace = true
 flume = "0.12"
-semver.workspace = true
+semver = "1.0"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd", target_os = "macos"))'.dependencies]
 blade-graphics = { workspace = true, optional = true }
 blade-macros = { workspace = true, optional = true }
 blade-util = { workspace = true, optional = true }
 pathfinder_geometry = "0.5"
+libc = "0.2"
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 # Always used
@@ -168,7 +166,7 @@ oo7 = { version = "0.5.0", default-features = false, features = [
 ] }
 
 # Used in both windowing options
-ashpd = { workspace = true, optional = true }
+ashpd = { version = "0.11", default-features = false, features = ["async-std"], optional = true }
 blade-graphics = { workspace = true, optional = true }
 blade-macros = { workspace = true, optional = true }
 blade-util = { workspace = true, optional = true }
@@ -185,6 +183,7 @@ filedescriptor = { version = "0.8.2", optional = true }
 open = { version = "5.2.0", optional = true }
 
 # Wayland
+bitflags = { version = "2.6", optional = true }
 calloop-wayland-source = { version = "0.4.1", optional = true }
 wayland-backend = { version = "0.3.3", features = [
     "client_system",
@@ -234,12 +233,11 @@ windows-numerics = "0.2"
 windows-registry = "0.5"
 
 [dev-dependencies]
-backtrace.workspace = true
-env_logger.workspace = true
-# http_client = { workspace = true, features = ["test-support"] }
+backtrace = "0.3"
+env_logger = "0.11"
 lyon = { version = "1.0", features = ["extra"] }
 reqwest_client = { workspace = true, features = ["test-support"] }
-unicode-segmentation.workspace = true
+unicode-segmentation = "1.10"
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
 windows-registry = "0.5"

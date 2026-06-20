@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::Context as _;
 use derive_more::{Deref, DerefMut};
-use futures_channel::oneshot;
+use tokio::sync::oneshot;
 
 use super::{Context, WeakEntity};
 use crate::{

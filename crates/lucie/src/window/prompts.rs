@@ -1,8 +1,8 @@
 use std::ops::Deref;
 
-use futures_channel::oneshot;
 use lucie_common::color::{opaque_grey, white};
 use lucie_style::Styled;
+use tokio::sync::oneshot;
 
 use super::Window;
 use crate::{

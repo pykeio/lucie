@@ -1,24 +1,14 @@
-use std::{
-	borrow::Cow,
-	error::Error,
-	mem,
-	pin::Pin,
-	sync::{LazyLock, OnceLock},
-	task::Poll,
-	time::Duration
-};
+use std::{error::Error, mem, pin::Pin, sync::OnceLock, task::Poll, time::Duration};
 
 use anyhow::anyhow;
 use bytes::{BufMut, Bytes, BytesMut};
-use futures_io::AsyncRead;
-use futures_util::{FutureExt as _, Stream, TryStreamExt as _, future::BoxFuture};
-use lucie::http::{AsyncBody, AsyncBodyInner, HttpClient, Response, Uri, http};
-use regex::Regex;
+use lucie::http::{AsyncBody, AsyncBodyInner, HttpClient, Response, Uri};
 use reqwest::header::{HeaderMap, HeaderValue};
+use tokio::io::AsyncRead;
+use tokio_stream::{Stream, StreamExt};
 
 const DEFAULT_CAPACITY: usize = 4096;
 static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-static REDACT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"key=[^&]+").unwrap());
 
 pub struct ReqwestClient {
 	client: reqwest::Client,
@@ -166,14 +156,10 @@ pub fn poll_read_buf(io: &mut Pin<Box<dyn AsyncRead + Send + Sync>>, cx: &mut st
 		// transparent wrapper around `[MaybeUninit<u8>]`.
 		let dst = unsafe { &mut *(dst as *mut _ as *mut [std::mem::MaybeUninit<u8>]) };
 		let mut buf = tokio::io::ReadBuf::uninit(dst);
-		let ptr = buf.filled().as_ptr();
-		let unfilled_portion = buf.initialize_unfilled();
 		// SAFETY: Pin projection
 		let io_pin = unsafe { Pin::new_unchecked(io) };
-		std::task::ready!(io_pin.poll_read(cx, unfilled_portion)?);
+		std::task::ready!(io_pin.poll_read(cx, &mut buf)?);
 
-		// Ensure the pointer does not change from under us
-		assert_eq!(ptr, buf.filled().as_ptr());
 		buf.filled().len()
 	};
 
@@ -189,9 +175,12 @@ pub fn poll_read_buf(io: &mut Pin<Box<dyn AsyncRead + Send + Sync>>, cx: &mut st
 fn redact_error(mut error: reqwest::Error) -> reqwest::Error {
 	if let Some(url) = error.url_mut()
 		&& let Some(query) = url.query()
-		&& let Cow::Owned(redacted) = REDACT_REGEX.replace_all(query, "key=REDACTED")
+		&& let Some(mut pos) = query.find("key=").or_else(|| query.find("Key="))
 	{
-		url.set_query(Some(redacted.as_str()));
+		pos += 4;
+		let end = query.find('&').unwrap_or(query.len());
+		let query = query[..pos].to_string() + "REDACTED" + &query[end..];
+		url.set_query(Some(query.as_str()));
 	}
 	error
 }
@@ -205,7 +194,7 @@ impl HttpClient for ReqwestClient {
 		self.user_agent.as_ref()
 	}
 
-	fn send(&self, req: http::Request<AsyncBody>) -> BoxFuture<'static, anyhow::Result<Response<AsyncBody>>> {
+	fn send(&self, req: http::Request<AsyncBody>) -> Pin<Box<dyn Future<Output = anyhow::Result<Response<AsyncBody>>> + Send + 'static>> {
 		let (parts, body) = req.into_parts();
 
 		let mut request = self.client.request(parts.method, parts.uri.to_string());
@@ -225,19 +214,18 @@ impl HttpClient for ReqwestClient {
 		});
 
 		let handle = self.handle.clone();
-		async move {
+		Box::pin(async move {
 			let mut response = handle.spawn(async { request.send().await }).await?.map_err(redact_error)?;
 
 			let headers = mem::take(response.headers_mut());
 			let mut builder = http::Response::builder().status(response.status().as_u16()).version(response.version());
 			*builder.headers_mut().unwrap() = headers;
 
-			let bytes = response.bytes_stream().map_err(futures_io::Error::other).into_async_read();
+			let bytes = tokio_util::io::StreamReader::new(response.bytes_stream().map(|res| res.map_err(std::io::Error::other)));
 			let body = AsyncBody::from_reader(bytes);
 
 			builder.body(body).map_err(|e| anyhow!(e))
-		}
-		.boxed()
+		})
 	}
 }
 

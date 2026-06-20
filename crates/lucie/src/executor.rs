@@ -16,10 +16,8 @@ use std::{
 	time::{Duration, Instant}
 };
 
-use futures_channel::mpsc;
-use futures_lite::FutureExt as _;
-use futures_util::StreamExt as _;
 use parking_lot::{Condvar, Mutex};
+use tokio::sync::mpsc;
 use waker_fn::waker_fn;
 
 use crate::{PlatformDispatcher, Runnable, RunnableMeta, TaskTiming, profiler};
@@ -171,7 +169,7 @@ impl<T> Future for Task<T> {
 	fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
 		match unsafe { self.get_unchecked_mut() } {
 			Task(TaskState::Ready(val)) => Poll::Ready(val.take().unwrap()),
-			Task(TaskState::Spawned(task)) => task.poll(cx)
+			Task(TaskState::Spawned(task)) => Pin::new(task).poll(cx)
 		}
 	}
 }
@@ -865,7 +863,7 @@ impl Drop for Scope<'_> {
 
 		// Wait until the channel is closed, which means that all of the spawned
 		// futures have resolved.
-		self.executor.block(self.rx.next());
+		self.executor.block(self.rx.recv());
 	}
 }
 
@@ -962,7 +960,7 @@ mod test {
 		let await_flag = Rc::clone(&reached_await);
 
 		// Channel to block the inner task until we're ready
-		let (tx, rx) = futures_channel::oneshot::channel::<()>();
+		let (tx, rx) = tokio::sync::oneshot::channel::<()>();
 
 		// We need clones of executor and liveness_token for the inner spawn
 		let inner_executor = foreground_executor.clone();
