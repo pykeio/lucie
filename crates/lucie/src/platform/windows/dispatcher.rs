@@ -1,4 +1,5 @@
 use std::{
+	cell::UnsafeCell,
 	sync::atomic::{AtomicBool, Ordering},
 	thread::{ThreadId, current},
 	time::Duration
@@ -46,9 +47,12 @@ impl WindowsDispatcher {
 
 	fn dispatch_on_threadpool(&self, runnable: Runnable, priority: WorkItemPriority) {
 		let handler = {
-			let mut runnable = Some(runnable);
+			let mut runnable = UnsafeCell::new(Some(runnable));
 			WorkItemHandler::new(move |_| {
-				runnable.take().expect("Takes FnMut but only runs once").run_and_profile();
+				unsafe { &mut *runnable.get() }
+					.take()
+					.expect("Takes FnMut but only runs once")
+					.run_and_profile();
 				Ok(())
 			})
 		};
@@ -58,9 +62,12 @@ impl WindowsDispatcher {
 
 	fn dispatch_on_threadpool_after(&self, runnable: Runnable, duration: Duration) {
 		let handler = {
-			let mut runnable = Some(runnable);
+			let mut runnable = UnsafeCell::new(Some(runnable));
 			TimerElapsedHandler::new(move |_| {
-				runnable.take().expect("Takes FnMut but only runs once").run_and_profile();
+				unsafe { &mut *runnable.get() }
+					.take()
+					.expect("Takes FnMut but only runs once")
+					.run_and_profile();
 				Ok(())
 			})
 		};

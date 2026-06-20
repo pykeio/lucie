@@ -92,10 +92,10 @@ smallvec = { version = "1.6", features = [ "union", "const_new", "const_generics
 tokio = { version = "1.48", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false, features = [ "std" ] }
-windows-core = "0.61"
+windows-core = "0.62"
 
 [workspace.dependencies.windows]
-version = "0.61"
+version = "0.62"
 features = [
     "System_Threading",
     "UI_ViewManagement",
