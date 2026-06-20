@@ -49,7 +49,7 @@ impl VSyncProvider {
 		// operation for the first call after the vsync thread becomes non-idle,
 		// but it shouldn't happen often.
 		if !wait_succeeded || elapsed < VSYNC_INTERVAL_THRESHOLD {
-			log::trace!("VSyncProvider::wait_for_vsync() took less time than expected");
+			tracing::trace!("VSyncProvider::wait_for_vsync() took less time than expected");
 			std::thread::sleep(self.interval);
 		}
 	}

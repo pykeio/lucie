@@ -130,9 +130,9 @@ impl MetalRenderer {
 		} else {
 			// For some reason `all()` can return an empty list, see https://github.com/zed-industries/zed/issues/37689
 			// In that case, we fall back to the system default device.
-			log::error!("Unable to enumerate Metal devices; attempting to use system default device");
+			tracing::error!("Unable to enumerate Metal devices; attempting to use system default device");
 			metal::Device::system_default().unwrap_or_else(|| {
-				log::error!("unable to access a compatible graphics device");
+				tracing::error!("unable to access a compatible graphics device");
 				std::process::exit(1);
 			})
 		};
@@ -305,7 +305,7 @@ impl MetalRenderer {
 		let drawable = if let Some(drawable) = layer.next_drawable() {
 			drawable
 		} else {
-			log::error!("failed to retrieve next drawable, drawable size: {:?}", viewport_size);
+			tracing::error!("failed to retrieve next drawable, drawable size: {:?}", viewport_size);
 			return;
 		};
 
@@ -337,15 +337,15 @@ impl MetalRenderer {
 					return;
 				}
 				Err(err) => {
-					log::error!("failed to render: {}. retrying with larger instance buffer size", err);
+					tracing::error!("failed to render: {}. retrying with larger instance buffer size", err);
 					let mut instance_buffer_pool = self.instance_buffer_pool.lock();
 					let buffer_size = instance_buffer_pool.buffer_size;
 					if buffer_size >= 256 * 1024 * 1024 {
-						log::error!("instance buffer size grew too large: {}", buffer_size);
+						tracing::error!("instance buffer size grew too large: {}", buffer_size);
 						break;
 					}
 					instance_buffer_pool.reset(buffer_size * 2);
-					log::info!("increased instance buffer size to {}", instance_buffer_pool.buffer_size);
+					tracing::info!("increased instance buffer size to {}", instance_buffer_pool.buffer_size);
 				}
 			}
 		}

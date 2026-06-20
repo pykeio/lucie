@@ -943,7 +943,7 @@ impl Dispatch<xdg_activation_token_v1::XdgActivationTokenV1, ()> for WaylandClie
 					let activation = state.globals.activation.as_ref().unwrap();
 					activation.activate(token, &window.surface());
 				}
-				None => log::error!("activation token received with no pending activation")
+				None => tracing::error!("activation token received with no pending activation")
 			}
 		}
 
@@ -1008,7 +1008,7 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for WaylandClientStatePtr {
 				..
 			} => {
 				if format != wl_keyboard::KeymapFormat::XkbV1 {
-					log::error!("Received keymap format {:?}, expected XkbV1", format);
+					tracing::error!("Received keymap format {:?}, expected XkbV1", format);
 					return;
 				}
 				let xkb_context = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
@@ -1658,7 +1658,7 @@ impl Dispatch<wl_data_device::WlDataDevice, ()> for WaylandClientStatePtr {
 							let file_list = match read_task.await {
 								Ok(list) => list,
 								Err(err) => {
-									log::error!("error reading drag and drop pipe: {err:?}");
+									tracing::error!("error reading drag and drop pipe: {err:?}");
 									return;
 								}
 							};

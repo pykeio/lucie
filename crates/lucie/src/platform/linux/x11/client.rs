@@ -246,11 +246,11 @@ impl X11ClientStatePtr {
 		}
 
 		let Some(mut ximc) = state.ximc.take() else {
-			log::error!("bug: xim connection not set");
+			tracing::error!("bug: xim connection not set");
 			return;
 		};
 		let Some(xim_handler) = state.xim_handler.take() else {
-			log::error!("bug: xim handler not set");
+			tracing::error!("bug: xim handler not set");
 			state.ximc = Some(ximc);
 			return;
 		};
@@ -347,7 +347,7 @@ impl X11Client {
 		let compositor_present = check_compositor_present(&xcb_connection, root);
 		let gtk_frame_extents_supported = check_gtk_frame_extents_supported(&xcb_connection, &atoms, root);
 		let client_side_decorations_supported = compositor_present && gtk_frame_extents_supported;
-		log::info!("x11: compositor present: {}, gtk_frame_extents_supported: {}", compositor_present, gtk_frame_extents_supported);
+		tracing::info!("x11: compositor present: {}, gtk_frame_extents_supported: {}", compositor_present, gtk_frame_extents_supported);
 
 		let xkb =
 			get_reply(|| "Failed to initialize XKB extension", xcb_connection.xkb_use_extension(XKB_X11_MIN_MAJOR_XKB_VERSION, XKB_X11_MIN_MINOR_XKB_VERSION))?;
@@ -543,7 +543,7 @@ impl X11Client {
 					}
 					Err(err) => {
 						let err = handle_connection_error(err);
-						log::warn!("error while polling for X11 events: {err:?}");
+						tracing::warn!("error while polling for X11 events: {err:?}");
 						break;
 					}
 				}
@@ -608,7 +608,7 @@ impl X11Client {
 						// we do lose 1-2 keys when crash happens since there is no reliable way to get that info
 						// luckily, x11 sends us window not found error when xim server crashes upon further key press
 						// hence we fall back to handle_event
-						log::error!("XIMClientError: {}", err);
+						tracing::error!("XIMClientError: {}", err);
 						let mut state = self.0.borrow_mut();
 						state.take_xim();
 						drop(state);
@@ -639,7 +639,7 @@ impl X11Client {
 		drop(state);
 		if let Some(window_id) = window_id {
 			let Some(window) = self.get_window(window_id) else {
-				log::error!("Failed to get window for IME positioning");
+				tracing::error!("Failed to get window for IME positioning");
 				let mut state = self.0.borrow_mut();
 				state.ximc = Some(ximc);
 				state.xim_handler = Some(xim_handler);
@@ -669,7 +669,7 @@ impl X11Client {
 			if let Some(xim_handler) = state.xim_handler.as_ref() {
 				ximc.reset_ic(xim_handler.im_id, xim_handler.ic_id).ok();
 			} else {
-				log::error!("bug: xim handler not set in reset_ime");
+				tracing::error!("bug: xim handler not set in reset_ime");
 			}
 			state.ximc = Some(ximc);
 		}
@@ -1022,7 +1022,7 @@ impl X11Client {
 						}
 					}
 					None => {
-						log::error!("Unknown x11 button: {}", event.detail);
+						tracing::error!("Unknown x11 button: {}", event.detail);
 					}
 				}
 			}
@@ -1159,7 +1159,7 @@ impl X11Client {
 
 	fn xim_handle_commit(&self, window: xproto::Window, text: String) -> Option<()> {
 		let Some(window) = self.get_window(window) else {
-			log::error!("bug: Failed to get window for XIM commit");
+			tracing::error!("bug: Failed to get window for XIM commit");
 			return None;
 		};
 		let mut state = self.0.borrow_mut();
@@ -1171,7 +1171,7 @@ impl X11Client {
 
 	fn xim_handle_preedit(&self, window: xproto::Window, text: String) -> Option<()> {
 		let Some(window) = self.get_window(window) else {
-			log::error!("bug: Failed to get window for XIM preedit");
+			tracing::error!("bug: Failed to get window for XIM preedit");
 			return None;
 		};
 
@@ -1440,7 +1440,7 @@ impl X11ClientState {
 			Some((ximc, xim_handler))
 		} else {
 			self.ximc = Some(ximc);
-			log::error!("bug: XIM handler not set");
+			tracing::error!("bug: XIM handler not set");
 			None
 		}
 	}
@@ -1490,7 +1490,7 @@ impl X11ClientState {
 				let refresh_rate = match mode_info {
 					Some(mode_info) => mode_refresh_rate(mode_info),
 					None => {
-						log::error!(
+						tracing::error!(
 							"Failed to get screen mode info from xrandr, \
                             defaulting to 60hz refresh rate."
 						);
@@ -1609,7 +1609,7 @@ pub fn mode_refresh_rate(mode: &randr::ModeInfo) -> Duration {
 
 	let millihertz = mode.dot_clock as u64 * 1_000 / (mode.htotal as u64 * mode.vtotal as u64);
 	let micros = 1_000_000_000 / millihertz;
-	log::info!("Refreshing every {}ms", micros / 1_000);
+	tracing::info!("Refreshing every {}ms", micros / 1_000);
 	Duration::from_micros(micros)
 }
 
@@ -1658,7 +1658,7 @@ fn check_compositor_present(xcb_connection: &XCBConnection, root: u32) -> bool {
 		_ => return false
 	};
 
-	log::debug!("Compositor detection: _NET_WM_CM_S?={}, _NET_WM_CM_OWNER={}, _NET_SUPPORTING_WM_CHECK={}", method1, method2, method3);
+	tracing::debug!("Compositor detection: _NET_WM_CM_S?={}, _NET_WM_CM_OWNER={}, _NET_SUPPORTING_WM_CHECK={}", method1, method2, method3);
 
 	method1 || method2 || method3
 }
@@ -1777,7 +1777,7 @@ fn current_pointer_device_states(
 			})
 	);
 	if pointer_device_states.is_empty() {
-		log::error!("Found no xinput mouse pointers.");
+		tracing::error!("Found no xinput mouse pointers.");
 	}
 	Some(pointer_device_states)
 }
@@ -1825,7 +1825,7 @@ fn get_axis_scroll_delta_and_update_state(event: &xinput::MotionEvent, axis: &mu
 		axis.scroll_value = Some(new_scroll);
 		delta_scroll
 	} else {
-		log::error!("Encountered invalid XInput valuator_mask, scrolling may not work properly.");
+		tracing::error!("Encountered invalid XInput valuator_mask, scrolling may not work properly.");
 		None
 	}
 }
@@ -1883,15 +1883,15 @@ fn get_scale_factor(connection: &XCBConnection, resource_database: &Database, sc
 
 	match env_dpi {
 		DpiMode::Scale(scale) => {
-			log::info!("Using scale factor from {}: {}", LUCIE_X11_SCALE_FACTOR_ENV, scale);
+			tracing::info!("Using scale factor from {}: {}", LUCIE_X11_SCALE_FACTOR_ENV, scale);
 			return scale;
 		}
 		DpiMode::Randr => {
 			if let Some(scale) = get_randr_scale_factor(connection, screen_index) {
-				log::info!("Using RandR scale factor from {}=randr: {}", LUCIE_X11_SCALE_FACTOR_ENV, scale);
+				tracing::info!("Using RandR scale factor from {}=randr: {}", LUCIE_X11_SCALE_FACTOR_ENV, scale);
 				return scale;
 			}
-			log::warn!("Failed to calculate RandR scale factor, falling back to default");
+			tracing::warn!("Failed to calculate RandR scale factor, falling back to default");
 			return 1.0;
 		}
 		DpiMode::NotSet => {}
@@ -1901,16 +1901,16 @@ fn get_scale_factor(connection: &XCBConnection, resource_database: &Database, sc
 
 	if let Some(dpi) = resource_database.get_value::<f32>("Xft.dpi", "Xft.dpi").ok().flatten() {
 		let scale = dpi / 96.0; // base dpi
-		log::info!("Using scale factor from Xft.dpi: {}", scale);
+		tracing::info!("Using scale factor from Xft.dpi: {}", scale);
 		return scale;
 	}
 
 	if let Some(scale) = get_randr_scale_factor(connection, screen_index) {
-		log::info!("Using RandR scale factor: {}", scale);
+		tracing::info!("Using RandR scale factor: {}", scale);
 		return scale;
 	}
 
-	log::info!("Using default scale factor: 1.0");
+	tracing::info!("Using default scale factor: 1.0");
 	1.0
 }
 
@@ -2049,7 +2049,7 @@ fn get_dpi_factor((width_px, height_px): (u32, u32), (width_mm, height_mm): (u64
 	if valid_scale_factor(validated_factor as f32) {
 		validated_factor as f32
 	} else {
-		log::warn!("Calculated DPI factor {} is invalid, using 1.0", validated_factor);
+		tracing::warn!("Calculated DPI factor {} is invalid, using 1.0", validated_factor);
 		1.0
 	}
 }

@@ -137,7 +137,7 @@ impl Application {
 	#[allow(clippy::new_without_default)]
 	pub fn new() -> Self {
 		#[cfg(any(test, feature = "test-support"))]
-		log::info!("Lucie was compiled in test mode");
+		tracing::info!("Lucie was compiled in test mode");
 
 		let liveness = Arc::new(());
 		Self(App::new_app(current_platform(false, Arc::downgrade(&liveness)), liveness, Arc::new(()), Arc::new(NullHttpClient)))
@@ -698,7 +698,7 @@ impl App {
 
 		let futures = join_all(futures);
 		if self.background_executor.block_with_timeout(SHUTDOWN_TIMEOUT, futures).is_err() {
-			log::error!("timed out waiting on app_will_quit");
+			tracing::error!("timed out waiting on app_will_quit");
 		}
 
 		self.quitting = false;

@@ -19,7 +19,7 @@ doctest = true
 anyhow.workspace = true
 bytes.workspace = true
 lucie = { workspace = true, default-features = false }
-log.workspace = true
+tracing.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread"] }
 tokio-stream = { workspace = true }
 tokio-util = { version = "0.7", features = [ "io" ] }

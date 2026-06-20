@@ -559,10 +559,10 @@ impl WaylandWindowStatePtr {
 					}
 				}
 				WEnum::Value(_) => {
-					log::warn!("Unknown decoration mode");
+					tracing::warn!("Unknown decoration mode");
 				}
 				WEnum::Unknown(v) => {
-					log::warn!("Unknown decoration mode: {}", v);
+					tracing::warn!("Unknown decoration mode: {}", v);
 				}
 			}
 		}
@@ -1170,7 +1170,7 @@ impl PlatformWindow for WaylandWindow {
 			}
 			None => {
 				if matches!(decorations, WindowDecorations::Server) {
-					log::info!("Server-side decorations requested, but the Wayland server does not support them. Falling back to client-side decorations.");
+					tracing::info!("Server-side decorations requested, but the Wayland server does not support them. Falling back to client-side decorations.");
 				}
 				state.decorations = WindowDecorations::Client;
 				update_window(state);

@@ -15,8 +15,8 @@ use std::{
 
 use anyhow::{Context as _, anyhow};
 use calloop::LoopSignal;
-use tokio::sync::oneshot;
 use lucie_common::ResultExt as _;
+use tokio::sync::oneshot;
 #[cfg(any(feature = "wayland", feature = "x11"))]
 use xkbcommon::xkb::{self, Keycode, Keysym, State};
 
@@ -155,19 +155,19 @@ impl<P: LinuxClient + 'static> Platform for P {
 	}
 
 	fn activate(&self, _ignoring_other_apps: bool) {
-		log::info!("activate is not implemented on Linux, ignoring the call")
+		tracing::info!("activate is not implemented on Linux, ignoring the call")
 	}
 
 	fn hide(&self) {
-		log::info!("hide is not implemented on Linux, ignoring the call")
+		tracing::info!("hide is not implemented on Linux, ignoring the call")
 	}
 
 	fn hide_other_apps(&self) {
-		log::info!("hide_other_apps is not implemented on Linux, ignoring the call")
+		tracing::info!("hide_other_apps is not implemented on Linux, ignoring the call")
 	}
 
 	fn unhide_other_apps(&self) {
-		log::info!("unhide_other_apps is not implemented on Linux, ignoring the call")
+		tracing::info!("unhide_other_apps is not implemented on Linux, ignoring the call")
 	}
 
 	fn primary_display(&self) -> Option<Rc<dyn PlatformDisplay>> {
@@ -349,14 +349,14 @@ impl CursorStyle {
 #[cfg(any(feature = "wayland", feature = "x11"))]
 pub(super) fn log_cursor_icon_warning(message: impl std::fmt::Display) {
 	if let Ok(xcursor_path) = env::var("XCURSOR_PATH") {
-		log::warn!(
+		tracing::warn!(
 			"{:#}\ncursor icon loading may be failing if XCURSOR_PATH environment variable is invalid. \
                     XCURSOR_PATH overrides the default icon search. Its current value is '{}'",
 			message,
 			xcursor_path
 		);
 	} else {
-		log::warn!("{:#}", message);
+		tracing::warn!("{:#}", message);
 	}
 }
 

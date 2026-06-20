@@ -111,7 +111,7 @@ impl Render for ImageShowcase {
 actions!(image, [Quit]);
 
 fn main() {
-	env_logger::init();
+	tracing_subscriber::fmt::init();
 
 	let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 

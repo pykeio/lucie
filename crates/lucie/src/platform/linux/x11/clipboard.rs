@@ -281,7 +281,7 @@ impl Inner {
 
 		let highest_precedence_format = match self.read_single(&reader, selection, self.atoms.TARGETS) {
 			Err(err) => {
-				log::trace!("Clipboard TARGETS query failed with {err:?}");
+				tracing::trace!("Clipboard TARGETS query failed with {err:?}");
 				None
 			}
 			Ok(ClipboardData { bytes, format }) => {
@@ -289,7 +289,7 @@ impl Inner {
 					let available_formats = Self::parse_formats(&bytes);
 					formats.iter().find(|format| available_formats.contains(format))
 				} else {
-					log::trace!("Unexpected clipboard TARGETS format {}", self.atom_name(format));
+					tracing::trace!("Unexpected clipboard TARGETS format {}", self.atom_name(format));
 					None
 				}
 			}
@@ -299,20 +299,20 @@ impl Inner {
 			let data = self.read_single(&reader, selection, format)?;
 			if !formats.contains(&data.format) {
 				// This shouldn't happen since the format is from the TARGETS list.
-				log::trace!("Conversion to {} responded with {} which is not supported", self.atom_name(format), self.atom_name(data.format),);
+				tracing::trace!("Conversion to {} responded with {} which is not supported", self.atom_name(format), self.atom_name(data.format),);
 				return Err(Error::ConversionFailure);
 			}
 			return Ok(data);
 		}
 
-		log::trace!("Falling back on attempting to convert clipboard to each format.");
+		tracing::trace!("Falling back on attempting to convert clipboard to each format.");
 		for format in formats {
 			match self.read_single(&reader, selection, *format) {
 				Ok(data) => {
 					if formats.contains(&data.format) {
 						return Ok(data);
 					} else {
-						log::trace!("Conversion to {} responded with {} which is not supported", self.atom_name(*format), self.atom_name(data.format),);
+						tracing::trace!("Conversion to {} responded with {} which is not supported", self.atom_name(*format), self.atom_name(data.format),);
 						continue;
 					}
 				}
@@ -320,12 +320,12 @@ impl Inner {
 					continue;
 				}
 				Err(e) => {
-					log::trace!("Conversion to {} failed: {}", self.atom_name(*format), e);
+					tracing::trace!("Conversion to {} failed: {}", self.atom_name(*format), e);
 					return Err(e);
 				}
 			}
 		}
-		log::trace!("All conversions to supported formats failed.");
+		tracing::trace!("All conversions to supported formats failed.");
 		Err(Error::ContentNotAvailable)
 	}
 
@@ -351,7 +351,7 @@ impl Inner {
 			.map_err(into_unknown)?;
 		reader.conn.sync().map_err(into_unknown)?;
 
-		log::trace!("Finished `convert_selection`");
+		tracing::trace!("Finished `convert_selection`");
 
 		let mut incr_data: Vec<u8> = Vec::new();
 		let mut using_incr = false;
@@ -370,7 +370,7 @@ impl Inner {
 			match event {
 				// The first response after requesting a selection.
 				Event::SelectionNotify(event) => {
-					log::trace!("Read SelectionNotify");
+					tracing::trace!("Read SelectionNotify");
 					let result = self.handle_read_selection_notify(reader, target_format, &mut using_incr, &mut incr_data, event)?;
 					match result {
 						ReadSelNotifyResult::GotData(data) => return Ok(data),
@@ -395,10 +395,10 @@ impl Inner {
 						});
 					}
 				}
-				_ => log::trace!("An unexpected event arrived while reading the clipboard: {:?}", event)
+				_ => tracing::trace!("An unexpected event arrived while reading the clipboard: {:?}", event)
 			}
 		}
-		log::info!("Time-out hit while reading the clipboard.");
+		tracing::info!("Time-out hit while reading the clipboard.");
 		Err(Error::ContentNotAvailable)
 	}
 
@@ -487,11 +487,11 @@ impl Inner {
 			return Err(Error::ContentNotAvailable);
 		}
 		if self.kind_of(event.selection).is_none() {
-			log::info!("Received a SelectionNotify for a selection other than CLIPBOARD, PRIMARY or SECONDARY. This is unexpected.");
+			tracing::info!("Received a SelectionNotify for a selection other than CLIPBOARD, PRIMARY or SECONDARY. This is unexpected.");
 			return Ok(ReadSelNotifyResult::EventNotRecognized);
 		}
 		if *using_incr {
-			log::warn!("Received a SelectionNotify while already expecting INCR segments.");
+			tracing::warn!("Received a SelectionNotify while already expecting INCR segments.");
 			return Ok(ReadSelNotifyResult::EventNotRecognized);
 		}
 		// Accept any property type. The property type will typically match the format type except
@@ -520,7 +520,7 @@ impl Inner {
 				.map_err(into_unknown)?
 				.reply()
 				.map_err(into_unknown)?;
-			log::trace!("Receiving INCR segments");
+			tracing::trace!("Receiving INCR segments");
 			*using_incr = true;
 			if reply.value_len == 4 {
 				let min_data_len = reply.value32().and_then(|mut vals| vals.next()).unwrap_or(0);
@@ -560,7 +560,7 @@ impl Inner {
 			.reply()
 			.map_err(into_unknown)?;
 
-		// log::trace!("Received segment. value_len {}", reply.value_len,);
+		// tracing::trace!("Received segment. value_len {}", reply.value_len,);
 		if reply.value_len == 0 {
 			// This indicates that all the data has been sent.
 			return Ok(true);
@@ -578,7 +578,7 @@ impl Inner {
 		let selection = match self.kind_of(event.selection) {
 			Some(kind) => kind,
 			None => {
-				log::warn!("Received a selection request to a selection other than the CLIPBOARD, PRIMARY or SECONDARY. This is unexpected.");
+				tracing::warn!("Received a selection request to a selection other than the CLIPBOARD, PRIMARY or SECONDARY. This is unexpected.");
 				return Ok(());
 			}
 		};
@@ -586,7 +586,7 @@ impl Inner {
 		let success;
 		// we are asked for a list of supported conversion targets
 		if event.target == self.atoms.TARGETS {
-			log::trace!("Handling TARGETS, dst property is {}", self.atom_name(event.property));
+			tracing::trace!("Handling TARGETS, dst property is {}", self.atom_name(event.property));
 			let mut targets = Vec::with_capacity(10);
 			targets.push(self.atoms.TARGETS);
 			targets.push(self.atoms.SAVE_TARGETS);
@@ -616,7 +616,7 @@ impl Inner {
 			self.server.conn.flush().map_err(into_unknown)?;
 			success = true;
 		} else {
-			log::trace!("Handling request for (probably) the clipboard contents.");
+			tracing::trace!("Handling request for (probably) the clipboard contents.");
 			let data = self.selection_of(selection).data.read();
 			if let Some(data_list) = &*data {
 				success = match data_list.iter().find(|d| d.format == event.target) {
@@ -664,7 +664,7 @@ impl Inner {
 	fn ask_clipboard_manager_to_request_our_data(&self) -> Result<()> {
 		if self.server.win_id == 0 {
 			// This shouldn't really ever happen but let's just check.
-			log::error!("The server's window id was 0. This is unexpected");
+			tracing::error!("The server's window id was 0. This is unexpected");
 			return Ok(());
 		}
 
@@ -682,7 +682,7 @@ impl Inner {
 		// after the request but before we can lock it here.
 		let mut handover_state = self.handover_state.lock();
 
-		log::trace!("Sending the data to the clipboard manager");
+		tracing::trace!("Sending the data to the clipboard manager");
 		self.server
 			.conn
 			.convert_selection(self.server.win_id, self.atoms.CLIPBOARD_MANAGER, self.atoms.SAVE_TARGETS, self.atoms.ARBOARD_CLIPBOARD, Time::CURRENT_TIME)
@@ -700,7 +700,7 @@ impl Inner {
 			return Ok(());
 		}
 		if result.timed_out() {
-			log::warn!("Could not hand the clipboard contents over to the clipboard manager. The request timed out.");
+			tracing::warn!("Could not hand the clipboard contents over to the clipboard manager. The request timed out.");
 			return Ok(());
 		}
 
@@ -710,7 +710,7 @@ impl Inner {
 
 fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>> {
 	fn handover_finished(clip: &Arc<Inner>, mut handover_state: MutexGuard<ManagerHandoverState>) {
-		log::trace!("Finishing clipboard manager handover.");
+		tracing::trace!("Finishing clipboard manager handover.");
 		*handover_state = ManagerHandoverState::Finished;
 
 		// Not sure if unlocking the mutex is necessary here but better safe than sorry.
@@ -719,7 +719,7 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 		clip.handover_cv.notify_all();
 	}
 
-	log::trace!("Started serve requests thread.");
+	tracing::trace!("Started serve requests thread.");
 
 	let _guard = lucie_common::defer(|| {
 		context.serve_stopped.store(true, Ordering::Relaxed);
@@ -732,14 +732,14 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 		match context.server.conn.wait_for_event().map_err(into_unknown)? {
 			Event::DestroyNotify(_) => {
 				// This window is being destroyed.
-				log::trace!("Clipboard server window is being destroyed x_x");
+				tracing::trace!("Clipboard server window is being destroyed x_x");
 				return Ok(());
 			}
 			Event::SelectionClear(event) => {
 				// TODO: check if this works
 				// Someone else has new content in the clipboard, so it is
 				// notifying us that we should delete our data now.
-				log::trace!("Somebody else owns the clipboard now");
+				tracing::trace!("Somebody else owns the clipboard now");
 
 				if let Some(selection) = context.kind_of(event.selection) {
 					let selection = context.selection_of(selection);
@@ -756,7 +756,7 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 				}
 			}
 			Event::SelectionRequest(event) => {
-				log::trace!("SelectionRequest - selection is: {}, target is {}", context.atom_name(event.selection), context.atom_name(event.target),);
+				tracing::trace!("SelectionRequest - selection is: {}, target is {}", context.atom_name(event.selection), context.atom_name(event.target),);
 				// Someone is requesting the clipboard content from us.
 				context.handle_selection_request(event).map_err(into_unknown)?;
 
@@ -767,7 +767,7 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 					// Only set written, when the actual contents were written,
 					// not just a response to what TARGETS we have.
 					if event.target != context.atoms.TARGETS {
-						log::trace!("The contents were written to the clipboard manager.");
+						tracing::trace!("The contents were written to the clipboard manager.");
 						written = true;
 						// if we have written and notified, make sure to notify that we are done
 						if notified {
@@ -782,7 +782,7 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 				// clipboard contents, this must come from the clipboard manager
 				// signaling that the data was handed over successfully.
 				if event.selection != context.atoms.CLIPBOARD_MANAGER {
-					log::error!("Received a `SelectionNotify` from a selection other than the CLIPBOARD_MANAGER. This is unexpected in this thread.");
+					tracing::error!("Received a `SelectionNotify` from a selection other than the CLIPBOARD_MANAGER. This is unexpected in this thread.");
 					continue;
 				}
 				let handover_state = context.handover_state.lock();
@@ -790,7 +790,7 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 					// Note that some clipboard managers send a selection notify
 					// before even sending a request for the actual contents.
 					// (That's why we use the "notified" & "written" flags)
-					log::trace!("The clipboard manager indicated that it's done requesting the contents from us.");
+					tracing::trace!("The clipboard manager indicated that it's done requesting the contents from us.");
 					notified = true;
 
 					// One would think that we could also finish if the property
@@ -806,7 +806,7 @@ fn serve_requests(context: Arc<Inner>) -> Result<(), Box<dyn std::error::Error>>
 			}
 			_event => {
 				// May be useful for debugging but nothing else really.
-				// log::trace!("Received unwanted event: {:?}", event);
+				// tracing::trace!("Received unwanted event: {:?}", event);
 			}
 		}
 	}
@@ -830,7 +830,7 @@ impl Clipboard {
 				let ctx = Arc::clone(&ctx);
 				move || {
 					if let Err(error) = serve_requests(ctx) {
-						log::error!("Worker thread errored with: {}", error);
+						tracing::error!("Worker thread errored with: {}", error);
 					}
 				}
 			})
@@ -914,7 +914,7 @@ impl Clipboard {
 
 		let result = self.inner.read(&format_atoms, selection)?;
 
-		log::trace!("read clipboard as format {:?}", self.inner.atom_name(result.format));
+		tracing::trace!("read clipboard as format {:?}", self.inner.atom_name(result.format));
 
 		for (format_atom, image_format) in image_format_atoms.into_iter().zip(image_formats) {
 			if result.format == format_atom {
@@ -954,15 +954,15 @@ impl Drop for Clipboard {
 			// and send the data to the clipboard manager
 
 			if let Err(e) = self.inner.ask_clipboard_manager_to_request_our_data() {
-				log::error!("Could not hand the clipboard data over to the clipboard manager: {}", e);
+				tracing::error!("Could not hand the clipboard data over to the clipboard manager: {}", e);
 			}
 			let global_cb = global_cb.take();
 			if let Err(e) = self.inner.server.conn.destroy_window(self.inner.server.win_id) {
-				log::error!("Failed to destroy the clipboard window. Error: {}", e);
+				tracing::error!("Failed to destroy the clipboard window. Error: {}", e);
 				return;
 			}
 			if let Err(e) = self.inner.server.conn.flush() {
-				log::error!("Failed to flush the clipboard window. Error: {}", e);
+				tracing::error!("Failed to flush the clipboard window. Error: {}", e);
 				return;
 			}
 			if let Some(global_cb) = global_cb
@@ -978,9 +978,9 @@ impl Drop for Clipboard {
 					message = None;
 				}
 				if let Some(message) = message {
-					log::error!("The clipboard server thread panicked. Panic message: '{}'", message,);
+					tracing::error!("The clipboard server thread panicked. Panic message: '{}'", message,);
 				} else {
-					log::error!("The clipboard server thread panicked.");
+					tracing::error!("The clipboard server thread panicked.");
 				}
 			}
 		}

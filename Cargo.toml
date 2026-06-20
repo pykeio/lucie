@@ -57,7 +57,6 @@ futures-util = { version = "0.3", default-features = false, features = [ "std" ]
 http = "1.1"
 http-body = "1.0"
 image = { version = "0.25.1", default-features = false, features = [ "gif", "jpeg", "png", "webp" ] }
-log = "0.4"
 mach2 = "0.5"
 metal = "0.29"
 naga = { version = "25.0", features = ["wgsl-in"] }

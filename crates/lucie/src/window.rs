@@ -2030,7 +2030,7 @@ impl Window {
 		// Use indexing instead of iteration to avoid borrowing self for the duration of the loop.
 		for tooltip_request_index in (0..self.next_frame.tooltip_requests.len()).rev() {
 			let Some(Some(tooltip_request)) = self.next_frame.tooltip_requests.get(tooltip_request_index).cloned() else {
-				log::error!("Unexpectedly absent TooltipRequest");
+				tracing::error!("Unexpectedly absent TooltipRequest");
 				continue;
 			};
 			let mut element = tooltip_request.tooltip.view.clone().into_any();

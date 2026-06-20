@@ -70,7 +70,7 @@ impl LinuxDispatcher {
 							location.end = Some(end);
 							profiler::add_task_timing(location);
 
-							log::trace!("background thread {}: ran runnable. took: {:?}", i, start.elapsed());
+							tracing::trace!("background thread {}: ran runnable. took: {:?}", i, start.elapsed());
 						}
 					})
 					.unwrap()
@@ -211,7 +211,7 @@ impl PlatformDispatcher for LinuxDispatcher {
 			// SAFETY: sched_param is a valid initialized structure
 			let result = unsafe { libc::pthread_setschedparam(thread_id, policy, &sched_param) };
 			if result != 0 {
-				log::warn!("failed to set realtime thread priority to {:?}", priority);
+				tracing::warn!("failed to set realtime thread priority to {:?}", priority);
 			}
 
 			f();

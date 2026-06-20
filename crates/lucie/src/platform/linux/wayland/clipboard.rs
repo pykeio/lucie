@@ -82,7 +82,7 @@ impl<T: ReceiveData> DataOffer<T> {
 		match unsafe { read_fd(fd) } {
 			Ok(bytes) => Some(bytes),
 			Err(err) => {
-				log::error!("error reading clipboard pipe: {err:?}");
+				tracing::error!("error reading clipboard pipe: {err:?}");
 				None
 			}
 		}
@@ -97,7 +97,7 @@ impl<T: ReceiveData> DataOffer<T> {
 		let text_content = match String::from_utf8(bytes) {
 			Ok(content) => content,
 			Err(e) => {
-				log::error!("Failed to convert clipboard content to UTF-8: {}", e);
+				tracing::error!("Failed to convert clipboard content to UTF-8: {}", e);
 				return None;
 			}
 		};

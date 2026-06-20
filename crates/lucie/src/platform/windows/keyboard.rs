@@ -38,20 +38,20 @@ impl PlatformKeyboardMapper for WindowsKeyboardMapper {
 			return KeybindingKeystroke::from_keystroke(keystroke);
 		};
 		if shifted_key && keystroke.modifiers.shift {
-			log::warn!("Keystroke '{}' has both shift and a shifted key, this is likely a bug", keystroke.key);
+			tracing::warn!("Keystroke '{}' has both shift and a shifted key, this is likely a bug", keystroke.key);
 		}
 
 		let shift = shifted_key || keystroke.modifiers.shift;
 		keystroke.modifiers.shift = false;
 
 		let Some(key) = self.vkey_to_key.get(&vkey).cloned() else {
-			log::error!("Failed to map key equivalent '{:?}' to a valid key", keystroke);
+			tracing::error!("Failed to map key equivalent '{:?}' to a valid key", keystroke);
 			return KeybindingKeystroke::from_keystroke(keystroke);
 		};
 
 		keystroke.key = if shift {
 			let Some(shifted_key) = self.vkey_to_shifted.get(&vkey).cloned() else {
-				log::error!("Failed to map keystroke {:?} with virtual key '{:?}' to a shifted key", keystroke, vkey);
+				tracing::error!("Failed to map keystroke {:?} with virtual key '{:?}' to a shifted key", keystroke, vkey);
 				return KeybindingKeystroke::from_keystroke(keystroke);
 			};
 			shifted_key

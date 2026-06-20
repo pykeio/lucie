@@ -132,7 +132,7 @@ impl DirectXRendererDevices {
 impl DirectXRenderer {
 	pub(crate) fn new(hwnd: HWND, directx_devices: &DirectXDevices, disable_direct_composition: bool) -> Result<Self> {
 		if disable_direct_composition {
-			log::info!("Direct Composition is disabled.");
+			tracing::info!("Direct Composition is disabled.");
 		}
 
 		let devices = DirectXRendererDevices::new(directx_devices, disable_direct_composition).context("Creating DirectX devices")?;
@@ -767,7 +767,7 @@ impl<T> PipelineState<T> {
 	fn update_buffer(&mut self, device: &ID3D11Device, device_context: &ID3D11DeviceContext, data: &[T]) -> Result<()> {
 		if self.buffer_size < data.len() {
 			let new_buffer_size = data.len().next_power_of_two();
-			log::info!("Updating {} buffer size from {} to {}", self.label, self.buffer_size, new_buffer_size);
+			tracing::info!("Updating {} buffer size from {} to {}", self.label, self.buffer_size, new_buffer_size);
 			let buffer = create_buffer(device, std::mem::size_of::<T>(), new_buffer_size)?;
 			let view = create_buffer_view(device, &buffer)?;
 			self.buffer = buffer;
@@ -1313,7 +1313,7 @@ pub(crate) mod shader_resources {
 				};
 
 				let error_string = std::ffi::CStr::from_ptr(error_blob.GetBufferPointer() as *const i8).to_string_lossy();
-				log::error!("Shader compile error: {}", error_string);
+				tracing::error!("Shader compile error: {}", error_string);
 				return Err(anyhow::anyhow!("Compile error: {}", error_string));
 			}
 			Ok(compile_blob.unwrap())

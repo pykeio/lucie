@@ -130,7 +130,7 @@ impl WindowsDisplay {
 		const POINT_ZERO: POINT = POINT { x: 0, y: 0 };
 		let monitor = unsafe { MonitorFromPoint(POINT_ZERO, MONITOR_DEFAULTTOPRIMARY) };
 		if monitor.is_invalid() {
-			log::error!("can not find the primary monitor: {}", std::io::Error::last_os_error());
+			tracing::error!("can not find the primary monitor: {}", std::io::Error::last_os_error());
 			return None;
 		}
 		WindowsDisplay::new_with_handle(monitor).log_err()

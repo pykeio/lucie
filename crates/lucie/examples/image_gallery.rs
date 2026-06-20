@@ -214,7 +214,7 @@ impl ImageCache for SimpleLruCache {
 actions!(image, [Quit]);
 
 fn main() {
-	env_logger::init();
+	tracing_subscriber::fmt::init();
 
 	Application::new().run(move |cx: &mut App| {
 		let http_client = ReqwestClient::user_agent("LucieExample/1.0").unwrap();

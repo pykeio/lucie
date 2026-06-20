@@ -71,7 +71,7 @@ where
 
 	fn load(source: Self::Source, cx: &mut App) -> impl Future<Output = Self::Output> + Send + 'static {
 		let load = T::load(source, cx);
-		load.inspect_err(|e| log::error!("Failed to load asset: {}", e))
+		load.inspect_err(|e| tracing::error!("Failed to load asset: {}", e))
 	}
 }
 

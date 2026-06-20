@@ -171,7 +171,7 @@ impl WindowsWindowInner {
 
 		self.state.logical_size.set(new_logical_size);
 		if should_resize_renderer && let Err(e) = self.state.renderer.borrow_mut().resize(device_size) {
-			log::error!("Failed to resize renderer, invalidating devices: {}", e);
+			tracing::error!("Failed to resize renderer, invalidating devices: {}", e);
 			self.state.invalidate_devices.store(true, std::sync::atomic::Ordering::Release);
 		}
 		if let Some(mut callback) = self.state.callbacks.resize.take() {
@@ -184,7 +184,7 @@ impl WindowsWindowInner {
 		unsafe {
 			let ret = SetTimer(Some(handle), SIZE_MOVE_LOOP_TIMER_ID, USER_TIMER_MINIMUM, None);
 			if ret == 0 {
-				log::error!("unable to create timer: {}", std::io::Error::last_os_error());
+				tracing::error!("unable to create timer: {}", std::io::Error::last_os_error());
 			}
 		}
 		None
@@ -678,7 +678,7 @@ impl WindowsWindowInner {
 		let new_monitor = unsafe { MonitorFromWindow(handle, MONITOR_DEFAULTTONULL) };
 		// all monitors disconnected
 		if new_monitor.is_invalid() {
-			log::error!("No monitor detected!");
+			tracing::error!("No monitor detected!");
 			return None;
 		}
 		let new_display = WindowsDisplay::new_with_handle(new_monitor).log_err()?;
@@ -912,7 +912,7 @@ impl WindowsWindowInner {
 		if unsafe { !parameter.is_null() && !parameter.is_empty() }
 			&& let Some(parameter_string) = unsafe { parameter.to_string() }.log_err()
 		{
-			log::info!("System settings changed: {}", parameter_string);
+			tracing::info!("System settings changed: {}", parameter_string);
 			if parameter_string.as_str() == "ImmersiveColorSet" {
 				let new_appearance = system_appearance()
 					.context("unable to get system appearance when handling ImmersiveColorSet")
@@ -990,7 +990,7 @@ impl WindowsWindowInner {
 					String::from_utf16(&[high_surrogate, code_point]).ok()
 				} else {
 					// Invalid low surrogate without a preceding high surrogate
-					log::warn!("Received low surrogate without a preceding high surrogate: {code_point:x}");
+					tracing::warn!("Received low surrogate without a preceding high surrogate: {code_point:x}");
 					None
 				}
 			}

@@ -102,7 +102,7 @@ impl PlatformDispatcher for WindowsDispatcher {
 		self.dispatch_on_threadpool(runnable, priority);
 
 		if let Some(label) = label {
-			log::debug!("TaskLabel: {label:?}");
+			tracing::debug!("TaskLabel: {label:?}");
 		}
 	}
 

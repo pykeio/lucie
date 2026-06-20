@@ -718,7 +718,7 @@ impl PlatformWindow for WindowsWindow {
 
 	fn set_title(&mut self, title: &str) {
 		unsafe { SetWindowTextW(self.0.hwnd, &HSTRING::from(title)) }
-			.inspect_err(|e| log::error!("Set title failed: {e}"))
+			.inspect_err(|e| tracing::error!("Set title failed: {e}"))
 			.ok();
 	}
 

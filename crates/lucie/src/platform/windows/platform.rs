@@ -438,7 +438,7 @@ impl WindowsPlatformInner {
 
 	fn handle_lucie_events(&self, message: u32, wparam: WPARAM, lparam: LPARAM) -> Option<isize> {
 		if wparam.0 != self.validation_number {
-			log::error!("Wrong validation number while processing message: {message}");
+			tracing::error!("Wrong validation number while processing message: {message}");
 			return None;
 		}
 		match message {
@@ -456,7 +456,7 @@ impl WindowsPlatformInner {
 
 	fn close_one_window(&self, target_window: HWND) -> bool {
 		let Some(all_windows) = self.raw_window_handles.upgrade() else {
-			log::error!("Failed to upgrade raw window handles");
+			tracing::error!("Failed to upgrade raw window handles");
 			return false;
 		};
 		let mut lock = all_windows.write();
@@ -474,7 +474,7 @@ impl WindowsPlatformInner {
 		'tasks: loop {
 			'timeout_loop: loop {
 				if start.elapsed().as_millis() >= MAIN_TASK_TIMEOUT {
-					log::debug!("foreground task timeout reached");
+					tracing::debug!("foreground task timeout reached");
 					// we spent our budget on lucie tasks, we likely have a lot of work queued so drain system events first to stay
 					// responsive then quit out of foreground work to allow us to process other lucie events first before returning back
 					// to foreground task work if we don't we might not for example process window quit events
@@ -535,7 +535,7 @@ impl WindowsPlatformInner {
 			.get(action_idx)
 			.map(|dock_menu| dock_menu.action.boxed_clone())
 		else {
-			log::error!("Dock menu for index {action_idx} not found");
+			tracing::error!("Dock menu for index {action_idx} not found");
 			return Some(1);
 		};
 		self.with_callback(|callbacks| &callbacks.app_menu_action, |callback| callback(&*action));
@@ -611,7 +611,7 @@ fn check_device_lost(device: &ID3D11Device) -> bool {
 	match device_state {
 		Ok(_) => false,
 		Err(err) => {
-			log::error!("DirectX device lost detected: {:?}", err);
+			tracing::error!("DirectX device lost detected: {:?}", err);
 			true
 		}
 	}
@@ -628,7 +628,7 @@ fn handle_gpu_device_lost(
 	std::thread::sleep(std::time::Duration::from_millis(350));
 
 	*directx_devices = try_to_recover_from_device_lost(|| DirectXDevices::new().context("Failed to recreate new DirectX devices after device lost"))?;
-	log::info!("DirectX devices successfully recreated.");
+	tracing::info!("DirectX devices successfully recreated.");
 
 	let lparam = LPARAM(directx_devices as *const _ as _);
 	unsafe {

@@ -43,7 +43,7 @@ impl ReqwestClient {
 
 		if let Some(proxy) = proxy.as_ref().and_then(|proxy_url| {
 			reqwest::Proxy::all(proxy_url.to_string())
-				.inspect_err(|e| log::error!("Failed to parse proxy URL '{}': {}", proxy_url, e.source().unwrap_or(&e as &_)))
+				.inspect_err(|e| tracing::error!("Failed to parse proxy URL '{}': {}", proxy_url, e.source().unwrap_or(&e as &_)))
 				.ok()
 		}) {
 			// Respect NO_PROXY env var
@@ -75,7 +75,7 @@ pub fn runtime() -> &'static tokio::runtime::Runtime {
 impl From<reqwest::Client> for ReqwestClient {
 	fn from(client: reqwest::Client) -> Self {
 		let handle = tokio::runtime::Handle::try_current().unwrap_or_else(|_| {
-			log::debug!("no tokio runtime found, creating one for Reqwest...");
+			tracing::debug!("no tokio runtime found, creating one for Reqwest...");
 			runtime().handle().clone()
 		});
 		Self {

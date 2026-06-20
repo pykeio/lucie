@@ -87,7 +87,7 @@ impl Cursor {
 		self.set_scaled_size(self.size * scale as u32);
 
 		let Some(loaded_theme) = &mut self.loaded_theme else {
-			log::warn!("Wayland: Unable to load cursor themes");
+			tracing::warn!("Wayland: Unable to load cursor themes");
 			return;
 		};
 		let mut theme = &mut loaded_theme.theme;

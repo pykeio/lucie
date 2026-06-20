@@ -224,7 +224,7 @@ impl MacTextSystemState {
 					// I spent far too long trying to track down why a font missing the 'm'
 					// character wasn't loading. This log statement will hopefully save
 					// someone else from suffering the same fate.
-					log::warn!("font '{}' has no 'm' character and was not loaded", font.full_name());
+					tracing::warn!("font '{}' has no 'm' character and was not loaded", font.full_name());
 					continue;
 				}
 			}
@@ -239,7 +239,7 @@ impl MacTextSystemState {
 					&& traits.get(kCTFontWeightTrait).downcast::<CFNumber>().is_some()
 					&& traits.get(kCTFontSlantTrait).downcast::<CFNumber>().is_some())
 			} {
-				log::error!("Failed to read traits for font {:?}", font.postscript_name().unwrap());
+				tracing::error!("Failed to read traits for font {:?}", font.postscript_name().unwrap());
 				continue;
 			}
 

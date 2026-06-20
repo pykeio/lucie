@@ -82,13 +82,13 @@ where
 		let mut buffer = vec![0u16; filename_length + 1];
 		let ret = unsafe { DragQueryFileW(hdrop, file_index, Some(buffer.as_mut_slice())) };
 		if ret == 0 {
-			log::error!("unable to read file name of dragged file");
+			tracing::error!("unable to read file name of dragged file");
 			continue;
 		}
 		match String::from_utf16(&buffer[0..filename_length]) {
 			Ok(file_name) => f(file_name),
 			Err(e) => {
-				log::error!("dragged file name is not UTF-16: {}", e)
+				tracing::error!("dragged file name is not UTF-16: {}", e)
 			}
 		}
 	}
@@ -102,12 +102,12 @@ where
 		Ok(()) => {
 			let result = f();
 			if let Err(e) = unsafe { CloseClipboard() } {
-				log::error!("Failed to close clipboard: {e}",);
+				tracing::error!("Failed to close clipboard: {e}",);
 			}
 			Some(result)
 		}
 		Err(e) => {
-			log::error!("Failed to open clipboard: {e}",);
+			tracing::error!("Failed to open clipboard: {e}",);
 			None
 		}
 	}
@@ -118,7 +118,7 @@ fn register_clipboard_format(format: PCWSTR) -> u32 {
 	if ret == 0 {
 		panic!("Error when registering clipboard format: {}", std::io::Error::last_os_error());
 	}
-	log::debug!("Registered clipboard format {} as {}", unsafe { format.display() }, ret);
+	tracing::debug!("Registered clipboard format {} as {}", unsafe { format.display() }, ret);
 	ret
 }
 
@@ -199,7 +199,7 @@ fn write_image_to_clipboard(item: &Image) -> Result<()> {
 			set_data_to_clipboard(&png_bytes, *CLIPBOARD_PNG_FORMAT)?;
 		}
 		other => {
-			log::warn!("Clipboard unsupported image format: {:?}, convert to PNG instead.", item.format);
+			tracing::warn!("Clipboard unsupported image format: {:?}, convert to PNG instead.", item.format);
 			let png_bytes = convert_image_to_png_format(item.bytes(), other)?;
 			set_data_to_clipboard(&png_bytes, *CLIPBOARD_PNG_FORMAT)?;
 		}
@@ -257,7 +257,7 @@ where
 			let mut buffer = [0u16; 64];
 			unsafe { GetClipboardFormatNameW(clipboard_format, &mut buffer) };
 			let format_name = String::from_utf16_lossy(&buffer);
-			log::warn!("Try to paste with unsupported clipboard format: {}, {}.", clipboard_format, format_name);
+			tracing::warn!("Try to paste with unsupported clipboard format: {}, {}.", clipboard_format, format_name);
 		}
 	}
 	None

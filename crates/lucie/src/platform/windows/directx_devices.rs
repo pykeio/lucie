@@ -49,13 +49,13 @@ impl DirectXDevices {
 			let device = get_device(&adapter, Some(&mut context), Some(&mut feature_level), debug_layer_available).context("Creating Direct3D device")?;
 			match feature_level {
 				D3D_FEATURE_LEVEL_11_1 => {
-					log::info!("Created device with Direct3D 11.1 feature level.")
+					tracing::info!("Created device with Direct3D 11.1 feature level.")
 				}
 				D3D_FEATURE_LEVEL_11_0 => {
-					log::info!("Created device with Direct3D 11.0 feature level.")
+					tracing::info!("Created device with Direct3D 11.0 feature level.")
 				}
 				D3D_FEATURE_LEVEL_10_1 => {
-					log::info!("Created device with Direct3D 10.1 feature level.")
+					tracing::info!("Created device with Direct3D 10.1 feature level.")
 				}
 				_ => unreachable!()
 			}
@@ -77,7 +77,7 @@ fn check_debug_layer_available() -> bool {
 	{
 		use windows::Win32::Graphics::Dxgi::{DXGIGetDebugInterface1, IDXGIInfoQueue};
 
-		unsafe { DXGIGetDebugInterface1::<IDXGIInfoQueue>(0) }.log_err().is_some()
+		unsafe { DXGIGetDebugInterface1::<IDXGIInfoQueue>(0) }.is_ok()
 	}
 	#[cfg(not(debug_assertions))]
 	{
@@ -91,7 +91,7 @@ fn get_dxgi_factory(debug_layer_available: bool) -> Result<IDXGIFactory6> {
 		DXGI_CREATE_FACTORY_DEBUG
 	} else {
 		#[cfg(debug_assertions)]
-		log::warn!("Failed to get DXGI debug interface. DirectX debugging features will be disabled.");
+		tracing::info!("Failed to get DXGI debug interface. DirectX debugging features will be disabled.");
 		DXGI_CREATE_FACTORY_FLAGS::default()
 	};
 	unsafe { Ok(CreateDXGIFactory2(factory_flag)?) }
@@ -103,7 +103,7 @@ fn get_adapter(dxgi_factory: &IDXGIFactory6, debug_layer_available: bool) -> Res
 		let adapter: IDXGIAdapter1 = unsafe { dxgi_factory.EnumAdapters(adapter_index)?.cast()? };
 		if let Ok(desc) = unsafe { adapter.GetDesc1() } {
 			let gpu_name = String::from_utf16_lossy(&desc.Description).trim_matches(char::from(0)).to_string();
-			log::info!("Using GPU: {}", gpu_name);
+			tracing::info!("Using GPU: {}", gpu_name);
 		}
 		// Check to see whether the adapter supports Direct3D 11, but don't
 		// create the actual device yet.

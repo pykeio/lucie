@@ -139,7 +139,7 @@ impl BladePipelines {
 	fn new(gpu: &gpu::Context, surface_info: gpu::SurfaceInfo, path_sample_count: u32) -> Self {
 		use gpu::ShaderData as _;
 
-		log::info!("Initializing Blade pipelines for surface {:?}", surface_info);
+		tracing::info!("Initializing Blade pipelines for surface {:?}", surface_info);
 		let shader = gpu.create_shader(gpu::ShaderDesc { source: include_str!("shaders.wgsl") });
 		shader.check_struct_size::<GlobalParams>();
 		shader.check_struct_size::<SurfaceParams>();
@@ -410,13 +410,13 @@ impl BladeRenderer {
 		if let Some(last_sp) = self.last_sync_point.take()
 			&& !self.gpu.wait_for(&last_sp, MAX_FRAME_TIME_MS)
 		{
-			log::error!("GPU hung");
+			tracing::error!("GPU hung");
 			#[cfg(target_os = "linux")]
 			if self.gpu.device_information().driver_name == "radv" {
-				log::error!("there's a known bug with amdgpu/radv, try setting ZED_PATH_SAMPLE_COUNT=0 as a workaround");
-				log::error!("if that helps you're running into https://github.com/zed-industries/zed/issues/26143");
+				tracing::error!("there's a known bug with amdgpu/radv, try setting ZED_PATH_SAMPLE_COUNT=0 as a workaround");
+				tracing::error!("if that helps you're running into https://github.com/zed-industries/zed/issues/26143");
 			}
-			log::error!("your device information is: {:?}", self.gpu.device_information());
+			tracing::error!("your device information is: {:?}", self.gpu.device_information());
 			while !self.gpu.wait_for(&last_sp, MAX_FRAME_TIME_MS) {}
 		}
 	}

@@ -17,7 +17,6 @@ lucie-style.workspace = true
 parking_lot.workspace = true
 rapidhash.workspace = true
 smallvec.workspace = true
-log.workspace = true
 either = "1.15"
 
 parley = { git = "https://github.com/pykeio/parley.git", rev = "97f9a9cc5247fe3365429fadc343cc9d5f57d247", default-features = false, features = [ "std", "system" ] }

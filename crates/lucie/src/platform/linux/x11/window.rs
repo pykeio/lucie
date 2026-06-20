@@ -180,7 +180,7 @@ fn find_visuals(xcb: &XCBConnection, screen_index: usize) -> VisualSet {
 				colormap: 0,
 				depth: depth_info.depth
 			};
-			log::debug!(
+			tracing::debug!(
 				"Visual id: {}, class: {:?}, depth: {}, bits_per_value: {}, masks: 0x{:x} 0x{:x} 0x{:x}",
 				visual_type.visual_id,
 				visual_type.class,
@@ -277,7 +277,7 @@ pub(crate) struct X11WindowStatePtr {
 impl rwh::HasWindowHandle for RawWindow {
 	fn window_handle(&self) -> Result<rwh::WindowHandle<'_>, rwh::HandleError> {
 		let Some(non_zero) = NonZeroU32::new(self.window_id) else {
-			log::error!("RawWindow.window_id zero when getting window handle.");
+			tracing::error!("RawWindow.window_id zero when getting window handle.");
 			return Err(rwh::HandleError::Unavailable);
 		};
 		let mut handle = rwh::XcbWindowHandle::new(non_zero);
@@ -288,7 +288,7 @@ impl rwh::HasWindowHandle for RawWindow {
 impl rwh::HasDisplayHandle for RawWindow {
 	fn display_handle(&self) -> Result<rwh::DisplayHandle<'_>, rwh::HandleError> {
 		let Some(non_zero) = NonNull::new(self.connection) else {
-			log::error!("Null RawWindow.connection when getting display handle.");
+			tracing::error!("Null RawWindow.connection when getting display handle.");
 			return Err(rwh::HandleError::Unavailable);
 		};
 		let handle = rwh::XcbDisplayHandle::new(Some(non_zero), self.screen_id as i32);
@@ -377,17 +377,17 @@ impl X11WindowState {
 		let visual = match visual_set.transparent {
 			Some(visual) => visual,
 			None => {
-				log::warn!("Unable to find a transparent visual",);
+				tracing::warn!("Unable to find a transparent visual",);
 				visual_set.inherit
 			}
 		};
-		log::info!("Using {:?}", visual);
+		tracing::info!("Using {:?}", visual);
 
 		let colormap = if visual.colormap != 0 {
 			visual.colormap
 		} else {
 			let id = xcb.generate_id()?;
-			log::info!("Creating colormap {}", id);
+			tracing::info!("Creating colormap {}", id);
 			check_reply(|| format!("X11 CreateColormap failed. id: {}", id), xcb.create_colormap(xproto::ColormapAlloc::NONE, id, visual_set.root, visual.id))?;
 			id
 		};
@@ -408,7 +408,7 @@ impl X11WindowState {
 
 		let mut bounds = params.bounds.to_device_pixels(scale_factor);
 		if bounds.size.width.0 == 0 || bounds.size.height.0 == 0 {
-			log::warn!("Window bounds contain a zero value. height={}, width={}. Falling back to defaults.", bounds.size.height.0, bounds.size.width.0);
+			tracing::warn!("Window bounds contain a zero value. height={}, width={}. Falling back to defaults.", bounds.size.height.0, bounds.size.width.0);
 			bounds.size.width = 800.into();
 			bounds.size.height = 600.into();
 		}
@@ -822,7 +822,7 @@ impl X11WindowStatePtr {
 				let edge_constraints = EdgeConstraints::from_atom(atom);
 				state.edge_constraints.replace(edge_constraints);
 			} else {
-				log::error!("Failed to parse GTK_EDGE_CONSTRAINTS");
+				tracing::error!("Failed to parse GTK_EDGE_CONSTRAINTS");
 			}
 		}
 
@@ -1409,7 +1409,7 @@ impl PlatformWindow for X11Window {
 		let mut state = self.0.state.borrow_mut();
 
 		if matches!(decorations, crate::WindowDecorations::Client) && !state.client_side_decorations_supported {
-			log::info!("x11: no compositor present, falling back to server-side window decorations");
+			tracing::info!("x11: no compositor present, falling back to server-side window decorations");
 			decorations = crate::WindowDecorations::Server;
 		}
 

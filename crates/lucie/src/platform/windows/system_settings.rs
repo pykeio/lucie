@@ -129,7 +129,7 @@ impl AutoHideTaskbarPosition {
 			if taskbar_bounds.size.width < display_bounds.size.width && taskbar_bounds.size.height == display_bounds.size.height {
 				return Ok(Some(Self::Right));
 			}
-			log::error!("Unrecognized taskbar bounds {:?} give display bounds {:?}", taskbar_bounds, display_bounds);
+			tracing::error!("Unrecognized taskbar bounds {:?} give display bounds {:?}", taskbar_bounds, display_bounds);
 			return Ok(None);
 		}
 		if taskbar_bounds.top() == display_bounds.top() && taskbar_bounds.left() == display_bounds.left() {
@@ -139,10 +139,10 @@ impl AutoHideTaskbarPosition {
 			if taskbar_bounds.size.width < display_bounds.size.width && taskbar_bounds.size.height == display_bounds.size.height {
 				return Ok(Some(Self::Left));
 			}
-			log::error!("Unrecognized taskbar bounds {:?} give display bounds {:?}", taskbar_bounds, display_bounds);
+			tracing::error!("Unrecognized taskbar bounds {:?} give display bounds {:?}", taskbar_bounds, display_bounds);
 			return Ok(None);
 		}
-		log::error!("Unrecognized taskbar bounds {:?} give display bounds {:?}", taskbar_bounds, display_bounds);
+		tracing::error!("Unrecognized taskbar bounds {:?} give display bounds {:?}", taskbar_bounds, display_bounds);
 		Ok(None)
 	}
 }

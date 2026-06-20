@@ -405,7 +405,7 @@ impl FakeHttpClient {
 	}
 
 	pub(crate) fn with_404_response() -> Arc<HttpClientWithUrl> {
-		log::warn!("Using fake HTTP client with 404 response");
+		tracing::warn!("Using fake HTTP client with 404 response");
 		Self::create(|_| async move { Ok(Response::builder().status(404).body(Default::default()).unwrap()) })
 	}
 }

@@ -41,7 +41,7 @@ impl Asset for LoadImageWithParameters {
 		async move {
 			timer.await;
 			if parameters.fail {
-				log::error!("Intentionally failed to load image");
+				tracing::error!("Intentionally failed to load image");
 				Err(anyhow::anyhow!("Failed to load image").into())
 			} else {
 				data.await
@@ -165,7 +165,7 @@ impl Render for ImageLoadingExample {
 }
 
 fn main() {
-	env_logger::init();
+	tracing_subscriber::fmt::init();
 	Application::new().with_assets(Assets {}).run(|cx: &mut App| {
 		let options = WindowOptions {
 			window_bounds: Some(WindowBounds::centered(size(px(300.), px(300.)), cx)),
