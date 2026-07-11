@@ -19,9 +19,9 @@ rapidhash.workspace = true
 smallvec.workspace = true
 either = "1.15"
 
-parley = { git = "https://github.com/pykeio/parley.git", rev = "97f9a9cc5247fe3365429fadc343cc9d5f57d247", default-features = false, features = [ "std", "system" ] }
-skrifa = { version = "0.42.0", default-features = false, features = [ "std", "autohint_shaping" ] }
-read-fonts = { version = "0.39", default-features = false }
+parley = { version = "0.11", default-features = false, features = [ "std", "system" ] }
+skrifa = { version = "0.43", default-features = false, features = [ "std", "autohint_shaping" ] }
+read-fonts = { version = "0.40", default-features = false }
 linebender_resource_handle = "0.1.1"
 tiny-skia = { version = "0.12", default-features = false, features = [ "std", "simd" ] }
 
