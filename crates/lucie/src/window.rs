@@ -1815,11 +1815,18 @@ impl Window {
 
 	/// Acquire a globally unique identifier for the given ElementId.
 	/// Only valid for the duration of the provided closure.
-	pub fn with_global_id<R>(&mut self, element_id: ElementId, f: impl FnOnce(&GlobalElementId, &mut Self) -> R) -> R {
-		self.element_id_stack.push(element_id);
-		let global_id = GlobalElementId::new(&*self.element_id_stack);
+	pub fn with_global_id<R>(&mut self, id: ElementId, f: impl FnOnce(&GlobalElementId, &mut Self) -> R) -> R {
+		self.with_id(id, |this| {
+			let global_id = GlobalElementId::new(&*this.element_id_stack);
+			f(&global_id, this)
+		})
+	}
 
-		let result = f(&global_id, self);
+	/// Calls the provided closure with the element ID pushed on the stack.
+	#[inline]
+	pub fn with_id<R>(&mut self, id: impl Into<ElementId>, f: impl FnOnce(&mut Self) -> R) -> R {
+		self.element_id_stack.push(id.into());
+		let result = f(self);
 		self.element_id_stack.pop();
 		result
 	}
@@ -2472,11 +2479,6 @@ impl Window {
 		})
 	}
 
-	/// Immediately push an element ID onto the stack. Useful for simplifying IDs in lists
-	pub fn with_id<R>(&mut self, id: impl Into<ElementId>, f: impl FnOnce(&mut Self) -> R) -> R {
-		self.with_global_id(id.into(), |_, window| f(window))
-	}
-
 	/// Updates or initializes state for an element with the given id that lives across multiple
 	/// frames. If an element with this ID existed in the rendered frame, its state will be passed
 	/// to the given closure. The state returned by the closure will be stored so it can be referenced
@@ -2969,6 +2971,7 @@ impl Window {
 		self.rendered_entity_stack.last().copied().unwrap()
 	}
 
+	#[inline]
 	pub(crate) fn with_rendered_view<R>(&mut self, id: EntityId, f: impl FnOnce(&mut Self) -> R) -> R {
 		self.rendered_entity_stack.push(id);
 		let result = f(self);

@@ -230,7 +230,7 @@ impl<C: RenderOnce> Element for Component<C> {
 	}
 
 	fn request_layout(&mut self, _id: Option<&GlobalElementId>, window: &mut Window, cx: &mut App) -> (LayoutId, Self::RequestLayoutState) {
-		window.with_global_id(ElementId::from(type_name::<C>()), |_, window| {
+		window.with_id(ElementId::from(type_name::<C>()), |window| {
 			let mut element = self.component.take().unwrap().render(window, cx).into_any_element();
 
 			let layout_id = element.request_layout(window, cx);
@@ -239,7 +239,7 @@ impl<C: RenderOnce> Element for Component<C> {
 	}
 
 	fn prepaint(&mut self, _id: Option<&GlobalElementId>, _: Bounds<Pixels>, element: &mut AnyElement, window: &mut Window, cx: &mut App) {
-		window.with_global_id(ElementId::from(type_name::<C>()), |_, window| {
+		window.with_id(ElementId::from(type_name::<C>()), |window| {
 			element.prepaint(window, cx);
 		})
 	}
@@ -253,7 +253,7 @@ impl<C: RenderOnce> Element for Component<C> {
 		window: &mut Window,
 		cx: &mut App
 	) {
-		window.with_global_id(ElementId::from(type_name::<C>()), |_, window| {
+		window.with_id(ElementId::from(type_name::<C>()), |window| {
 			element.paint(window, cx);
 		})
 	}
@@ -479,18 +479,22 @@ where
 		&mut self.element
 	}
 
+	#[inline]
 	fn request_layout(&mut self, window: &mut Window, cx: &mut App) -> LayoutId {
 		Drawable::request_layout(self, window, cx)
 	}
 
+	#[inline]
 	fn prepaint(&mut self, window: &mut Window, cx: &mut App) {
 		Drawable::prepaint(self, window, cx);
 	}
 
+	#[inline]
 	fn paint(&mut self, window: &mut Window, cx: &mut App) {
 		Drawable::paint(self, window, cx);
 	}
 
+	#[inline]
 	fn layout_as_root(&mut self, available_space: Size<AvailableSpace>, window: &mut Window, cx: &mut App) -> Size<Pixels> {
 		Drawable::layout_as_root(self, available_space, window, cx)
 	}
