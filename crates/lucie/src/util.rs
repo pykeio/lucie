@@ -5,7 +5,7 @@ use std::{
 
 use lucie_common::{
 	color::{BackgroundTag, Hsla},
-	geometry::{Bounds, Edges, Pixels, Point, point}
+	geometry::{Bounds, Edges, Pixels, Point, Size, point}
 };
 use lucie_style::{Fill, Overflow, Style};
 
@@ -70,14 +70,24 @@ pub fn paint_style(style: &Style, bounds: Bounds<Pixels>, window: &mut Window, c
 	continuation(window, cx);
 
 	if is_border_visible(&style) {
+		const ZERO_SIZE: Size<Pixels> = Size {
+			width: Pixels::ZERO,
+			height: Pixels::ZERO
+		};
+
 		let border_widths = style.border_widths.to_pixels(rem_size);
 		let max_border_width = border_widths.max();
 		let max_corner_radius = corner_radii.max();
 
-		let top_bounds = Bounds::from_corners(bounds.origin, bounds.top_right() + point(Pixels::ZERO, max_border_width.max(max_corner_radius)));
-		let bottom_bounds = Bounds::from_corners(bounds.bottom_left() - point(Pixels::ZERO, max_border_width.max(max_corner_radius)), bounds.bottom_right());
-		let left_bounds = Bounds::from_corners(top_bounds.bottom_left(), bottom_bounds.origin + point(max_border_width, Pixels::ZERO));
-		let right_bounds = Bounds::from_corners(top_bounds.bottom_right() - point(max_border_width, Pixels::ZERO), bottom_bounds.top_right());
+		let mut top_bounds = Bounds::from_corners(bounds.origin, bounds.top_right() + point(Pixels::ZERO, max_border_width.max(max_corner_radius)));
+		let mut bottom_bounds =
+			Bounds::from_corners(bounds.bottom_left() - point(Pixels::ZERO, max_border_width.max(max_corner_radius)), bounds.bottom_right());
+		let mut left_bounds = Bounds::from_corners(top_bounds.bottom_left(), bottom_bounds.origin + point(max_border_width, Pixels::ZERO));
+		let mut right_bounds = Bounds::from_corners(top_bounds.bottom_right() - point(max_border_width, Pixels::ZERO), bottom_bounds.top_right());
+		top_bounds.size = top_bounds.size.max(&ZERO_SIZE);
+		bottom_bounds.size = bottom_bounds.size.max(&ZERO_SIZE);
+		left_bounds.size = left_bounds.size.max(&ZERO_SIZE);
+		right_bounds.size = right_bounds.size.max(&ZERO_SIZE);
 
 		let mut background = style.border_color.unwrap_or_default();
 		background.a = 0.;
