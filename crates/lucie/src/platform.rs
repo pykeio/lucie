@@ -12,7 +12,6 @@ use std::{
 };
 
 use anyhow::Result;
-use tokio::sync::oneshot;
 #[cfg(any(test, feature = "test-support"))]
 use image::RgbaImage;
 use image::{AnimationDecoder as _, Frame, codecs::gif::GifDecoder};
@@ -24,6 +23,7 @@ use lucie_style::CursorStyle;
 use lucie_text::GlyphKey;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use smallvec::SmallVec;
+use tokio::sync::oneshot;
 
 use crate::{
 	Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, DEFAULT_WINDOW_SIZE, DispatchEventResult, ForegroundExecutor, GpuSpecs, ImageSource,
@@ -101,9 +101,9 @@ pub(crate) fn current_platform(headless: bool, liveness: std::sync::Weak<()>) ->
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn current_platform(_headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
+pub(crate) fn current_platform(headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
 	Rc::new(
-		WindowsPlatform::new(liveness)
+		WindowsPlatform::new(headless, liveness)
 			.inspect_err(|err| show_error("Failed to launch", err.to_string()))
 			.unwrap()
 	)
