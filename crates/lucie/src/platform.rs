@@ -27,7 +27,7 @@ use tokio::sync::oneshot;
 
 use crate::{
 	Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, DEFAULT_WINDOW_SIZE, DispatchEventResult, ForegroundExecutor, GpuSpecs, ImageSource,
-	Keymap, PlatformInput, Priority, RealtimePriority, RenderImage, RenderImageParams, RenderSvgParams, Scene, SvgRenderer, SystemWindowTab, TaskLabel,
+	Keymap, PlatformInput, Priority, RealtimePriority, RenderImage, RenderImageParams, RenderSvgParams, Scene, SvgRenderer, SystemWindowTab, Task, TaskLabel,
 	TaskTiming, ThreadTaskTimings, Window, WindowControlArea, hash
 };
 
@@ -174,8 +174,8 @@ pub(crate) trait Platform: 'static {
 	fn set_dock_menu(&self, menu: Vec<MenuItem>, keymap: &Keymap);
 	fn perform_dock_menu_action(&self, _action: usize) {}
 	fn add_recent_document(&self, _path: &Path) {}
-	fn update_jump_list(&self, _menus: Vec<MenuItem>, _entries: Vec<SmallVec<[PathBuf; 2]>>) -> Vec<SmallVec<[PathBuf; 2]>> {
-		Vec::new()
+	fn update_jump_list(&self, _menus: Vec<MenuItem>, _entries: Vec<SmallVec<[PathBuf; 2]>>) -> Task<Vec<SmallVec<[PathBuf; 2]>>> {
+		Task::ready(Vec::new())
 	}
 	fn on_app_menu_action(&self, callback: Box<dyn FnMut(&dyn Action)>);
 	fn on_will_open_app_menu(&self, callback: Box<dyn FnMut()>);
