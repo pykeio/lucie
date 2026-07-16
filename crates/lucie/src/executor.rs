@@ -16,6 +16,7 @@ use std::{
 	time::{Duration, Instant}
 };
 
+use futures_util::FutureExt;
 use parking_lot::{Condvar, Mutex};
 use tokio::sync::mpsc;
 use waker_fn::waker_fn;
@@ -260,7 +261,7 @@ impl BackgroundExecutor {
 	where
 		R: Send + 'static
 	{
-		self.spawn_with_priority(Priority::default(), future)
+		self.spawn_with_priority(Priority::default(), future.boxed())
 	}
 
 	/// Enqueues the given future to be run to completion on a background thread.
@@ -269,7 +270,7 @@ impl BackgroundExecutor {
 	where
 		R: Send + 'static
 	{
-		self.spawn_internal::<R>(Box::pin(future), None, priority)
+		self.spawn_internal::<R>(future.boxed(), None, priority)
 	}
 
 	/// Enqueues the given future to be run to completion on a background thread and blocking the current task on it.
@@ -713,7 +714,7 @@ impl ForegroundExecutor {
 	where
 		R: 'static
 	{
-		self.inner_spawn(self.liveness.clone(), Priority::default(), future)
+		self.inner_spawn(self.liveness.clone(), Priority::default(), future.boxed_local())
 	}
 
 	/// Enqueues the given Task to run on the main thread at some point in the future.
@@ -722,7 +723,7 @@ impl ForegroundExecutor {
 	where
 		R: 'static
 	{
-		self.inner_spawn(self.liveness.clone(), priority, future)
+		self.inner_spawn(self.liveness.clone(), priority, future.boxed_local())
 	}
 
 	#[track_caller]

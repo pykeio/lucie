@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Context as _;
 use derive_more::{Deref, DerefMut};
+use futures_util::FutureExt;
 use tokio::sync::oneshot;
 
 use super::{Context, WeakEntity};
@@ -164,7 +165,7 @@ impl AsyncApp {
 		R: 'static
 	{
 		let mut cx = self.clone();
-		self.foreground_executor.spawn(async move { f(&mut cx).await })
+		self.foreground_executor.spawn(async move { f(&mut cx).await }.boxed_local())
 	}
 
 	/// Determine whether global state of the specified type has been assigned.
@@ -289,7 +290,7 @@ impl AsyncWindowContext {
 		R: 'static
 	{
 		let mut cx = self.clone();
-		self.foreground_executor.spawn(async move { f(&mut cx).await })
+		self.foreground_executor.spawn(async move { f(&mut cx).await }.boxed_local())
 	}
 
 	/// Present a platform dialog.
