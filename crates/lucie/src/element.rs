@@ -37,7 +37,7 @@ use std::{
 };
 
 use lucie_common::{
-	ArenaBox,
+	ArenaBox, SharedString,
 	geometry::{Bounds, Pixels, Point, Size},
 	mix_hashes
 };
@@ -221,8 +221,20 @@ impl<C: RenderOnce> Component<C> {
 	}
 }
 
+fn prepaint_component((element, name): &mut (AnyElement, &'static str), window: &mut Window, cx: &mut App) {
+	window.with_id(ElementId::from(SharedString::new_static(name)), |window| {
+		element.prepaint(window, cx);
+	})
+}
+
+fn paint_component((element, name): &mut (AnyElement, &'static str), window: &mut Window, cx: &mut App) {
+	window.with_id(ElementId::from(SharedString::new_static(name)), |window| {
+		element.paint(window, cx);
+	})
+}
+
 impl<C: RenderOnce> Element for Component<C> {
-	type RequestLayoutState = AnyElement;
+	type RequestLayoutState = (AnyElement, &'static str);
 	type PrepaintState = ();
 
 	fn id(&self) -> Option<ElementId> {
@@ -234,28 +246,24 @@ impl<C: RenderOnce> Element for Component<C> {
 			let mut element = self.component.take().unwrap().render(window, cx).into_any_element();
 
 			let layout_id = element.request_layout(window, cx);
-			(layout_id, element)
+			(layout_id, (element, type_name::<C>()))
 		})
 	}
 
-	fn prepaint(&mut self, _id: Option<&GlobalElementId>, _: Bounds<Pixels>, element: &mut AnyElement, window: &mut Window, cx: &mut App) {
-		window.with_id(ElementId::from(type_name::<C>()), |window| {
-			element.prepaint(window, cx);
-		})
+	fn prepaint(&mut self, _id: Option<&GlobalElementId>, _: Bounds<Pixels>, state: &mut Self::RequestLayoutState, window: &mut Window, cx: &mut App) {
+		prepaint_component(state, window, cx);
 	}
 
 	fn paint(
 		&mut self,
 		_id: Option<&GlobalElementId>,
 		_: Bounds<Pixels>,
-		element: &mut Self::RequestLayoutState,
+		state: &mut Self::RequestLayoutState,
 		_: &mut Self::PrepaintState,
 		window: &mut Window,
 		cx: &mut App
 	) {
-		window.with_id(ElementId::from(type_name::<C>()), |window| {
-			element.paint(window, cx);
-		})
+		paint_component(state, window, cx);
 	}
 }
 

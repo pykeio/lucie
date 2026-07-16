@@ -1129,7 +1129,9 @@ mod test {
 		}
 
 		// Paint
-		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(20.))), |_, cx| cx.new(|_| TestView(state.clone())));
+		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(20.))), |_, cx| {
+			cx.new(|_| TestView(state.clone())).into_any_element()
+		});
 
 		// Reset
 		state.reset(5);
@@ -1160,7 +1162,9 @@ mod test {
 		}
 
 		// Paint
-		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(100.))), |_, cx| cx.new(|_| TestView(state.clone())));
+		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(100.))), |_, cx| {
+			cx.new(|_| TestView(state.clone())).into_any_element()
+		});
 
 		// Test positive distance: start at item 1, move down 30px
 		state.scroll_by(px(30.));
@@ -1222,7 +1226,7 @@ mod test {
 		// original item height is 100px, this equates to 40% inside the item.
 		state.scroll_to(lucie::ListOffset { item_ix: 2, offset_in_item: px(40.) });
 
-		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(200.))), |_, _| view.clone());
+		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(200.))), |_, _| view.clone().into_any_element());
 
 		let offset = state.logical_scroll_top();
 		assert_eq!(offset.item_ix, 2);
@@ -1235,7 +1239,7 @@ mod test {
 		item_height.set(50);
 		state.remeasure();
 
-		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(200.))), |_, _| view);
+		cx.draw(point(px(0.), px(0.)), AvailableSpace::from_definite(size(px(100.), px(200.))), |_, _| view.into_any_element());
 
 		let offset = state.logical_scroll_top();
 		assert_eq!(offset.item_ix, 2);
