@@ -1,10 +1,10 @@
-use std::{num::NonZeroU32, ops::Range};
+use std::{cmp::Ordering, hint::select_unpredictable, num::NonZeroU32, ops::Range};
 
 use lucie_common::geometry::{Bounds, Pixels, Point, ScaledPixels, Size, point, px, size};
 use lucie_style::{StrikethroughStyle, TextAlign, TextStyle, UnderlineStyle};
 
 use crate::{
-	TextPainter, TextSystem, apply_base_text_style,
+	Affinity, TextPainter, TextSystem, apply_base_text_style,
 	run::{GlyphRun, Renderable, Run},
 	select::Cursor,
 	style::{Brush, TruncateFrom}
@@ -39,7 +39,8 @@ pub struct Layout {
 	shape_mode: Option<ShapeMode>,
 	needs_realign: bool,
 	pub(crate) rem_size: Pixels,
-	truncation: Option<Truncation>
+	truncation: Option<Truncation>,
+	pub(crate) text_len: usize
 }
 
 impl Layout {
@@ -51,7 +52,8 @@ impl Layout {
 			shape_mode: None,
 			needs_realign: false,
 			rem_size: px(0.0),
-			truncation: None
+			truncation: None,
+			text_len: 0
 		}
 	}
 
@@ -61,6 +63,7 @@ impl Layout {
 		self.needs_realign = false;
 		self.rem_size = px(0.0);
 		self.truncation = None;
+		self.text_len = 0;
 	}
 
 	#[inline]
@@ -191,7 +194,7 @@ impl Layout {
 		size(ScaledPixels(self.layout.width()), ScaledPixels(self.layout.height()))
 	}
 
-	pub fn lines(&self) -> impl Iterator<Item = Line<'_>> + '_ + Clone {
+	pub fn lines(&self) -> impl ExactSizeIterator<Item = Line<'_>> + '_ + Clone {
 		self.layout.lines().enumerate().map(|(idx, line)| Line {
 			line,
 			idx: idx as u32,
@@ -199,12 +202,87 @@ impl Layout {
 		})
 	}
 
-	pub fn cursor_at(&self, point: Point<ScaledPixels>) -> Cursor {
-		Cursor::new(parley::Cursor::from_point(&self.layout, point.x.0, point.y.0))
+	pub fn get(&self, index: usize) -> Option<Line<'_>> {
+		self.layout.get(index).map(|line| Line {
+			line,
+			idx: index as _,
+			truncation: self.truncation.as_ref().filter(|t| t.line() == index)
+		})
+	}
+
+	pub fn cursor_at(&self, point: Point<ScaledPixels>, exact: bool) -> Option<Cursor> {
+		let cluster = if exact {
+			parley::Cluster::from_point_exact(&self.layout, point.x.0, point.y.0)
+		} else {
+			parley::Cluster::from_point(&self.layout, point.x.0, point.y.0)
+		};
+		let (index, affinity) = if let Some((cluster, side)) = cluster {
+			let is_leading = side == parley::ClusterSide::Left;
+			if cluster.is_rtl() {
+				if is_leading {
+					(cluster.text_range().end, Affinity::Upstream)
+				} else {
+					(cluster.text_range().start, Affinity::Downstream)
+				}
+			} else {
+				if is_leading || cluster.is_line_break() == Some(parley::BreakReason::Explicit) {
+					(cluster.text_range().start, Affinity::Downstream)
+				} else {
+					(cluster.text_range().end, Affinity::Upstream)
+				}
+			}
+		} else if !exact {
+			(self.text_len, Affinity::Downstream)
+		} else {
+			return None;
+		};
+		Some(Cursor::new(index, affinity))
 	}
 
 	pub fn cursor_at_byte(&self, byte: usize) -> Cursor {
-		Cursor::new(parley::Cursor::from_byte_index(&self.layout, byte, parley::Affinity::Downstream))
+		Cursor::from_parley(parley::Cursor::from_byte_index(&self.layout, byte, parley::Affinity::Downstream))
+	}
+
+	pub(crate) fn line_for_offset(&self, offset: f32) -> Option<usize> {
+		if offset < 0.0 {
+			return Some(0);
+		}
+
+		let lines = self.lines();
+		let mut size = lines.len();
+		if size == 0 {
+			return None;
+		}
+
+		let mut base = 0;
+		while size > 1 {
+			let half = size / 2;
+			let mid = base + half;
+			let line = self.get(mid)?;
+			let cmp = if offset < line.line.metrics().block_min_coord {
+				Ordering::Greater
+			} else if offset >= line.line.metrics().block_max_coord {
+				Ordering::Less
+			} else {
+				Ordering::Equal
+			};
+			base = select_unpredictable(cmp == Ordering::Greater, base, mid);
+			size -= half;
+		}
+
+		let line = self.get(base)?;
+		let cmp = if offset < line.line.metrics().block_min_coord {
+			Ordering::Greater
+		} else if offset >= line.line.metrics().block_max_coord {
+			Ordering::Less
+		} else {
+			Ordering::Equal
+		};
+		Some(if cmp == Ordering::Equal {
+			base
+		} else {
+			(base + (cmp == Ordering::Less) as usize).saturating_sub(1)
+		})
 	}
 }
 
@@ -493,5 +571,10 @@ impl<'a> Line<'a> {
 		}
 
 		Ok(())
+	}
+
+	#[inline]
+	pub(crate) fn parley_line(&self) -> &parley::Line<'_, Brush> {
+		&self.line
 	}
 }

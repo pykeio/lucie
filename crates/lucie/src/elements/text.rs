@@ -6,7 +6,6 @@ use std::{
 	rc::Rc
 };
 
-use anyhow::Context as _;
 use lucie_common::{
 	SharedString,
 	geometry::{Bounds, Pixels, Point, ScaledPixels}
@@ -45,7 +44,7 @@ impl Element for &'static str {
 	}
 
 	fn paint(&mut self, _id: Option<&GlobalElementId>, bounds: Bounds<Pixels>, text_layout: &mut TextLayout, _: &mut (), window: &mut Window, cx: &mut App) {
-		text_layout.paint(self, bounds, window, cx)
+		text_layout.paint(bounds, window, cx)
 	}
 }
 
@@ -98,7 +97,7 @@ impl Element for SharedString {
 		window: &mut Window,
 		cx: &mut App
 	) {
-		text_layout.paint(self, bounds, window, cx)
+		text_layout.paint(bounds, window, cx)
 	}
 }
 
@@ -222,7 +221,7 @@ impl Element for StyledText {
 		window: &mut Window,
 		cx: &mut App
 	) {
-		self.layout.paint(&self.text, bounds, window, cx)
+		self.layout.paint(bounds, window, cx)
 	}
 }
 
@@ -327,12 +326,9 @@ impl TextLayout {
 		})
 	}
 
-	fn paint(&self, text: &str, bounds: Bounds<Pixels>, window: &mut Window, _cx: &mut App) {
+	fn paint(&self, bounds: Bounds<Pixels>, window: &mut Window, _cx: &mut App) {
 		let element_state = self.0.borrow();
-		let element_state = element_state
-			.as_ref()
-			.with_context(|| format!("measurement has not been performed on {text}"))
-			.unwrap();
+		let element_state = element_state.as_ref().expect("measurement has not been performed yet");
 
 		let scale_factor = window.scale_factor();
 		let line_origin = bounds.origin.scale(scale_factor);
@@ -344,13 +340,18 @@ impl TextLayout {
 	}
 
 	/// Get the byte index into the input of the pixel position.
-	pub fn index_for_position(&self, mut position: Point<Pixels>) -> Result<usize, usize> {
-		unimplemented!();
+	pub fn index_for_position(&self, position: Point<ScaledPixels>, exact: bool) -> Option<usize> {
+		let element_state = self.0.borrow();
+		let element_state = element_state.as_ref().expect("measurement has not been performed yet");
+		element_state.layout.borrow().cursor_at(position, exact).map(|c| c.index())
 	}
 
 	/// Get the pixel position for the given byte index.
-	pub fn position_for_index(&self, index: usize) -> Option<Point<Pixels>> {
-		unimplemented!();
+	pub fn position_for_index(&self, index: usize) -> Point<ScaledPixels> {
+		let element_state = self.0.borrow();
+		let element_state = element_state.as_ref().expect("measurement has not been performed yet");
+		let layout = element_state.layout.borrow();
+		layout.cursor_at_byte(index).position(&*layout)
 	}
 
 	/// The UTF-8 length of the underlying text.
@@ -494,12 +495,13 @@ impl Element for InteractiveText {
 		cx: &mut App
 	) {
 		let current_view = window.current_view();
+		let scale_factor = window.scale_factor();
 		let text_layout = self.text.layout().clone();
 		window.with_element_state::<InteractiveTextState, _>(global_id.unwrap(), |interactive_state, window| {
 			let mut interactive_state = interactive_state.unwrap_or_default();
 			if let Some(click_listener) = self.click_listener.take() {
-				let mouse_position = window.mouse_position();
-				if let Ok(ix) = text_layout.index_for_position(mouse_position)
+				let mouse_position = window.mouse_position().scale(scale_factor);
+				if let Some(ix) = text_layout.index_for_position(mouse_position, true)
 					&& self.clickable_ranges.iter().any(|range| range.contains(&ix))
 				{
 					window.set_cursor_style(CursorStyle::PointingHand, hitbox)
@@ -512,7 +514,7 @@ impl Element for InteractiveText {
 					let clickable_ranges = mem::take(&mut self.clickable_ranges);
 					window.on_mouse_event(move |event: &MouseUpEvent, phase, window: &mut Window, cx| {
 						if phase == DispatchPhase::Bubble && hitbox.is_hovered(window) {
-							if let Ok(mouse_up_index) = text_layout.index_for_position(event.position) {
+							if let Some(mouse_up_index) = text_layout.index_for_position(event.position.scale(scale_factor), true) {
 								click_listener(&clickable_ranges, InteractiveTextClickEvent { mouse_down_index, mouse_up_index }, window, cx)
 							}
 
@@ -525,7 +527,7 @@ impl Element for InteractiveText {
 					window.on_mouse_event(move |event: &MouseDownEvent, phase, window, _| {
 						if phase == DispatchPhase::Bubble
 							&& hitbox.is_hovered(window)
-							&& let Ok(mouse_down_index) = text_layout.index_for_position(event.position)
+							&& let Some(mouse_down_index) = text_layout.index_for_position(event.position.scale(scale_factor), true)
 						{
 							mouse_down.set(Some(mouse_down_index));
 							window.refresh();
@@ -542,7 +544,7 @@ impl Element for InteractiveText {
 				move |event: &MouseMoveEvent, phase, window, cx| {
 					if phase == DispatchPhase::Bubble && hitbox.is_hovered(window) {
 						let current = hovered_index.get();
-						let updated = text_layout.index_for_position(event.position).ok();
+						let updated = text_layout.index_for_position(event.position.scale(scale_factor), true);
 						if current != updated {
 							hovered_index.set(updated);
 							if let Some(hover_listener) = hover_listener.as_ref() {
@@ -561,8 +563,7 @@ impl Element for InteractiveText {
 					let text_layout = text_layout.clone();
 					move |window: &mut Window, cx: &mut App| {
 						text_layout
-							.index_for_position(window.mouse_position())
-							.ok()
+							.index_for_position(window.mouse_position().scale(scale_factor), true)
 							.and_then(|position| tooltip_builder(position, window, cx))
 							.map(|view| (view, tooltip_is_hoverable))
 					}
@@ -574,8 +575,9 @@ impl Element for InteractiveText {
 					let text_layout = text_layout.clone();
 					let pending_mouse_down = interactive_state.mouse_down_index.clone();
 					move |window: &Window| {
-						text_layout.index_for_position(window.mouse_position()).is_ok()
-							&& source_bounds.contains(&window.mouse_position())
+						text_layout
+							.index_for_position(window.mouse_position().scale(scale_factor), true)
+							.is_some() && source_bounds.contains(&window.mouse_position())
 							&& pending_mouse_down.get().is_none()
 					}
 				});
@@ -585,7 +587,10 @@ impl Element for InteractiveText {
 					let text_layout = text_layout.clone();
 					let pending_mouse_down = interactive_state.mouse_down_index.clone();
 					move |window: &Window| {
-						text_layout.index_for_position(window.mouse_position()).is_ok() && hitbox.is_hovered(window) && pending_mouse_down.get().is_none()
+						text_layout
+							.index_for_position(window.mouse_position().scale(scale_factor), true)
+							.is_some() && hitbox.is_hovered(window)
+							&& pending_mouse_down.get().is_none()
 					}
 				});
 

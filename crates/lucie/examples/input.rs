@@ -157,7 +157,10 @@ impl TextInput {
 		if position.y > bounds.bottom() {
 			return self.content.len();
 		}
-		layout.cursor_at((position - bounds.origin).scale(window.scale_factor())).index()
+		layout
+			.cursor_at((position - bounds.origin).scale(window.scale_factor()), false)
+			.unwrap()
+			.index()
 	}
 
 	fn select_to(&mut self, offset: usize, cx: &mut Context<Self>) {
@@ -328,7 +331,7 @@ impl EntityInputHandler for TextInput {
 		let scale_factor = window.scale_factor();
 		let line_point = self.last_bounds?.localize(&point)?.scale(scale_factor);
 		let last_layout = self.last_layout.as_ref()?;
-		let utf8_index = last_layout.cursor_at(line_point).index();
+		let utf8_index = last_layout.cursor_at(line_point, false).unwrap().index();
 		Some(self.offset_to_utf16(utf8_index))
 	}
 }
@@ -433,7 +436,7 @@ impl Element for TextElement {
 		};
 		layout.fit(None);
 
-		let cursor_pos = layout.cursor_at_byte(cursor).x(&layout).unscale(scale_factor);
+		let cursor_pos = layout.cursor_at_byte(cursor).position(&layout).x.unscale(scale_factor);
 		let (selection, cursor) = if selected_range.is_empty() {
 			(None, Some(fill(Bounds::new(point(bounds.left() + cursor_pos, bounds.top()), size(px(2.), bounds.bottom() - bounds.top())), lucie::blue())))
 		} else {

@@ -187,13 +187,18 @@ impl<'s> RangedBuilder<'s> {
 	}
 
 	pub fn build_into(self, layout: &mut Layout, text: impl AsRef<str>) {
-		layout.clear();
+		fn inner(builder: &mut RangedBuilder<'_>, layout: &mut Layout, text: &str) {
+			layout.clear();
 
-		let rem_size = self.rem_size;
+			let rem_size = builder.rem_size;
+			let builder = unsafe { ptr::read(&mut builder.builder) };
+			builder.build_into(layout.layout_mut(), text);
+			layout.rem_size = rem_size;
+			layout.text_len = text.len();
+		}
+
 		let mut this = ManuallyDrop::new(self);
-		let builder = unsafe { ptr::read(&mut this.builder) };
-		builder.build_into(layout.layout_mut(), text.as_ref());
-		layout.rem_size = rem_size;
+		inner(&mut this, layout, text.as_ref());
 		unsafe { this.release() };
 	}
 
