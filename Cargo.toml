@@ -138,88 +138,17 @@ calloop = { git = "https://github.com/zed-industries/calloop" }
 
 [profile.dev]
 split-debuginfo = "unpacked"
-# https://github.com/rust-lang/cargo/issues/16104
-# incremental = false
-# codegen-units = 16
-
-# mirror configuration for crates compiled for the build platform
-# (without this cargo will compile ~400 crates twice)
-# [profile.dev.build-override]
-# codegen-units = 16
-
-# [profile.dev.package]
-# # proc-macros start
-# lucie-macros = { opt-level = 3 }
-# quote = { opt-level = 3 }
-# syn = { opt-level = 3 }
-# proc-macro2 = { opt-level = 3 }
-# # proc-macros end
-
-# taffy = { opt-level = 3 }
-# resvg = { opt-level = 3 }
-
-# reqwest_client = { codegen-units = 1 }
 
 [profile.release]
-debug = "limited"
-lto = "thin"
+debug = "none"
+lto = "fat"
 codegen-units = 1
-
-[profile.release-fast]
-inherits = "release"
-debug = "full"
-lto = false
-codegen-units = 16
-
-[workspace.lints.rust]
-unexpected_cfgs = { level = "allow" }
 
 [workspace.lints.clippy]
 incompatible_msrv = "deny"
-dbg_macro = "deny"
-todo = "deny"
-
-# This is not a style lint, see https://github.com/rust-lang/rust-clippy/pull/15454
-# Remove when the lint gets promoted to `suspicious`.
 declare_interior_mutable_const = "deny"
-
 redundant_clone = "deny"
 disallowed_methods = "deny"
-
-# We currently do not restrict any style rules
-# as it slows down shipping code to Zed.
-#
-# Running ./script/clippy can take several minutes, and so it's
-# common to skip that step and let CI do it. Any unexpected failures
-# (which also take minutes to discover) thus require switching back
-# to an old branch, manual fixing, and re-pushing.
-#
-# In the future we could improve this by either making sure
-# Zed can surface clippy errors in diagnostics (in addition to the
-# rust-analyzer errors), or by having CI fix style nits automatically.
-style = { level = "allow", priority = -1 }
-
-# Individual rules that have violations in the codebase:
 type_complexity = "allow"
-let_underscore_future = "allow"
-
-# Motivation: We use `vec![a..b]` a lot when dealing with ranges in text, so
-# warning on this rule produces a lot of noise.
-single_range_in_vec_init = "allow"
-
-# in Rust it can be very tedious to reduce argument count without
-# running afoul of the borrow checker.
 too_many_arguments = "allow"
-
-# We often have large enum variants yet we rarely actually bother with splitting them up.
 large_enum_variant = "allow"
-
-# Boolean expressions can be hard to read, requiring only the minimal form gets in the way
-nonminimal_bool = "allow"
-
-[workspace.metadata.cargo-machete]
-ignored = [
-    "bindgen",
-    "cbindgen",
-    "serde",
-]
