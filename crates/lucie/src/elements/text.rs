@@ -1,4 +1,5 @@
 use std::{
+	borrow::Cow,
 	cell::{Cell, RefCell},
 	hash::{Hash, Hasher},
 	mem,
@@ -57,6 +58,14 @@ impl IntoElement for &'static str {
 }
 
 impl IntoElement for String {
+	type Element = SharedString;
+
+	fn into_element(self) -> Self::Element {
+		self.into()
+	}
+}
+
+impl IntoElement for Cow<'static, str> {
 	type Element = SharedString;
 
 	fn into_element(self) -> Self::Element {
