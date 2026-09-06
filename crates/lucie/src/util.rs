@@ -57,9 +57,8 @@ pub fn paint_style(style: &Style, bounds: Bounds<Pixels>, window: &mut Window, c
 	if background_color.is_some_and(|color| !color.is_transparent()) {
 		let mut border_color = match background_color {
 			Some(color) => match color.tag {
-				BackgroundTag::Solid => color.solid,
-				BackgroundTag::LinearGradient => color.colors.first().map(|stop| stop.color).unwrap_or_default(),
-				BackgroundTag::PatternSlash => color.solid
+				BackgroundTag::Solid | BackgroundTag::PatternSlash | BackgroundTag::Checkerboard => color.solid,
+				BackgroundTag::LinearGradient => color.colors.first().map(|stop| stop.color).unwrap_or_default()
 			},
 			None => Hsla::default()
 		};

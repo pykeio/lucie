@@ -304,7 +304,7 @@ float quad_sdf(float2 pt, Bounds bounds, Corners corner_radii) {
 
 GradientColor prepare_gradient_color(uint tag, uint color_space, Hsla solid, LinearColorStop colors[2]) {
     GradientColor output;
-    if (tag == 0 || tag == 2) {
+    if (tag == 0 || tag == 2 || tag == 3) {
         output.solid = hsla_to_rgba(solid);
     } else if (tag == 1) {
         output.color0 = hsla_to_rgba(colors[0].color);
@@ -335,10 +335,10 @@ float4 gradient_color(Background background,
     float4 color;
 
     switch (background.tag) {
-        case 0:
+        case 0: // solid
             color = solid_color;
             break;
-        case 1: {
+        case 1: { // linear gradient
             // -90 degrees to match the CSS gradient angle.
             float gradient_angle = background.gradient_angle_or_pattern_height;
             float radians = (fmod(gradient_angle, 360.0) - 90.0) * (M_PI_F / 180.0);
@@ -381,7 +381,7 @@ float4 gradient_color(Background background,
             }
             break;
         }
-        case 2: {
+        case 2: { // slash pattern
             float gradient_angle_or_pattern_height = background.gradient_angle_or_pattern_height;
             float pattern_width = (gradient_angle_or_pattern_height / 65535.0f) / 255.0f;
             float pattern_interval = fmod(gradient_angle_or_pattern_height, 65535.0f) / 255.0f;
@@ -395,6 +395,18 @@ float4 gradient_color(Background background,
             float distance = min(pattern, pattern_period - pattern) - pattern_period * (pattern_width / pattern_height) /  2.0f;
             color = solid_color;
             color.a *= saturate(0.5 - distance);
+            break;
+        }
+        case 3: { // checkerboard
+            float size = background.gradient_angle_or_pattern_height;
+            float2 relative_position = position - bounds.origin;
+
+            float x_index = floor(relative_position.x / size);
+            float y_index = floor(relative_position.y / size);
+            float should_be_colored = (x_index + y_index) % 2.0;
+
+            color = solid_color;
+            color.a *= saturate(should_be_colored);
             break;
         }
     }
