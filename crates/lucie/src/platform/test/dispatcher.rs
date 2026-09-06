@@ -41,7 +41,8 @@ struct TestDispatcherState {
 	waiting_backtrace: Option<Backtrace>,
 	deprioritized_task_labels: RapidHashSet<TaskLabel>,
 	block_on_ticks: RangeInclusive<usize>,
-	unparkers: Vec<Unparker>
+	unparkers: Vec<Unparker>,
+	num_cpus_override: Option<usize>
 }
 
 impl TestDispatcher {
@@ -61,7 +62,8 @@ impl TestDispatcher {
 			waiting_backtrace: None,
 			deprioritized_task_labels: Default::default(),
 			block_on_ticks: 0..=1000,
-			unparkers: Default::default()
+			unparkers: Default::default(),
+			num_cpus_override: None
 		};
 
 		TestDispatcher {
@@ -249,6 +251,17 @@ impl TestDispatcher {
 	pub fn push_unparker(&self, unparker: Unparker) {
 		let mut state = self.state.lock();
 		state.unparkers.push(unparker);
+	}
+
+	/// Override the value returned by `BackgroundExecutor::num_cpus()` in tests.
+	/// A value of 0 means no override (the default of 4 is used).
+	pub fn set_num_cpus(&self, count: usize) {
+		self.state.lock().num_cpus_override = Some(count);
+	}
+
+	/// Returns the overridden CPU count, or `None` if no override is set.
+	pub fn num_cpus_override(&self) -> Option<usize> {
+		self.state.lock().num_cpus_override
 	}
 }
 
