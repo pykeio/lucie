@@ -11,6 +11,7 @@ use windows::{
 	System::Threading::{ThreadPool, ThreadPoolTimer, TimerElapsedHandler, WorkItemHandler, WorkItemPriority},
 	Win32::{
 		Foundation::{LPARAM, WPARAM},
+		Media::{timeBeginPeriod, timeEndPeriod},
 		System::Threading::{
 			GetCurrentThread, HIGH_PRIORITY_CLASS, SetPriorityClass, SetThreadPriority, THREAD_PRIORITY_HIGHEST, THREAD_PRIORITY_TIME_CRITICAL
 		},
@@ -20,7 +21,7 @@ use windows::{
 
 use crate::{
 	GLOBAL_THREAD_TIMINGS, HWND, PlatformDispatcher, Priority, PriorityQueueSender, RealtimePriority, Runnable, SafeHwnd, THREAD_TIMINGS, TaskLabel,
-	ThreadTaskTimings, WM_LUCIE_TASK_DISPATCHED_ON_MAIN_THREAD
+	ThreadTaskTimings, TimerResolutionGuard, WM_LUCIE_TASK_DISPATCHED_ON_MAIN_THREAD
 };
 
 pub(crate) struct WindowsDispatcher {
@@ -168,5 +169,16 @@ impl PlatformDispatcher for WindowsDispatcher {
 
 			f();
 		});
+	}
+
+	fn increase_timer_resolution(&self) -> TimerResolutionGuard {
+		unsafe {
+			timeBeginPeriod(1);
+		}
+		TimerResolutionGuard {
+			cleanup: Some(Box::new(|| unsafe {
+				timeEndPeriod(1);
+			}))
+		}
 	}
 }

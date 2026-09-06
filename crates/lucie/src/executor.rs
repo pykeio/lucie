@@ -417,9 +417,16 @@ impl BackgroundExecutor {
 		});
 		let mut cx = std::task::Context::from_waker(&waker);
 
+		let park_deadline = |deadline: Instant| {
+			// Timer expirations are only delivered every ~15.6 milliseconds by default on Windows.
+			// We increase the resolution during this wait so that short timeouts stay reasonably short.
+			let _timer_guard = self.dispatcher.increase_timer_resolution();
+			parker.park_deadline(deadline)
+		};
+
 		loop {
 			match deadline {
-				Some(deadline) if !parker.park_deadline(deadline) && deadline <= Instant::now() => {
+				Some(deadline) if !park_deadline(deadline) && deadline <= Instant::now() => {
 					return Err(future);
 				}
 				Some(_) => (),

@@ -18,7 +18,6 @@ use windows::{
 	Win32::{
 		Foundation::*,
 		Graphics::{Direct3D11::ID3D11Device, Gdi::*},
-		Media::{timeBeginPeriod, timeEndPeriod},
 		System::{Com::*, LibraryLoader::*, Ole::*},
 		UI::{Input::KeyboardAndMouse::*, Shell::*, WindowsAndMessaging::*}
 	},
@@ -90,13 +89,8 @@ impl WindowsPlatformState {
 
 impl WindowsPlatform {
 	pub(crate) fn new(headless: bool, liveness: std::sync::Weak<()>) -> Result<Self> {
-		unsafe {
-			OleInitialize(None).context("unable to initialize Windows OLE")?;
-			// Set the system timer resolution to 1ms so that short timeouts
-			// (e.g. in Scheduler::block) are not rounded up to the default
-			// ~15.6ms tick interval.
-			timeBeginPeriod(1);
-		}
+		unsafe { OleInitialize(None).context("unable to initialize Windows OLE")? };
+
 		let directx_devices = if !headless { Some(DirectXDevices::new().context("Creating DirectX devices")?) } else { None };
 		let (main_sender, main_receiver) = PriorityQueueReceiver::new();
 		let validation_number = fastrand::usize(..);
@@ -598,7 +592,6 @@ impl WindowsPlatformInner {
 impl Drop for WindowsPlatform {
 	fn drop(&mut self) {
 		unsafe {
-			timeEndPeriod(1);
 			DestroyWindow(self.handle).context("Destroying platform window").log_err();
 			OleUninitialize();
 		}
