@@ -171,7 +171,7 @@ impl DirectXRenderer {
 		self.atlas.clone()
 	}
 
-	fn pre_draw(&self) -> Result<()> {
+	fn pre_draw(&self, clear_color: &[f32; 4]) -> Result<()> {
 		let resources = self.resources.as_ref().expect("resources missing");
 		let device_context = &self.devices.as_ref().expect("devices missing").device_context;
 		update_buffer(
@@ -185,7 +185,7 @@ impl DirectXRenderer {
 			}]
 		)?;
 		unsafe {
-			device_context.ClearRenderTargetView(resources.render_target_view.as_ref().context("missing render target view")?, &[0.0; 4]);
+			device_context.ClearRenderTargetView(resources.render_target_view.as_ref().context("missing render target view")?, clear_color);
 			device_context.OMSetRenderTargets(Some(slice::from_ref(&resources.render_target_view)), None);
 			device_context.RSSetViewports(Some(slice::from_ref(&resources.viewport)));
 		}
@@ -261,25 +261,32 @@ impl DirectXRenderer {
 		Ok(())
 	}
 
-	pub(crate) fn draw(&mut self, scene: &Scene) -> Result<()> {
+	pub(crate) fn draw(&mut self, scene: &Scene, background_appearance: WindowBackgroundAppearance) -> Result<()> {
 		if self.skip_draws {
 			// skip drawing this frame, we just recovered from a device lost event
 			// and so likely do not have the textures anymore that are required for drawing
 			return Ok(());
 		}
-		self.pre_draw()?;
+
+		self.pre_draw(&match background_appearance {
+			WindowBackgroundAppearance::Opaque => [1.0f32; 4],
+			_ => [0.0f32; 4]
+		})?;
+		self.upload_scene_buffers(scene)?;
+
 		for batch in scene.batches() {
 			match batch {
-				PrimitiveBatch::Shadows(shadows) => self.draw_shadows(shadows),
-				PrimitiveBatch::Quads(quads) => self.draw_quads(quads),
-				PrimitiveBatch::Paths(paths) => {
+				PrimitiveBatch::Shadows(range) => self.draw_shadows(range.start, range.len()),
+				PrimitiveBatch::Quads(range) => self.draw_quads(range.start, range.len()),
+				PrimitiveBatch::Paths(range) => {
+					let paths = &scene.paths[range];
 					self.draw_paths_to_intermediate(paths)?;
 					self.draw_paths_from_intermediate(paths)
 				}
-				PrimitiveBatch::Underlines(underlines) => self.draw_underlines(underlines),
-				PrimitiveBatch::MonochromeSprites { texture_id, sprites } => self.draw_monochrome_sprites(texture_id, sprites),
-				PrimitiveBatch::PolychromeSprites { texture_id, sprites } => self.draw_polychrome_sprites(texture_id, sprites),
-				PrimitiveBatch::Surfaces(surfaces) => self.draw_surfaces(surfaces)
+				PrimitiveBatch::Underlines(range) => self.draw_underlines(range.start, range.len()),
+				PrimitiveBatch::MonochromeSprites { texture_id, range } => self.draw_monochrome_sprites(texture_id, range.start, range.len()),
+				PrimitiveBatch::PolychromeSprites { texture_id, range } => self.draw_polychrome_sprites(texture_id, range.start, range.len()),
+				PrimitiveBatch::Surfaces(range) => self.draw_surfaces(&scene.surfaces[range])
 			}
 			.context(format!(
 				"scene too large:\
@@ -334,39 +341,73 @@ impl DirectXRenderer {
 		Ok(())
 	}
 
-	fn draw_shadows(&mut self, shadows: &[Shadow]) -> Result<()> {
-		if shadows.is_empty() {
+	fn upload_scene_buffers(&mut self, scene: &Scene) -> Result<()> {
+		let devices = self.devices.as_ref().context("devices missing")?;
+
+		if !scene.shadows.is_empty() {
+			self.pipelines
+				.shadow_pipeline
+				.update_buffer(&devices.device, &devices.device_context, &scene.shadows)?;
+		}
+
+		if !scene.quads.is_empty() {
+			self.pipelines
+				.quad_pipeline
+				.update_buffer(&devices.device, &devices.device_context, &scene.quads)?;
+		}
+
+		if !scene.underlines.is_empty() {
+			self.pipelines
+				.underline_pipeline
+				.update_buffer(&devices.device, &devices.device_context, &scene.underlines)?;
+		}
+
+		if !scene.monochrome_sprites.is_empty() {
+			self.pipelines
+				.mono_sprites
+				.update_buffer(&devices.device, &devices.device_context, &scene.monochrome_sprites)?;
+		}
+
+		if !scene.polychrome_sprites.is_empty() {
+			self.pipelines
+				.poly_sprites
+				.update_buffer(&devices.device, &devices.device_context, &scene.polychrome_sprites)?;
+		}
+
+		Ok(())
+	}
+
+	fn draw_shadows(&mut self, start: usize, len: usize) -> Result<()> {
+		if len == 0 {
 			return Ok(());
 		}
+
 		let devices = self.devices.as_ref().context("devices missing")?;
-		self.pipelines
-			.shadow_pipeline
-			.update_buffer(&devices.device, &devices.device_context, shadows)?;
-		self.pipelines.shadow_pipeline.draw(
+		self.pipelines.shadow_pipeline.draw_range(
+			&devices.device,
 			&devices.device_context,
 			slice::from_ref(&self.resources.as_ref().context("resources missing")?.viewport),
 			slice::from_ref(&self.globals.global_params_buffer),
-			D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
 			4,
-			shadows.len() as u32
+			start as u32,
+			len as u32
 		)
 	}
 
-	fn draw_quads(&mut self, quads: &[Quad]) -> Result<()> {
-		if quads.is_empty() {
+	fn draw_quads(&mut self, start: usize, len: usize) -> Result<()> {
+		if len == 0 {
 			return Ok(());
 		}
+
 		let devices = self.devices.as_ref().context("devices missing")?;
-		self.pipelines
-			.quad_pipeline
-			.update_buffer(&devices.device, &devices.device_context, quads)?;
-		self.pipelines.quad_pipeline.draw(
+		self.pipelines.quad_pipeline.draw_range(
+			&devices.device,
 			&devices.device_context,
 			slice::from_ref(&self.resources.as_ref().context("resources missing")?.viewport),
 			slice::from_ref(&self.globals.global_params_buffer),
-			D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
 			4,
-			quads.len() as u32
+			start as u32,
+			len as u32
 		)
 	}
 
@@ -470,63 +511,61 @@ impl DirectXRenderer {
 		)
 	}
 
-	fn draw_underlines(&mut self, underlines: &[Underline]) -> Result<()> {
-		if underlines.is_empty() {
+	fn draw_underlines(&mut self, start: usize, len: usize) -> Result<()> {
+		if len == 0 {
 			return Ok(());
 		}
+
 		let devices = self.devices.as_ref().context("devices missing")?;
 		let resources = self.resources.as_ref().context("resources missing")?;
-		self.pipelines
-			.underline_pipeline
-			.update_buffer(&devices.device, &devices.device_context, underlines)?;
-		self.pipelines.underline_pipeline.draw(
+		self.pipelines.underline_pipeline.draw_range(
+			&devices.device,
 			&devices.device_context,
 			slice::from_ref(&resources.viewport),
 			slice::from_ref(&self.globals.global_params_buffer),
-			D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
 			4,
-			underlines.len() as u32
+			start as u32,
+			len as u32
 		)
 	}
 
-	fn draw_monochrome_sprites(&mut self, texture_id: AtlasTextureId, sprites: &[MonochromeSprite]) -> Result<()> {
-		if sprites.is_empty() {
-			return Ok(());
-		}
-		let devices = self.devices.as_ref().context("devices missing")?;
-		let resources = self.resources.as_ref().context("resources missing")?;
-		self.pipelines
-			.mono_sprites
-			.update_buffer(&devices.device, &devices.device_context, sprites)?;
-		let texture_view = self.atlas.get_texture_view(texture_id);
-		self.pipelines.mono_sprites.draw_with_texture(
-			&devices.device_context,
-			&texture_view,
-			slice::from_ref(&resources.viewport),
-			slice::from_ref(&self.globals.global_params_buffer),
-			slice::from_ref(&self.globals.sampler),
-			sprites.len() as u32
-		)
-	}
-
-	fn draw_polychrome_sprites(&mut self, texture_id: AtlasTextureId, sprites: &[PolychromeSprite]) -> Result<()> {
-		if sprites.is_empty() {
+	fn draw_monochrome_sprites(&mut self, texture_id: AtlasTextureId, start: usize, len: usize) -> Result<()> {
+		if len == 0 {
 			return Ok(());
 		}
 
 		let devices = self.devices.as_ref().context("devices missing")?;
 		let resources = self.resources.as_ref().context("resources missing")?;
-		self.pipelines
-			.poly_sprites
-			.update_buffer(&devices.device, &devices.device_context, sprites)?;
 		let texture_view = self.atlas.get_texture_view(texture_id);
-		self.pipelines.poly_sprites.draw_with_texture(
+		self.pipelines.mono_sprites.draw_range_with_texture(
+			&devices.device,
 			&devices.device_context,
 			&texture_view,
 			slice::from_ref(&resources.viewport),
 			slice::from_ref(&self.globals.global_params_buffer),
 			slice::from_ref(&self.globals.sampler),
-			sprites.len() as u32
+			start as u32,
+			len as u32
+		)
+	}
+
+	fn draw_polychrome_sprites(&mut self, texture_id: AtlasTextureId, start: usize, len: usize) -> Result<()> {
+		if len == 0 {
+			return Ok(());
+		}
+
+		let devices = self.devices.as_ref().context("devices missing")?;
+		let resources = self.resources.as_ref().context("resources missing")?;
+		let texture_view = self.atlas.get_texture_view(texture_id);
+		self.pipelines.poly_sprites.draw_range_with_texture(
+			&devices.device,
+			&devices.device_context,
+			&texture_view,
+			slice::from_ref(&resources.viewport),
+			slice::from_ref(&self.globals.global_params_buffer),
+			slice::from_ref(&self.globals.sampler),
+			start as u32,
+			len as u32
 		)
 	}
 
@@ -817,6 +856,64 @@ impl<T> PipelineState<T> {
 			device_context.VSSetShaderResources(0, Some(texture));
 			device_context.PSSetShaderResources(0, Some(texture));
 
+			device_context.DrawInstanced(4, instance_count, 0, 0);
+		}
+		Ok(())
+	}
+
+	fn draw_range(
+		&self,
+		device: &ID3D11Device,
+		device_context: &ID3D11DeviceContext,
+		viewport: &[D3D11_VIEWPORT],
+		global_params: &[Option<ID3D11Buffer>],
+		vertex_count: u32,
+		first_instance: u32,
+		instance_count: u32
+	) -> Result<()> {
+		let view = create_buffer_view_range(device, &self.buffer, first_instance, instance_count)?;
+		set_pipeline_state(
+			device_context,
+			slice::from_ref(&view),
+			D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+			viewport,
+			&self.vertex,
+			&self.fragment,
+			global_params,
+			&self.blend_state
+		);
+		unsafe {
+			device_context.DrawInstanced(vertex_count, instance_count, 0, 0);
+		}
+		Ok(())
+	}
+
+	fn draw_range_with_texture(
+		&self,
+		device: &ID3D11Device,
+		device_context: &ID3D11DeviceContext,
+		texture: &[Option<ID3D11ShaderResourceView>],
+		viewport: &[D3D11_VIEWPORT],
+		global_params: &[Option<ID3D11Buffer>],
+		sampler: &[Option<ID3D11SamplerState>],
+		first_instance: u32,
+		instance_count: u32
+	) -> Result<()> {
+		let view = create_buffer_view_range(device, &self.buffer, first_instance, instance_count)?;
+		set_pipeline_state(
+			device_context,
+			slice::from_ref(&view),
+			D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+			viewport,
+			&self.vertex,
+			&self.fragment,
+			global_params,
+			&self.blend_state
+		);
+		unsafe {
+			device_context.PSSetSamplers(0, Some(sampler));
+			device_context.VSSetShaderResources(0, Some(texture));
+			device_context.PSSetShaderResources(0, Some(texture));
 			device_context.DrawInstanced(4, instance_count, 0, 0);
 		}
 		Ok(())
@@ -1121,6 +1218,23 @@ fn create_buffer_view(device: &ID3D11Device, buffer: &ID3D11Buffer) -> Result<Op
 }
 
 #[inline]
+fn create_buffer_view_range(device: &ID3D11Device, buffer: &ID3D11Buffer, first_element: u32, num_elements: u32) -> Result<Option<ID3D11ShaderResourceView>> {
+	let desc = D3D11_SHADER_RESOURCE_VIEW_DESC {
+		Format: DXGI_FORMAT_UNKNOWN,
+		ViewDimension: D3D11_SRV_DIMENSION_BUFFER,
+		Anonymous: D3D11_SHADER_RESOURCE_VIEW_DESC_0 {
+			Buffer: D3D11_BUFFER_SRV {
+				Anonymous1: D3D11_BUFFER_SRV_0 { FirstElement: first_element },
+				Anonymous2: D3D11_BUFFER_SRV_1 { NumElements: num_elements }
+			}
+		}
+	};
+	let mut view = None;
+	unsafe { device.CreateShaderResourceView(buffer, Some(&desc), Some(&mut view)) }?;
+	Ok(view)
+}
+
+#[inline]
 fn update_buffer<T>(device_context: &ID3D11DeviceContext, buffer: &ID3D11Buffer, data: &[T]) -> Result<()> {
 	unsafe {
 		let mut dest = std::mem::zeroed();
@@ -1185,8 +1299,7 @@ pub(crate) mod shader_resources {
 		PathRasterization,
 		PathSprite,
 		MonochromeSprite,
-		PolychromeSprite,
-		EmojiRasterization
+		PolychromeSprite
 	}
 
 	#[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -1265,12 +1378,6 @@ pub(crate) mod shader_resources {
 		unsafe {
 			use windows::Win32::Graphics::{Direct3D::ID3DInclude, Hlsl::D3D_COMPILE_STANDARD_FILE_INCLUDE};
 
-			let shader_name = if matches!(entry, ShaderModule::EmojiRasterization) {
-				"color_text_raster.hlsl"
-			} else {
-				"shaders.hlsl"
-			};
-
 			let entry = format!(
 				"{}_{}\0",
 				entry.as_str(),
@@ -1287,7 +1394,7 @@ pub(crate) mod shader_resources {
 			let mut compile_blob = None;
 			let mut error_blob = None;
 			let shader_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-				.join(&format!("src/platform/windows/{}", shader_name))
+				.join("src/platform/windows/shaders.hlsl")
 				.canonicalize()?;
 
 			let entry_point = PCSTR::from_raw(entry.as_ptr());
@@ -1333,8 +1440,7 @@ pub(crate) mod shader_resources {
 				ShaderModule::PathRasterization => "path_rasterization",
 				ShaderModule::PathSprite => "path_sprite",
 				ShaderModule::MonochromeSprite => "monochrome_sprite",
-				ShaderModule::PolychromeSprite => "polychrome_sprite",
-				ShaderModule::EmojiRasterization => "emoji_rasterization"
+				ShaderModule::PolychromeSprite => "polychrome_sprite"
 			}
 		}
 	}

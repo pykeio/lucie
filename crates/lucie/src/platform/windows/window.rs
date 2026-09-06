@@ -47,6 +47,7 @@ pub struct WindowsWindowState {
 	pub fullscreen_restore_bounds: Cell<Bounds<Pixels>>,
 	pub border_offset: WindowBorderOffset,
 	pub appearance: Cell<WindowAppearance>,
+	pub background_appearance: Cell<WindowBackgroundAppearance>,
 	pub scale_factor: Cell<f32>,
 	pub restore_from_minimized: Cell<Option<Box<dyn FnMut(RequestFrameOptions)>>>,
 
@@ -130,6 +131,7 @@ impl WindowsWindowState {
 			fullscreen_restore_bounds: Cell::new(fullscreen_restore_bounds),
 			border_offset,
 			appearance: Cell::new(appearance),
+			background_appearance: Cell::new(WindowBackgroundAppearance::Opaque),
 			scale_factor: Cell::new(scale_factor),
 			restore_from_minimized: Cell::new(restore_from_minimized),
 			min_size,
@@ -716,6 +718,10 @@ impl PlatformWindow for WindowsWindow {
 		self.state.hovered.get()
 	}
 
+	fn background_appearance(&self) -> WindowBackgroundAppearance {
+		self.state.background_appearance.get()
+	}
+
 	fn set_title(&mut self, title: &str) {
 		unsafe { SetWindowTextW(self.0.hwnd, &HSTRING::from(title)) }
 			.inspect_err(|e| tracing::error!("Set title failed: {e}"))
@@ -723,6 +729,8 @@ impl PlatformWindow for WindowsWindow {
 	}
 
 	fn set_background_appearance(&self, background_appearance: WindowBackgroundAppearance) {
+		self.state.background_appearance.set(background_appearance);
+
 		let hwnd = self.0.hwnd;
 
 		// using Dwm APIs for Mica and MicaAlt backdrops.
@@ -817,7 +825,11 @@ impl PlatformWindow for WindowsWindow {
 	}
 
 	fn draw(&self, scene: &Scene) {
-		self.state.renderer.borrow_mut().draw(scene).log_err();
+		self.state
+			.renderer
+			.borrow_mut()
+			.draw(scene, self.state.background_appearance.get())
+			.log_err();
 	}
 
 	fn sprite_atlas(&self) -> Arc<dyn PlatformAtlas> {

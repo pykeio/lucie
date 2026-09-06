@@ -158,13 +158,7 @@ impl PlatformWindow for TestWindow {
 		self.0.lock().input_handler.take()
 	}
 
-	fn prompt(
-		&self,
-		_level: crate::PromptLevel,
-		msg: &str,
-		detail: Option<&str>,
-		answers: &[PromptButton]
-	) -> Option<tokio::sync::oneshot::Receiver<usize>> {
+	fn prompt(&self, _level: crate::PromptLevel, msg: &str, detail: Option<&str>, answers: &[PromptButton]) -> Option<tokio::sync::oneshot::Receiver<usize>> {
 		Some(self.0.lock().platform.upgrade().expect("platform dropped").prompt(msg, detail, answers))
 	}
 
@@ -178,6 +172,10 @@ impl PlatformWindow for TestWindow {
 
 	fn is_hovered(&self) -> bool {
 		false
+	}
+
+	fn background_appearance(&self) -> WindowBackgroundAppearance {
+		WindowBackgroundAppearance::Opaque
 	}
 
 	fn set_title(&mut self, title: &str) {
