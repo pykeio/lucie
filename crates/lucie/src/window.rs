@@ -206,19 +206,63 @@ slotmap::new_key_type! {
 }
 
 thread_local! {
+	/// fallback arena used when no app-specific arena is active
 	pub(crate) static ELEMENT_ARENA: RefCell<Arena> = RefCell::new(Arena::new(1024 * 1024));
+
+	static CURRENT_ELEMENT_ARENA: Cell<Option<*const RefCell<Arena>>> = const { Cell::new(None) };
+}
+
+pub(crate) fn with_element_arena<R>(f: impl FnOnce(&mut Arena) -> R) -> R {
+	CURRENT_ELEMENT_ARENA.with(|current| {
+		if let Some(arena_ptr) = current.get() {
+			let arena_cell = unsafe { &*arena_ptr };
+			f(&mut arena_cell.borrow_mut())
+		} else {
+			ELEMENT_ARENA.with_borrow_mut(f)
+		}
+	})
+}
+
+pub(crate) struct ElementArenaScope {
+	previous: Option<*const RefCell<Arena>>
+}
+
+impl ElementArenaScope {
+	pub(crate) fn enter(arena: &RefCell<Arena>) -> Self {
+		let previous = CURRENT_ELEMENT_ARENA.with(|current| {
+			let prev = current.get();
+			current.set(Some(arena as *const RefCell<Arena>));
+			prev
+		});
+		Self { previous }
+	}
+}
+
+impl Drop for ElementArenaScope {
+	fn drop(&mut self) {
+		CURRENT_ELEMENT_ARENA.with(|current| {
+			current.set(self.previous);
+		});
+	}
 }
 
 /// Returned when the element arena has been used and so must be cleared before the next draw.
 #[must_use]
-pub struct ArenaClearNeeded;
+pub struct ArenaClearNeeded {
+	arena: *const RefCell<Arena>
+}
 
 impl ArenaClearNeeded {
+	pub(crate) fn new(arena: &RefCell<Arena>) -> Self {
+		Self {
+			arena: arena as *const RefCell<Arena>
+		}
+	}
+
 	/// Clear the element arena.
 	pub fn clear(self) {
-		ELEMENT_ARENA.with_borrow_mut(|element_arena| {
-			element_arena.clear();
-		});
+		let arena_cell = unsafe { &*self.arena };
+		arena_cell.borrow_mut().clear();
 	}
 }
 
@@ -1910,6 +1954,8 @@ impl Window {
 	/// the contents of the new [`Scene`], use [`Self::present`].
 	#[profiling::function]
 	pub fn draw(&mut self, cx: &mut App) -> ArenaClearNeeded {
+		let _arena_scope = ElementArenaScope::enter(&cx.element_arena);
+
 		self.invalidate_entities();
 		cx.entities.clear_accessed();
 		debug_assert!(self.rendered_entity_stack.is_empty());
@@ -1962,7 +2008,7 @@ impl Window {
 		self.invalidator.set_phase(DrawPhase::None);
 		self.needs_present.set(true);
 
-		ArenaClearNeeded
+		ArenaClearNeeded::new(&cx.element_arena)
 	}
 
 	fn record_entities_accessed(&mut self, cx: &mut App) {

@@ -43,7 +43,7 @@ use lucie_common::{
 };
 use lucie_style::{Display, Style};
 
-use crate::{App, AvailableSpace, Context, DispatchNodeId, ELEMENT_ARENA, ElementId, FocusHandle, LayoutId, Window};
+use crate::{App, AvailableSpace, Context, DispatchNodeId, ElementId, FocusHandle, LayoutId, Window, with_element_arena};
 
 /// Implemented by types that participate in laying out and painting the contents of a window.
 /// Elements form a tree and are laid out according to web-based layout rules, as implemented by Taffy.
@@ -517,9 +517,7 @@ impl AnyElement {
 		E: 'static + Element,
 		E::RequestLayoutState: Any
 	{
-		let element = ELEMENT_ARENA
-			.with_borrow_mut(|arena| arena.alloc(|| Drawable::new(element)))
-			.map(|element| element as &mut dyn ElementObject);
+		let element = with_element_arena(|arena| arena.alloc(|| Drawable::new(element))).map(|element| element as &mut dyn ElementObject);
 		AnyElement(element)
 	}
 

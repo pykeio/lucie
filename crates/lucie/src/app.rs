@@ -21,7 +21,7 @@ use futures_util::{
 };
 use itertools::Itertools;
 use lucie_common::{
-	ResultExt, SharedString, debug_panic,
+	Arena, ArenaBox, ResultExt, SharedString, debug_panic,
 	geometry::{Bounds, Pixels, Point}
 };
 use lucie_style::CursorStyle;
@@ -588,7 +588,9 @@ pub struct App {
 	#[cfg(any(test, feature = "test-support", debug_assertions))]
 	pub(crate) name: Option<&'static str>,
 	quit_mode: QuitMode,
-	quitting: bool
+	quitting: bool,
+	pub(crate) element_arena: RefCell<Arena>,
+	pub(crate) event_arena: Arena
 }
 
 impl App {
@@ -651,7 +653,8 @@ impl App {
 				prompt_builder: Some(PromptBuilder::Default),
 				quit_mode: QuitMode::default(),
 				quitting: false,
-
+				element_arena: RefCell::new(Arena::new(1024 * 1024)),
+				event_arena: Arena::new(1024 * 1024),
 				#[cfg(any(test, feature = "test-support", debug_assertions))]
 				name: None
 			})
@@ -1059,7 +1062,7 @@ impl App {
 						self.apply_notify_effect(emitter);
 					}
 
-					Effect::Emit { emitter, event_type, event } => self.apply_emit_effect(emitter, event_type, event),
+					Effect::Emit { emitter, event_type, event } => self.apply_emit_effect(emitter, event_type, &*event),
 
 					Effect::RefreshWindows => {
 						self.apply_refresh_effect();
@@ -1091,6 +1094,7 @@ impl App {
 				}
 
 				if self.pending_effects.is_empty() {
+					self.event_arena.clear();
 					break;
 				}
 			}
@@ -1143,10 +1147,10 @@ impl App {
 		self.observers.clone().retain(&emitter, |handler| handler(self));
 	}
 
-	fn apply_emit_effect(&mut self, emitter: EntityId, event_type: TypeId, event: Box<dyn Any>) {
+	fn apply_emit_effect(&mut self, emitter: EntityId, event_type: TypeId, event: &dyn Any) {
 		self.event_listeners
 			.clone()
-			.retain(&emitter, |(stored_type, handler)| if *stored_type == event_type { handler(event.as_ref(), self) } else { true });
+			.retain(&emitter, |(stored_type, handler)| if *stored_type == event_type { handler(event, self) } else { true });
 	}
 
 	fn apply_refresh_effect(&mut self) {
@@ -1950,12 +1954,26 @@ impl AppContext for App {
 
 /// These effects are processed at the end of each application update cycle.
 pub(crate) enum Effect {
-	Notify { emitter: EntityId },
-	Emit { emitter: EntityId, event_type: TypeId, event: Box<dyn Any> },
+	Notify {
+		emitter: EntityId
+	},
+	Emit {
+		emitter: EntityId,
+		event_type: TypeId,
+		event: ArenaBox<dyn Any>
+	},
 	RefreshWindows,
-	NotifyGlobalObservers { global_type: TypeId },
-	Defer { callback: Box<dyn FnOnce(&mut App) + 'static> },
-	EntityCreated { entity: AnyEntity, tid: TypeId, window: Option<WindowId> }
+	NotifyGlobalObservers {
+		global_type: TypeId
+	},
+	Defer {
+		callback: Box<dyn FnOnce(&mut App) + 'static>
+	},
+	EntityCreated {
+		entity: AnyEntity,
+		tid: TypeId,
+		window: Option<WindowId>
+	}
 }
 
 impl std::fmt::Debug for Effect {
