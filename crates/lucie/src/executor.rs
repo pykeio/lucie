@@ -418,18 +418,15 @@ impl BackgroundExecutor {
 		let mut cx = std::task::Context::from_waker(&waker);
 
 		loop {
-			match future.as_mut().poll(&mut cx) {
-				Poll::Ready(result) => return Ok(result),
-				Poll::Pending => {
-					let timeout = deadline.map(|deadline| deadline.saturating_duration_since(Instant::now()));
-					if let Some(timeout) = timeout {
-						if !parker.park_timeout(timeout) && deadline.is_some_and(|deadline| deadline < Instant::now()) {
-							return Err(future);
-						}
-					} else {
-						parker.park();
-					}
+			match deadline {
+				Some(deadline) if !parker.park_deadline(deadline) && deadline <= Instant::now() => {
+					return Err(future);
 				}
+				Some(_) => (),
+				None => parker.park()
+			}
+			if let Poll::Ready(result) = future.as_mut().poll(&mut cx) {
+				break Ok(result);
 			}
 		}
 	}
