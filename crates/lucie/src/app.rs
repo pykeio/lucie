@@ -776,9 +776,9 @@ impl App {
 	}
 
 	pub(crate) fn detect_accessed_entities<R>(&mut self, callback: impl FnOnce(&mut App) -> R) -> (R, RapidHashSet<EntityId>) {
-		let accessed_entities_start = self.entities.accessed_entities.borrow().clone();
+		let accessed_entities_start = self.entities.accessed_entities.get_mut().clone();
 		let result = callback(self);
-		let accessed_entities_end = self.entities.accessed_entities.borrow().clone();
+		let accessed_entities_end = self.entities.accessed_entities.get_mut().clone();
 		let entities_accessed_in_callback = accessed_entities_end
 			.difference(&accessed_entities_start)
 			.copied()

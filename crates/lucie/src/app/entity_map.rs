@@ -5,7 +5,6 @@ use std::{
 	fmt::{self, Display},
 	hash::{Hash, Hasher},
 	marker::PhantomData,
-	mem,
 	num::NonZeroU64,
 	sync::{
 		Arc, Weak,
@@ -96,7 +95,7 @@ impl EntityMap {
 	where
 		T: 'static
 	{
-		let mut accessed_entities = self.accessed_entities.borrow_mut();
+		let mut accessed_entities = self.accessed_entities.get_mut();
 		accessed_entities.insert(slot.entity_id);
 
 		let handle = slot.0;
@@ -108,7 +107,7 @@ impl EntityMap {
 	#[track_caller]
 	pub fn lease<T>(&mut self, pointer: &Entity<T>) -> Lease<T> {
 		self.assert_valid_context(pointer);
-		let mut accessed_entities = self.accessed_entities.borrow_mut();
+		let mut accessed_entities = self.accessed_entities.get_mut();
 		accessed_entities.insert(pointer.entity_id);
 
 		let entity = Some(
@@ -144,20 +143,19 @@ impl EntityMap {
 	}
 
 	pub fn extend_accessed(&mut self, entities: &RapidHashSet<EntityId>) {
-		self.accessed_entities.borrow_mut().extend(entities.iter().copied());
+		self.accessed_entities.get_mut().extend(entities.iter().copied());
 	}
 
 	pub fn clear_accessed(&mut self) {
-		self.accessed_entities.borrow_mut().clear();
+		self.accessed_entities.get_mut().clear();
 	}
 
 	pub fn take_dropped(&mut self) -> Vec<(EntityId, Box<dyn Any>)> {
-		let mut ref_counts = self.ref_counts.write();
-		let dropped_entity_ids = mem::take(&mut ref_counts.dropped_entity_ids);
-		let mut accessed_entities = self.accessed_entities.borrow_mut();
+		let mut ref_counts = &mut *self.ref_counts.write();
+		let dropped_entity_ids = ref_counts.dropped_entity_ids.drain(..);
+		let mut accessed_entities = self.accessed_entities.get_mut();
 
 		dropped_entity_ids
-			.into_iter()
 			.filter_map(|entity_id| {
 				let count = ref_counts.counts.remove(entity_id).unwrap();
 				debug_assert_eq!(count.load(SeqCst), 0, "dropped an entity that was referenced");
