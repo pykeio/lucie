@@ -806,7 +806,7 @@ impl<T> PipelineState<T> {
 	fn update_buffer(&mut self, device: &ID3D11Device, device_context: &ID3D11DeviceContext, data: &[T]) -> Result<()> {
 		if self.buffer_size < data.len() {
 			let new_buffer_size = data.len().next_power_of_two();
-			tracing::info!("Updating {} buffer size from {} to {}", self.label, self.buffer_size, new_buffer_size);
+			tracing::debug!("Updating {} buffer size from {} to {}", self.label, self.buffer_size, new_buffer_size);
 			let buffer = create_buffer(device, std::mem::size_of::<T>(), new_buffer_size)?;
 			let view = create_buffer_view(device, &buffer)?;
 			self.buffer = buffer;
