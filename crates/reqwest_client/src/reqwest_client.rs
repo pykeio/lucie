@@ -1,4 +1,4 @@
-use std::{error::Error, mem, pin::Pin, sync::OnceLock, task::Poll, time::Duration};
+use std::{error::Error, mem, pin::Pin, task::Poll, time::Duration};
 
 use anyhow::anyhow;
 use bytes::{BufMut, Bytes, BytesMut};
@@ -8,13 +8,11 @@ use tokio::io::AsyncRead;
 use tokio_stream::{Stream, StreamExt};
 
 const DEFAULT_CAPACITY: usize = 4096;
-static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
 
 pub struct ReqwestClient {
 	client: reqwest::Client,
 	proxy: Option<Uri>,
-	user_agent: Option<HeaderValue>,
-	handle: tokio::runtime::Handle
+	user_agent: Option<HeaderValue>
 }
 
 impl ReqwestClient {
@@ -61,26 +59,10 @@ impl ReqwestClient {
 	}
 }
 
-pub fn runtime() -> &'static tokio::runtime::Runtime {
-	RUNTIME.get_or_init(|| {
-		tokio::runtime::Builder::new_multi_thread()
-            // Since we now have two executors, let's try to keep our footprint small
-            .worker_threads(1)
-            .enable_all()
-            .build()
-            .expect("Failed to initialize HTTP client")
-	})
-}
-
 impl From<reqwest::Client> for ReqwestClient {
 	fn from(client: reqwest::Client) -> Self {
-		let handle = tokio::runtime::Handle::try_current().unwrap_or_else(|_| {
-			tracing::debug!("no tokio runtime found, creating one for Reqwest...");
-			runtime().handle().clone()
-		});
 		Self {
 			client,
-			handle,
 			proxy: None,
 			user_agent: None
 		}
@@ -213,9 +195,8 @@ impl HttpClient for ReqwestClient {
 			AsyncBodyInner::AsyncReader(stream) => reqwest::Body::wrap_stream(StreamReader::new(stream))
 		});
 
-		let handle = self.handle.clone();
 		Box::pin(async move {
-			let mut response = handle.spawn(async { request.send().await }).await?.map_err(redact_error)?;
+			let mut response = request.send().await.map_err(redact_error)?;
 
 			let headers = mem::take(response.headers_mut());
 			let mut builder = http::Response::builder().status(response.status().as_u16()).version(response.version());

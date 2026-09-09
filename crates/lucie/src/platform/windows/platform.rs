@@ -1,6 +1,7 @@
 use std::{
 	cell::{Cell, RefCell},
 	path::PathBuf,
+	pin::Pin,
 	rc::{Rc, Weak},
 	sync::{
 		Arc,
@@ -125,7 +126,7 @@ impl WindowsPlatform {
 		let handle = result?;
 
 		let disable_direct_composition = std::env::var(DISABLE_DIRECT_COMPOSITION).is_ok_and(|value| value == "true" || value == "1");
-		let background_executor = BackgroundExecutor::new(dispatcher.clone());
+		let background_executor = BackgroundExecutor::new();
 		let foreground_executor = ForegroundExecutor::new(dispatcher, liveness);
 
 		let drop_target_helper: Option<IDropTargetHelper> = if !headless {
@@ -194,14 +195,12 @@ impl WindowsPlatform {
 			.map(|menu| (menu.name.clone(), menu.description.clone()))
 			.collect::<Vec<_>>();
 		let recent_workspaces = borrow.recent_workspaces.clone();
-		self.background_executor
-			.spawn(async move {
-				update_jump_list(&recent_workspaces, &dock_menus).log_err();
-			})
-			.detach();
+		self.background_executor.spawn(async move {
+			update_jump_list(&recent_workspaces, &dock_menus).log_err();
+		});
 	}
 
-	fn update_jump_list(&self, menus: Vec<MenuItem>, entries: Vec<SmallVec<[PathBuf; 2]>>) -> Task<Vec<SmallVec<[PathBuf; 2]>>> {
+	async fn update_jump_list(&self, menus: Vec<MenuItem>, entries: Vec<SmallVec<[PathBuf; 2]>>) -> Vec<SmallVec<[PathBuf; 2]>> {
 		let mut actions = Vec::new();
 		menus.into_iter().for_each(|menu| {
 			if let Some(dock_menu) = DockMenuItem::new(menu).log_err() {
@@ -217,8 +216,7 @@ impl WindowsPlatform {
 			.map(|menu| (menu.name.clone(), menu.description.clone()))
 			.collect::<Vec<_>>();
 		let recent_workspaces = jump_list.recent_workspaces.clone();
-		self.background_executor
-			.spawn(async move { update_jump_list(&recent_workspaces, &dock_menus).log_err().unwrap_or_default() })
+		update_jump_list(&recent_workspaces, &dock_menus).log_err().unwrap_or_default()
 	}
 
 	fn begin_vsync_thread(&self) {
@@ -415,8 +413,8 @@ impl Platform for WindowsPlatform {
 		}
 	}
 
-	fn update_jump_list(&self, menus: Vec<MenuItem>, entries: Vec<SmallVec<[PathBuf; 2]>>) -> Task<Vec<SmallVec<[PathBuf; 2]>>> {
-		self.update_jump_list(menus, entries)
+	fn update_jump_list(&self, menus: Vec<MenuItem>, entries: Vec<SmallVec<[PathBuf; 2]>>) -> Pin<Box<dyn Future<Output = Vec<SmallVec<[PathBuf; 2]>>> + '_>> {
+		Box::pin(self.update_jump_list(menus, entries))
 	}
 }
 

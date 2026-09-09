@@ -136,7 +136,7 @@ pub trait AppContext {
 		T: 'static;
 
 	/// Spawn a future on a background thread
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
 	where
 		R: Send + 'static;
 

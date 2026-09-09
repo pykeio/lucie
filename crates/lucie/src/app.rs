@@ -7,6 +7,7 @@ use std::{
 	mem,
 	ops::{Deref, DerefMut},
 	path::{Path, PathBuf},
+	pin::Pin,
 	rc::{Rc, Weak},
 	sync::{Arc, atomic::Ordering::SeqCst},
 	time::{Duration, Instant}
@@ -32,11 +33,11 @@ use slotmap::SlotMap;
 use smallvec::SmallVec;
 
 use crate::{
-	Action, ActionBuildError, ActionRegistry, Any, AnyView, AnyWindowHandle, AppContext, Asset, AssetSource, BackgroundExecutor, ClipboardItem, DispatchPhase,
-	DisplayId, EventEmitter, FocusHandle, FocusMap, ForegroundExecutor, Global, KeyBinding, KeyContext, Keymap, Keystroke, LayoutId, Menu, MenuItem, OwnedMenu,
-	Platform, PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, Priority, PromptBuilder, PromptButton, PromptHandle, PromptLevel, Render,
-	RenderImage, RenderablePromptHandle, Reservation, SubscriberSet, Subscription, SvgRenderer, Task, Window, WindowAppearance, WindowHandle, WindowId,
-	WindowInvalidator,
+	Action, ActionBuildError, ActionRegistry, Any, AnyView, AnyWindowHandle, AppContext, Asset, AssetSource, BackgroundExecutor, BackgroundTask, ClipboardItem,
+	DispatchPhase, DisplayId, EventEmitter, FocusHandle, FocusMap, ForegroundExecutor, ForegroundTask, Global, KeyBinding, KeyContext, Keymap, Keystroke,
+	LayoutId, Menu, MenuItem, OwnedMenu, Platform, PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PromptBuilder, PromptButton, PromptHandle,
+	PromptLevel, Render, RenderImage, RenderablePromptHandle, Reservation, SubscriberSet, Subscription, SvgRenderer, TaskPriority, Window, WindowAppearance,
+	WindowHandle, WindowId, WindowInvalidator,
 	colors::{Colors, GlobalColors},
 	current_platform, hash,
 	http::{AsyncBody, HttpClient, Uri},
@@ -598,7 +599,7 @@ impl App {
 	pub(crate) fn new_app(platform: Rc<dyn Platform>, liveness: Arc<()>, asset_source: Arc<dyn AssetSource>, http_client: Arc<dyn HttpClient>) -> Rc<AppCell> {
 		let executor = platform.background_executor();
 		let foreground_executor = platform.foreground_executor();
-		assert!(executor.is_main_thread(), "must construct App on main thread");
+		assert!(foreground_executor.dispatcher.is_main_thread(), "must construct App on main thread");
 
 		let text_system = Arc::new(TextSystem::new());
 		let entities = EntityMap::new();
@@ -700,7 +701,11 @@ impl App {
 		self.quitting = true;
 
 		let futures = join_all(futures);
-		if self.background_executor.block_with_timeout(SHUTDOWN_TIMEOUT, futures).is_err() {
+		if self
+			.background_executor
+			.block_with_timeout(TaskPriority::Normal, SHUTDOWN_TIMEOUT, futures)
+			.is_err()
+		{
 			tracing::error!("timed out waiting on app_will_quit");
 		}
 
@@ -1258,7 +1263,7 @@ impl App {
 	/// Spawns the future returned by the given function on the main thread. The closure will be invoked
 	/// with [AsyncApp], which allows the application state to be accessed across await points.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> Task<R>
+	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> ForegroundTask<R>
 	where
 		AsyncFn: AsyncFnOnce(&mut AsyncApp) -> R + 'static,
 		R: 'static
@@ -1275,7 +1280,7 @@ impl App {
 	/// Spawns the future returned by the given function on the main thread with
 	/// the given priority. The closure will be invoked with [AsyncApp], which
 	/// allows the application state to be accessed across await points.
-	pub fn spawn_with_priority<AsyncFn, R>(&self, priority: Priority, f: AsyncFn) -> Task<R>
+	pub fn spawn_with_priority<AsyncFn, R>(&self, priority: TaskPriority, f: AsyncFn) -> ForegroundTask<R>
 	where
 		AsyncFn: AsyncFnOnce(&mut AsyncApp) -> R + 'static,
 		R: 'static
@@ -1675,7 +1680,11 @@ impl App {
 
 	/// Updates the jump list with the updated list of recent paths for the application, only used on Windows for now.
 	/// Note that this also sets the dock menu on Windows.
-	pub fn update_jump_list(&self, menus: Vec<MenuItem>, entries: Vec<SmallVec<[PathBuf; 2]>>) -> Task<Vec<SmallVec<[PathBuf; 2]>>> {
+	pub fn update_jump_list(
+		&self,
+		menus: Vec<MenuItem>,
+		entries: Vec<SmallVec<[PathBuf; 2]>>
+	) -> Pin<Box<dyn Future<Output = Vec<SmallVec<[PathBuf; 2]>>> + '_>> {
 		self.platform.update_jump_list(menus, entries)
 	}
 
@@ -1779,17 +1788,16 @@ impl App {
 	///
 	/// Note that the multiple calls to this method will only result in one `Asset::load` call at a
 	/// time, and the results of this call will be cached
-	pub fn fetch_asset<A: Asset>(&mut self, source: &A::Source) -> (Shared<Task<A::Output>>, bool) {
+	pub fn fetch_asset<A: Asset>(&mut self, source: &A::Source) -> (Shared<BackgroundTask<A::Output>>, bool) {
 		let asset_id = (TypeId::of::<A>(), hash(source));
 		let mut is_first = false;
 		let task = self
 			.loading_assets
 			.remove(&asset_id)
-			.map(|boxed_task| *boxed_task.downcast::<Shared<Task<A::Output>>>().unwrap())
+			.map(|boxed_task| *boxed_task.downcast::<Shared<BackgroundTask<A::Output>>>().unwrap())
 			.unwrap_or_else(|| {
 				is_first = true;
 				let future = A::load(source.clone(), self);
-
 				self.background_executor().spawn(future).shared()
 			});
 
@@ -1936,7 +1944,7 @@ impl AppContext for App {
 		Ok(read(view, self))
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
 	where
 		R: Send + 'static
 	{

@@ -4,9 +4,9 @@ use anyhow::anyhow;
 use image::RgbaImage;
 
 use crate::{
-	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, BackgroundExecutor, Bounds, ClipboardItem, Context, Entity, ForegroundExecutor, Global,
-	InputEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Platform, Point, Render, Result, Size, Task,
-	TextSystem, Window, WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, current_platform, http::FakeHttpClient
+	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, BackgroundExecutor, BackgroundTask, Bounds, ClipboardItem, Context, Entity, ForegroundExecutor,
+	ForegroundTask, Global, InputEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Platform, Point, Render,
+	Result, Size, TextSystem, Window, WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, current_platform, http::FakeHttpClient
 };
 
 /// A test context that uses real platform rendering instead of mocked rendering.
@@ -116,7 +116,7 @@ impl VisualTestAppContext {
 
 	/// Runs pending background tasks until there's nothing left to do.
 	pub fn run_until_parked(&self) {
-		self.background_executor.run_until_parked();
+		self.foreground_executor.run_until_parked();
 	}
 
 	/// Updates the app state.
@@ -141,7 +141,7 @@ impl VisualTestAppContext {
 	}
 
 	/// Spawns a task on the foreground executor.
-	pub fn spawn<F, R>(&self, f: F) -> Task<R>
+	pub fn spawn<F, R>(&self, f: F) -> ForegroundTask<R>
 	where
 		F: Future<Output = R> + 'static,
 		R: 'static
@@ -378,7 +378,7 @@ impl AppContext for VisualTestAppContext {
 		app.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
 	where
 		R: Send + 'static
 	{

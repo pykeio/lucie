@@ -13,9 +13,9 @@ use fastrand::Rng;
 use lucie_common::post_inc;
 use parking::Unparker;
 use parking_lot::Mutex;
-use rapidhash::fast::{RapidHashMap, RapidHashSet};
+use rapidhash::fast::RapidHashMap;
 
-use crate::{PlatformDispatcher, Runnable, TaskLabel};
+use crate::{PlatformDispatcher, Runnable};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 struct TestDispatcherId(usize);
@@ -39,7 +39,6 @@ struct TestDispatcherState {
 	allow_parking: bool,
 	waiting_hint: Option<String>,
 	waiting_backtrace: Option<Backtrace>,
-	deprioritized_task_labels: RapidHashSet<TaskLabel>,
 	block_on_ticks: RangeInclusive<usize>,
 	unparkers: Vec<Unparker>,
 	num_cpus_override: Option<usize>
@@ -60,7 +59,6 @@ impl TestDispatcher {
 			allow_parking: false,
 			waiting_hint: None,
 			waiting_backtrace: None,
-			deprioritized_task_labels: Default::default(),
 			block_on_ticks: 0..=1000,
 			unparkers: Default::default(),
 			num_cpus_override: None
@@ -187,10 +185,6 @@ impl TestDispatcher {
 		true
 	}
 
-	pub fn deprioritize(&self, task_label: TaskLabel) {
-		self.state.lock().deprioritized_task_labels.insert(task_label);
-	}
-
 	pub fn run_until_parked(&self) {
 		while self.tick(false) {}
 	}
@@ -293,39 +287,14 @@ impl PlatformDispatcher for TestDispatcher {
 		state.start_time + state.time
 	}
 
-	fn dispatch(&self, runnable: Runnable, label: Option<TaskLabel>) {
-		{
-			let mut state = self.state.lock();
-			if label.is_some_and(|label| state.deprioritized_task_labels.contains(&label)) {
-				state.deprioritized_background.push(runnable);
-			} else {
-				state.background.push(runnable);
-			}
-		}
-		self.unpark_all();
-	}
-
 	fn dispatch_on_main_thread(&self, runnable: Runnable) {
 		self.state.lock().foreground.entry(self.id).or_default().push_back(runnable);
 		self.unpark_all();
-	}
-
-	fn dispatch_after(&self, duration: std::time::Duration, runnable: Runnable) {
-		let mut state = self.state.lock();
-		let next_time = state.time + duration;
-		let ix = match state.delayed.binary_search_by_key(&next_time, |e| e.0) {
-			Ok(ix) | Err(ix) => ix
-		};
-		state.delayed.insert(ix, (next_time, runnable));
 	}
 
 	fn as_test(&self) -> Option<&TestDispatcher> {
 		Some(self)
 	}
 
-	fn spawn_realtime(&self, _priority: crate::RealtimePriority, f: Box<dyn FnOnce() + Send>) {
-		std::thread::spawn(move || {
-			f();
-		});
-	}
+	fn set_thread_priority(&self, _priority: crate::ThreadPriority) {}
 }

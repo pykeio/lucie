@@ -25,8 +25,8 @@ use tokio::io::AsyncReadExt as _;
 
 use super::{Stateful, StatefulInteractiveElement};
 use crate::{
-	AnyElement, AnyImageCache, App, Asset, AssetLogger, Element, ElementId, Entity, GlobalElementId, Hitbox, Image, ImageCache, InteractiveElement,
-	Interactivity, IntoElement, LayoutId, RenderImage, Resource, Task, Window
+	AnyElement, AnyImageCache, App, Asset, AssetLogger, Element, ElementId, Entity, ForegroundTask, GlobalElementId, Hitbox, Image, ImageCache,
+	InteractiveElement, Interactivity, IntoElement, LayoutId, RenderImage, Resource, Window
 };
 
 /// The delay before showing the loading state.
@@ -255,7 +255,7 @@ impl DerefMut for Stateful<Img> {
 struct ImgState {
 	frame_index: usize,
 	last_frame_time: Option<Instant>,
-	started_loading: Option<(Instant, Task<()>)>
+	started_loading: Option<(Instant, ForegroundTask<()>)>
 }
 
 /// The image layout state between frames

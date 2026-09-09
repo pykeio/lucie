@@ -47,11 +47,11 @@ use tokio::sync::oneshot;
 use crate::{
 	Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Asset, AsyncWindowContext, AtlasTextureKind, AtlasTileData,
 	AtlasTileWithMetadata, AvailableSpace, Capslock, Context, Decorations, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Effect, Empty,
-	Entity, EntityId, EventEmitter, FileDropEvent, Global, GlobalElementId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke,
-	KeystrokeEvent, LayoutId, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, PlatformAtlas,
-	PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, Priority, PromptButton, PromptLevel, Quad, Render, RenderImage,
-	RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, Scene, Shadow, SubscriberSet, Subscription, SystemWindowTab,
-	SystemWindowTabController, TabStopMap, TaffyLayoutEngine, Task, TransformationMatrix, Underline, WindowAppearance, WindowBackgroundAppearance,
+	Entity, EntityId, EventEmitter, FileDropEvent, ForegroundTask, Global, GlobalElementId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent,
+	KeyEvent, Keystroke, KeystrokeEvent, LayoutId, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent,
+	Path, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, PromptButton, PromptLevel, Quad, Render,
+	RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, Scene, Shadow, SubscriberSet, Subscription, SystemWindowTab,
+	SystemWindowTabController, TabStopMap, TaffyLayoutEngine, TaskPriority, TransformationMatrix, Underline, WindowAppearance, WindowBackgroundAppearance,
 	WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, prelude::*
 };
 
@@ -946,7 +946,7 @@ pub(crate) enum DrawPhase {
 struct PendingInput {
 	keystrokes: SmallVec<[Keystroke; 1]>,
 	focus: Option<FocusId>,
-	timer: Option<Task<()>>,
+	timer: Option<ForegroundTask<()>>,
 	needs_timeout: bool
 }
 
@@ -1675,7 +1675,7 @@ impl Window {
 	/// The closure is provided a handle to the current window and an `AsyncWindowContext` for
 	/// use within your future.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, cx: &App, f: AsyncFn) -> Task<R>
+	pub fn spawn<AsyncFn, R>(&self, cx: &App, f: AsyncFn) -> ForegroundTask<R>
 	where
 		R: 'static,
 		AsyncFn: AsyncFnOnce(&mut AsyncWindowContext) -> R + 'static
@@ -1691,7 +1691,7 @@ impl Window {
 	/// pool, with the given priority. The closure is provided a handle to the
 	/// current window and an `AsyncWindowContext` for use within your future.
 	#[track_caller]
-	pub fn spawn_with_priority<AsyncFn, R>(&self, priority: Priority, cx: &App, f: AsyncFn) -> Task<R>
+	pub fn spawn_with_priority<AsyncFn, R>(&self, priority: TaskPriority, cx: &App, f: AsyncFn) -> ForegroundTask<R>
 	where
 		R: 'static,
 		AsyncFn: AsyncFnOnce(&mut AsyncWindowContext) -> R + 'static

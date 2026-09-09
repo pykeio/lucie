@@ -6,9 +6,9 @@ use std::{
 };
 
 use anyhow::Result;
-use tokio::sync::oneshot;
 use lucie_style::CursorStyle;
 use parking_lot::Mutex;
+use tokio::sync::oneshot;
 
 use crate::{
 	AnyWindowHandle, BackgroundExecutor, ClipboardItem, DummyKeyboardMapper, ForegroundExecutor, Keymap, Platform, PlatformDisplay, PlatformKeyboardLayout,
@@ -56,7 +56,6 @@ impl TestPlatform {
 	#[track_caller]
 	pub(crate) fn simulate_prompt_answer(&self, response: &str) {
 		let prompt = self.prompts.borrow_mut().pop_front().expect("no pending multiple choice prompt");
-		self.background_executor().set_waiting_hint(None);
 		let Some(ix) = prompt.answers.iter().position(|a| a == response) else {
 			panic!("PROMPT: {}\n{:?}\n{:?}\nCannot respond with {}", prompt.msg, prompt.detail, prompt.answers, response)
 		};
@@ -76,8 +75,6 @@ impl TestPlatform {
 	pub(crate) fn prompt(&self, msg: &str, detail: Option<&str>, answers: &[PromptButton]) -> oneshot::Receiver<usize> {
 		let (tx, rx) = oneshot::channel();
 		let answers: Vec<String> = answers.iter().map(|s| s.label().to_string()).collect();
-		self.background_executor()
-			.set_waiting_hint(Some(format!("PROMPT: {:?} {:?}", msg, detail)));
 		self.prompts.borrow_mut().push_back(TestPrompt {
 			msg: msg.to_string(),
 			detail: detail.map(|s| s.to_string()),

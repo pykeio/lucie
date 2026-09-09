@@ -3,12 +3,12 @@ use std::{
 	fmt::{self, Debug},
 	hash::{Hash, Hasher},
 	io::Cursor,
-	ops,
-	ops::Range,
+	ops::{self, Range},
 	path::{Path, PathBuf},
+	pin::Pin,
 	rc::Rc,
 	sync::Arc,
-	time::{Duration, Instant}
+	time::Instant
 };
 
 use anyhow::Result;
@@ -27,8 +27,8 @@ use tokio::sync::oneshot;
 
 use crate::{
 	Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, DEFAULT_WINDOW_SIZE, DispatchEventResult, ForegroundExecutor, GpuSpecs, ImageSource,
-	Keymap, PlatformInput, Priority, RealtimePriority, RenderImage, RenderImageParams, RenderSvgParams, Scene, SvgRenderer, SystemWindowTab, Task, TaskLabel,
-	TaskTiming, ThreadTaskTimings, Window, WindowControlArea, hash
+	Keymap, PlatformInput, RenderImage, RenderImageParams, RenderSvgParams, Scene, SvgRenderer, SystemWindowTab, TaskPriority, TaskTiming, ThreadTaskTimings,
+	Window, WindowControlArea, hash
 };
 
 mod app_menu;
@@ -174,8 +174,12 @@ pub(crate) trait Platform: 'static {
 	fn set_dock_menu(&self, menu: Vec<MenuItem>, keymap: &Keymap);
 	fn perform_dock_menu_action(&self, _action: usize) {}
 	fn add_recent_document(&self, _path: &Path) {}
-	fn update_jump_list(&self, _menus: Vec<MenuItem>, _entries: Vec<SmallVec<[PathBuf; 2]>>) -> Task<Vec<SmallVec<[PathBuf; 2]>>> {
-		Task::ready(Vec::new())
+	fn update_jump_list(
+		&self,
+		_menus: Vec<MenuItem>,
+		_entries: Vec<SmallVec<[PathBuf; 2]>>
+	) -> Pin<Box<dyn Future<Output = Vec<SmallVec<[PathBuf; 2]>>> + '_>> {
+		Box::pin(std::future::ready(Vec::new()))
 	}
 	fn on_app_menu_action(&self, callback: Box<dyn FnMut(&dyn Action)>);
 	fn on_will_open_app_menu(&self, callback: Box<dyn FnMut()>);
@@ -467,11 +471,9 @@ impl Drop for TimerResolutionGuard {
 	}
 }
 
-/// This type is public so that our test macro can generate and use it, but it should not
-/// be considered part of our public API.
 #[doc(hidden)]
 pub struct RunnableMeta {
-	pub priority: Priority,
+	pub priority: TaskPriority,
 	/// Location of the runnable
 	pub location: &'static core::panic::Location<'static>,
 	/// Weak reference to check if the app is still alive before running this task
@@ -499,10 +501,7 @@ impl RunnableMeta {
 }
 
 #[doc(hidden)]
-pub enum Runnable {
-	Meta(async_task::Runnable<RunnableMeta>),
-	Compat(async_task::Runnable)
-}
+pub struct Runnable(pub(crate) async_task::Runnable<RunnableMeta>);
 
 impl Runnable {
 	fn run_and_profile(self) -> Instant {
@@ -511,7 +510,7 @@ impl Runnable {
 		}
 
 		let mut timing = TaskTiming {
-			location: self.location().unwrap_or(core::panic::Location::caller()),
+			location: self.location(),
 			start: Instant::now(),
 			end: None
 		};
@@ -524,33 +523,29 @@ impl Runnable {
 	}
 
 	fn app_dropped(&self) -> bool {
-		match self {
-			Runnable::Meta(runnable) => !runnable.metadata().is_app_alive(),
-			Runnable::Compat(_) => false
-		}
+		!self.0.metadata().is_app_alive()
 	}
 
-	fn location(&self) -> Option<&'static core::panic::Location<'static>> {
-		match self {
-			Runnable::Meta(runnable) => runnable.metadata().location.into(),
-			Runnable::Compat(_) => None
-		}
+	fn location(&self) -> &'static core::panic::Location<'static> {
+		self.0.metadata().location
 	}
 
 	fn run_unprofiled(self) {
 		self.priority().set_as_default_for_spawns();
-		match self {
-			Runnable::Meta(r) => r.run(),
-			Runnable::Compat(r) => r.run()
-		};
+		self.0.run();
 	}
 
-	fn priority(&self) -> Priority {
-		match self {
-			Runnable::Meta(r) => r.metadata().priority,
-			Runnable::Compat(_) => Priority::Medium
-		}
+	fn priority(&self) -> TaskPriority {
+		self.0.metadata().priority
 	}
+}
+
+pub enum ThreadPriority {
+	Critical,
+	High,
+	Normal,
+	Low,
+	Background
 }
 
 /// This type is public so that our test macro can generate and use it, but it should not
@@ -560,18 +555,13 @@ pub trait PlatformDispatcher: Send + Sync {
 	fn get_all_timings(&self) -> Vec<ThreadTaskTimings>;
 	fn get_current_thread_timings(&self) -> Vec<TaskTiming>;
 	fn is_main_thread(&self) -> bool;
-	fn dispatch(&self, runnable: Runnable, label: Option<TaskLabel>);
 	fn dispatch_on_main_thread(&self, runnable: Runnable);
-	fn dispatch_after(&self, duration: Duration, runnable: Runnable);
-	fn spawn_realtime(&self, priority: RealtimePriority, f: Box<dyn FnOnce() + Send>);
 
 	fn now(&self) -> Instant {
 		Instant::now()
 	}
 
-	fn increase_timer_resolution(&self) -> TimerResolutionGuard {
-		TimerResolutionGuard { cleanup: None }
-	}
+	fn set_thread_priority(&self, priority: ThreadPriority);
 
 	#[cfg(any(test, feature = "test-support"))]
 	fn as_test(&self) -> Option<&TestDispatcher> {

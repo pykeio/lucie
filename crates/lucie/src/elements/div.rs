@@ -39,10 +39,10 @@ use stacksafe::{StackSafe, stacksafe};
 
 use super::ImageCacheProvider;
 use crate::{
-	Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, ClickEvent, DispatchPhase, Element, ElementId, Entity, FocusHandle, Global, GlobalElementId, Hitbox,
-	HitboxBehavior, HitboxId, IntoElement, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId, ModifiersChangedEvent,
-	MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent, MousePressureEvent, MouseUpEvent, ParentElement, Render, ScrollWheelEvent, Task, TooltipId,
-	Window, WindowControlArea,
+	Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, ClickEvent, DispatchPhase, Element, ElementId, Entity, FocusHandle, ForegroundTask, Global,
+	GlobalElementId, Hitbox, HitboxBehavior, HitboxId, IntoElement, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId,
+	ModifiersChangedEvent, MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent, MousePressureEvent, MouseUpEvent, ParentElement, Render,
+	ScrollWheelEvent, TooltipId, Window, WindowControlArea,
 	util::{overflow_mask, paint_style}
 };
 
@@ -2245,12 +2245,12 @@ pub struct ElementHoverState {
 
 pub(crate) enum ActiveTooltip {
 	/// Currently delaying before showing the tooltip.
-	WaitingForShow { _task: Task<()> },
+	WaitingForShow { _task: ForegroundTask<()> },
 	/// Tooltip is visible, element was hovered or for hoverable tooltips, the tooltip was hovered.
 	Visible { tooltip: AnyTooltip, is_hoverable: bool },
 	/// Tooltip is visible and hoverable, but the mouse is no longer hovering. Currently delaying
 	/// before hiding it.
-	WaitingForHide { tooltip: AnyTooltip, _task: Task<()> }
+	WaitingForHide { tooltip: AnyTooltip, _task: ForegroundTask<()> }
 }
 
 pub(crate) fn clear_active_tooltip(active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>, window: &mut Window) {

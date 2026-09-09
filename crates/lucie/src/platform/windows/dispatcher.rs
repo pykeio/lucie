@@ -1,27 +1,22 @@
 use std::{
-	cell::UnsafeCell,
 	sync::atomic::{AtomicBool, Ordering},
-	thread::{ThreadId, current},
-	time::Duration
+	thread::{ThreadId, current}
 };
 
 use anyhow::Context;
 use lucie_common::ResultExt;
-use windows::{
-	System::Threading::{ThreadPool, ThreadPoolTimer, TimerElapsedHandler, WorkItemHandler, WorkItemPriority},
-	Win32::{
-		Foundation::{LPARAM, WPARAM},
-		Media::{timeBeginPeriod, timeEndPeriod},
-		System::Threading::{
-			GetCurrentThread, HIGH_PRIORITY_CLASS, SetPriorityClass, SetThreadPriority, THREAD_PRIORITY_HIGHEST, THREAD_PRIORITY_TIME_CRITICAL
-		},
-		UI::WindowsAndMessaging::PostMessageW
-	}
+use windows::Win32::{
+	Foundation::{LPARAM, WPARAM},
+	System::Threading::{
+		GetCurrentThread, SetThreadPriority, THREAD_PRIORITY_BELOW_NORMAL, THREAD_PRIORITY_HIGHEST, THREAD_PRIORITY_IDLE, THREAD_PRIORITY_NORMAL,
+		THREAD_PRIORITY_TIME_CRITICAL
+	},
+	UI::WindowsAndMessaging::PostMessageW
 };
 
 use crate::{
-	GLOBAL_THREAD_TIMINGS, HWND, PlatformDispatcher, Priority, PriorityQueueSender, RealtimePriority, Runnable, SafeHwnd, THREAD_TIMINGS, TaskLabel,
-	ThreadTaskTimings, TimerResolutionGuard, WM_LUCIE_TASK_DISPATCHED_ON_MAIN_THREAD
+	GLOBAL_THREAD_TIMINGS, HWND, PlatformDispatcher, PriorityQueueSender, Runnable, SafeHwnd, THREAD_TIMINGS, ThreadPriority, ThreadTaskTimings,
+	WM_LUCIE_TASK_DISPATCHED_ON_MAIN_THREAD
 };
 
 pub(crate) struct WindowsDispatcher {
@@ -44,35 +39,6 @@ impl WindowsDispatcher {
 			validation_number,
 			wake_posted: AtomicBool::new(false)
 		}
-	}
-
-	fn dispatch_on_threadpool(&self, runnable: Runnable, priority: WorkItemPriority) {
-		let handler = {
-			let mut runnable = UnsafeCell::new(Some(runnable));
-			WorkItemHandler::new(move |_| {
-				unsafe { &mut *runnable.get() }
-					.take()
-					.expect("Takes FnMut but only runs once")
-					.run_and_profile();
-				Ok(())
-			})
-		};
-
-		ThreadPool::RunWithPriorityAsync(&handler, priority).log_err();
-	}
-
-	fn dispatch_on_threadpool_after(&self, runnable: Runnable, duration: Duration) {
-		let handler = {
-			let mut runnable = UnsafeCell::new(Some(runnable));
-			TimerElapsedHandler::new(move |_| {
-				unsafe { &mut *runnable.get() }
-					.take()
-					.expect("Takes FnMut but only runs once")
-					.run_and_profile();
-				Ok(())
-			})
-		};
-		ThreadPoolTimer::CreateTimer(&handler, duration.into()).log_err();
 	}
 }
 
@@ -98,20 +64,6 @@ impl PlatformDispatcher for WindowsDispatcher {
 
 	fn is_main_thread(&self) -> bool {
 		current().id() == self.main_thread_id
-	}
-
-	fn dispatch(&self, runnable: Runnable, label: Option<TaskLabel>) {
-		let priority = match runnable.priority() {
-			Priority::Realtime(_) => unreachable!(),
-			Priority::High => WorkItemPriority::High,
-			Priority::Medium => WorkItemPriority::Normal,
-			Priority::Low => WorkItemPriority::Low
-		};
-		self.dispatch_on_threadpool(runnable, priority);
-
-		if let Some(label) = label {
-			tracing::debug!("TaskLabel: {label:?}");
-		}
 	}
 
 	fn dispatch_on_main_thread(&self, runnable: Runnable) {
@@ -143,42 +95,18 @@ impl PlatformDispatcher for WindowsDispatcher {
 		}
 	}
 
-	fn dispatch_after(&self, duration: Duration, runnable: Runnable) {
-		self.dispatch_on_threadpool_after(runnable, duration);
-	}
+	fn set_thread_priority(&self, priority: ThreadPriority) {
+		let thread_handle = unsafe { GetCurrentThread() };
+		let thread_priority = match priority {
+			ThreadPriority::Critical => THREAD_PRIORITY_TIME_CRITICAL,
+			ThreadPriority::High => THREAD_PRIORITY_HIGHEST,
+			ThreadPriority::Normal => THREAD_PRIORITY_NORMAL,
+			ThreadPriority::Low => THREAD_PRIORITY_BELOW_NORMAL,
+			ThreadPriority::Background => THREAD_PRIORITY_IDLE
+		};
 
-	fn spawn_realtime(&self, priority: RealtimePriority, f: Box<dyn FnOnce() + Send>) {
-		std::thread::spawn(move || {
-			// SAFETY: always safe to call
-			let thread_handle = unsafe { GetCurrentThread() };
-
-			let thread_priority = match priority {
-				RealtimePriority::Audio => THREAD_PRIORITY_TIME_CRITICAL,
-				RealtimePriority::Other => THREAD_PRIORITY_HIGHEST
-			};
-
-			// SAFETY: thread_handle is a valid handle to a thread
-			unsafe { SetPriorityClass(thread_handle, HIGH_PRIORITY_CLASS) }
-				.context("thread priority class")
-				.log_err();
-
-			// SAFETY: thread_handle is a valid handle to a thread
-			unsafe { SetThreadPriority(thread_handle, thread_priority) }
-				.context("thread priority")
-				.log_err();
-
-			f();
-		});
-	}
-
-	fn increase_timer_resolution(&self) -> TimerResolutionGuard {
-		unsafe {
-			timeBeginPeriod(1);
-		}
-		TimerResolutionGuard {
-			cleanup: Some(Box::new(|| unsafe {
-				timeEndPeriod(1);
-			}))
-		}
+		unsafe { SetThreadPriority(thread_handle, thread_priority) }
+			.context("thread priority")
+			.log_err();
 	}
 }

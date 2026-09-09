@@ -9,8 +9,8 @@ use lucie_style::{Style, StyleRefinement, Styled};
 use smallvec::SmallVec;
 
 use crate::{
-	AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, Element, ElementId, Entity, GlobalElementId, ImageAssetLoader, ImageCacheError, IntoElement,
-	LayoutId, ParentElement, RenderImage, Resource, Task, Window, hash
+	AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, BackgroundTask, Element, ElementId, Entity, GlobalElementId, ImageAssetLoader, ImageCacheError,
+	IntoElement, LayoutId, ParentElement, RenderImage, Resource, Window, hash
 };
 
 /// An image cache element, all its child img elements will use the cache specified by this element.
@@ -143,7 +143,7 @@ impl Element for ImageCacheElement {
 }
 
 /// An image loading task associated with an image cache.
-pub type ImageLoadingTask = Shared<Task<Result<Arc<RenderImage>, ImageCacheError>>>;
+pub type ImageLoadingTask = Shared<BackgroundTask<Result<Arc<RenderImage>, ImageCacheError>>>;
 
 /// An image cache item
 pub enum ImageCacheItem {

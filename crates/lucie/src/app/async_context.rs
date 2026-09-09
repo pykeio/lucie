@@ -10,8 +10,8 @@ use tokio::sync::oneshot;
 
 use super::{Context, WeakEntity};
 use crate::{
-	AnyView, AnyWindowHandle, App, AppCell, AppContext, BackgroundExecutor, BorrowAppContext, Entity, EventEmitter, Focusable, ForegroundExecutor, Global,
-	PromptButton, PromptLevel, Render, Reservation, Result, Subscription, Task, VisualContext, Window, WindowHandle
+	AnyView, AnyWindowHandle, App, AppCell, AppContext, BackgroundExecutor, BackgroundTask, BorrowAppContext, Entity, EventEmitter, Focusable,
+	ForegroundExecutor, ForegroundTask, Global, PromptButton, PromptLevel, Render, Reservation, Result, Subscription, VisualContext, Window, WindowHandle
 };
 
 /// An async-friendly version of [App] with a static lifetime so it can be held across `await` points in async code.
@@ -92,7 +92,7 @@ impl AppContext for AsyncApp {
 		lock.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
 	where
 		R: Send + 'static
 	{
@@ -159,7 +159,7 @@ impl AsyncApp {
 
 	/// Schedule a future to be polled in the foreground.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> Task<R>
+	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> ForegroundTask<R>
 	where
 		AsyncFn: AsyncFnOnce(&mut AsyncApp) -> R + 'static,
 		R: 'static
@@ -284,7 +284,7 @@ impl AsyncWindowContext {
 	/// Schedule a future to be executed on the main thread. This is used for collecting
 	/// the results of background tasks and updating the UI.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> Task<R>
+	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> ForegroundTask<R>
 	where
 		AsyncFn: AsyncFnOnce(&mut AsyncWindowContext) -> R + 'static,
 		R: 'static
@@ -354,7 +354,7 @@ impl AppContext for AsyncWindowContext {
 		self.app.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
 	where
 		R: Send + 'static
 	{

@@ -9,10 +9,10 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
-	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace, BackgroundExecutor, BorrowAppContext, Capslock, ClipboardItem,
-	DrawPhase, Drawable, Element, Empty, EventEmitter, ForegroundExecutor, Global, InputEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton,
-	MouseDownEvent, MouseMoveEvent, MouseUpEvent, Platform, Render, Result, Task, TestDispatcher, TestPlatform, TestWindow, VisualContext, Window,
-	WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, http::FakeHttpClient, util::Race
+	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace, BackgroundExecutor, BackgroundTask, BorrowAppContext, Capslock,
+	ClipboardItem, DrawPhase, Drawable, Element, Empty, EventEmitter, ForegroundExecutor, ForegroundTask, Global, InputEvent, Keystroke, Modifiers,
+	ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Platform, Render, Result, TestDispatcher, TestPlatform, TestWindow,
+	VisualContext, Window, WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, http::FakeHttpClient, util::Race
 };
 
 /// A TestAppContext is provided to tests created with `#[lucie::test]`, it provides
@@ -85,7 +85,7 @@ impl AppContext for TestAppContext {
 		app.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
 	where
 		R: Send + 'static
 	{
@@ -106,7 +106,7 @@ impl TestAppContext {
 	pub fn build(dispatcher: TestDispatcher, fn_name: Option<&'static str>) -> Self {
 		let arc_dispatcher = Arc::new(dispatcher.clone());
 		let liveness = Arc::new(());
-		let background_executor = BackgroundExecutor::new(arc_dispatcher.clone());
+		let background_executor = BackgroundExecutor::new();
 		let foreground_executor = ForegroundExecutor::new(arc_dispatcher, Arc::downgrade(&liveness));
 		let platform = TestPlatform::new(background_executor.clone(), foreground_executor.clone());
 		let asset_source = Arc::new(());
@@ -308,7 +308,7 @@ impl TestAppContext {
 
 	/// Run the given task on the main thread.
 	#[track_caller]
-	pub fn spawn<Fut, R>(&self, f: impl FnOnce(AsyncApp) -> Fut) -> Task<R>
+	pub fn spawn<Fut, R>(&self, f: impl FnOnce(AsyncApp) -> Fut) -> ForegroundTask<R>
 	where
 		Fut: Future<Output = R> + 'static,
 		R: 'static
@@ -359,7 +359,7 @@ impl TestAppContext {
 
 	/// Wait until there are no more pending tasks.
 	pub fn run_until_parked(&mut self) {
-		self.background_executor.run_until_parked()
+		self.foreground_executor.run_until_parked()
 	}
 
 	/// Simulate dispatching an action to the currently focused node in the window.
@@ -371,7 +371,7 @@ impl TestAppContext {
 			.update(self, |_, window, cx| window.dispatch_action(action.boxed_clone(), cx))
 			.unwrap();
 
-		self.background_executor.run_until_parked()
+		self.foreground_executor.run_until_parked()
 	}
 
 	/// simulate_keystrokes takes a space-separated list of keys to type.
@@ -383,7 +383,7 @@ impl TestAppContext {
 			self.dispatch_keystroke(window, keystroke);
 		}
 
-		self.background_executor.run_until_parked()
+		self.foreground_executor.run_until_parked()
 	}
 
 	/// simulate_input takes a string of text to type.
@@ -395,7 +395,7 @@ impl TestAppContext {
 			self.dispatch_keystroke(window, keystroke);
 		}
 
-		self.background_executor.run_until_parked()
+		self.foreground_executor.run_until_parked()
 	}
 
 	/// dispatches a single Keystroke (see also `simulate_keystrokes` and `simulate_input`)
@@ -517,9 +517,9 @@ impl<V: 'static> Entity<V> {
 			tx.try_send(()).ok();
 		});
 
-		cx.executor().advance_clock(advance_clock_by);
-
 		async move {
+			tokio::time::advance(advance_clock_by).await;
+
 			rx.recv().await.expect("entity dropped while test was waiting for its next notification");
 			drop(subscription);
 		}
@@ -564,9 +564,7 @@ impl<V> Entity<V> {
 					}
 				}
 
-				cx.borrow().background_executor().start_waiting();
 				rx.recv().await.expect("view dropped with pending condition");
-				cx.borrow().background_executor().finish_waiting();
 			}
 
 			drop(subscriptions);
@@ -603,7 +601,7 @@ impl VisualTestContext {
 
 	/// Wait until there are no more pending tasks.
 	pub fn run_until_parked(&self) {
-		self.cx.background_executor.run_until_parked();
+		self.cx.foreground_executor.run_until_parked();
 	}
 
 	/// Dispatch the action to the currently focused node.
@@ -734,7 +732,7 @@ impl VisualTestContext {
 	/// Make sure you've called [VisualTestContext::draw] first!
 	pub fn simulate_event<E: InputEvent>(&mut self, event: E) {
 		self.test_window(self.window).simulate_input(event.to_platform_input());
-		self.background_executor.run_until_parked();
+		self.foreground_executor.run_until_parked();
 	}
 
 	/// Simulates the user blurring the window.
@@ -742,7 +740,7 @@ impl VisualTestContext {
 		if Some(self.window) == self.test_platform.active_window() {
 			self.test_platform.set_active_window(None)
 		}
-		self.background_executor.run_until_parked();
+		self.foreground_executor.run_until_parked();
 	}
 
 	/// Simulates the user closing the window.
@@ -830,7 +828,7 @@ impl AppContext for VisualTestContext {
 		self.cx.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
 	where
 		R: Send + 'static
 	{
