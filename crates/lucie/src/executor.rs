@@ -23,7 +23,7 @@ use tokio::{
 	task::JoinHandle
 };
 
-use crate::{PlatformDispatcher, Runnable, RunnableMeta};
+use crate::{PlatformDispatcher, Runnable, RunnableMeta, ThreadPriority};
 
 /// A pointer to the executor that is currently running,
 /// for spawning background tasks.
@@ -213,15 +213,25 @@ impl BackgroundExecutor {
 		Self {
 			normal_runtime: Arc::new(TimedShutdownRuntime::new(
 				tokio::runtime::Builder::new_multi_thread()
+					.name("lucie")
 					.enable_all()
+					.thread_name("luciert")
 					.worker_threads(normal_count)
 					.build()
 					.unwrap()
 			)),
 			low_runtime: Arc::new(TimedShutdownRuntime::new(
 				tokio::runtime::Builder::new_multi_thread()
+					.name("lucie-low")
 					.enable_all()
+					.thread_name("luciert-low")
 					.worker_threads(low_count)
+					.on_thread_start({
+						let dispatcher = Arc::clone(&dispatcher);
+						move || {
+							dispatcher.set_thread_priority(ThreadPriority::Low);
+						}
+					})
 					.build()
 					.unwrap()
 			))
