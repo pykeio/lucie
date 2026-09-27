@@ -18,27 +18,31 @@ use std::{
 
 use futures_util::FutureExt;
 use tokio::{
-	runtime::{Handle, Runtime},
+	runtime::{Handle, Runtime as TokioRuntime},
 	sync::mpsc,
 	task::JoinHandle
 };
 
 use crate::{PlatformDispatcher, Runnable, RunnableMeta, ThreadPriority};
 
-/// A pointer to the executor that is currently running,
-/// for spawning background tasks.
+/// An async multithreaded runtime based on [`tokio`] used for background tasks that shouldn't block the main thread.
+///
+/// To perform work on the main thread, see [`Dispatcher`].
 #[derive(Clone)]
-pub struct BackgroundExecutor {
+pub struct Runtime {
 	normal_runtime: Arc<TimedShutdownRuntime>,
-	low_runtime: Arc<TimedShutdownRuntime>
+	low_runtime: Arc<TimedShutdownRuntime>,
+
+	#[cfg(any(test, feature = "test-support"))]
+	dispatcher: Arc<dyn PlatformDispatcher>
 }
 
 struct TimedShutdownRuntime {
-	runtime: ManuallyDrop<Runtime>,
+	runtime: ManuallyDrop<TokioRuntime>,
 	timeout_ms: AtomicU32
 }
 impl TimedShutdownRuntime {
-	fn new(runtime: Runtime) -> Self {
+	fn new(runtime: TokioRuntime) -> Self {
 		Self {
 			runtime: ManuallyDrop::new(runtime),
 			timeout_ms: AtomicU32::new(0)
@@ -46,7 +50,7 @@ impl TimedShutdownRuntime {
 	}
 }
 impl Deref for TimedShutdownRuntime {
-	type Target = Runtime;
+	type Target = TokioRuntime;
 
 	fn deref(&self) -> &Self::Target {
 		&*self.runtime
@@ -58,17 +62,24 @@ impl Drop for TimedShutdownRuntime {
 	}
 }
 
-/// A pointer to the executor that is currently running,
-/// for spawning tasks on the main thread.
+/// The `Dispatcher` sends tasks (called *[`Process`]es* to distinguish them from normal background [`Task`]s) to be
+/// executed on the main thread.
 ///
-/// This is intentionally `!Send` via the `not_send` marker field. This is because
-/// `ForegroundExecutor::spawn` does not require `Send` but checks at runtime that the future is
-/// only polled from the same thread it was spawned from. These checks would fail when spawning
-/// foreground tasks from background threads.
+/// Unlike [`Runtime`] tasks, dispatched processes *cannot use `tokio` APIs* like timers, filesystem, or networking.
+/// They can, however, send & receive messages to/from tasks (which *can* use those APIs) over
+/// [`mpsc`]/[`oneshot`]/[`broadcast`] channels.
+///
+/// [`mpsc`]: tokio::sync::mpsc
+/// [`oneshot`]: tokio::sync::oneshot
+/// [`broadcast`]: tokio::sync::broadcast
+// This is intentionally `!Send` via the `not_send` marker field. This is because
+// `Dispatcher::spawn` does not require `Send` but checks at runtime that the future is
+// only polled from the same thread it was spawned from. These checks would fail when dispatching processes
+// from runtime threads.
 #[derive(Clone)]
-pub struct ForegroundExecutor {
+pub struct Dispatcher {
 	#[doc(hidden)]
-	pub dispatcher: Arc<dyn PlatformDispatcher>,
+	pub platform: Arc<dyn PlatformDispatcher>,
 	liveness: std::sync::Weak<()>,
 	not_send: PhantomData<Rc<()>>
 }
@@ -94,7 +105,8 @@ impl TaskPriority {
 		CURRENT_TASKS_PRIORITY.set(*self);
 	}
 
-	/// Returns the priority from the currently running task
+	/// Inherits the priority from the currently running task (or the default [`Self::Normal`] if not called from a
+	/// task).
 	pub fn inherit() -> Self {
 		CURRENT_TASKS_PRIORITY.get()
 	}
@@ -109,19 +121,19 @@ impl TaskPriority {
 
 pin_project_lite::pin_project! {
 	#[derive(Debug)]
-	pub struct BackgroundTask<T> {
+	pub struct Task<T> {
 		#[pin]
 		inner: JoinHandle<T>
 	}
 }
 
-impl<T> BackgroundTask<T> {
+impl<T> Task<T> {
 	pub fn fallible(self) -> JoinHandle<T> {
 		self.inner
 	}
 }
 
-impl<T> Future for BackgroundTask<T> {
+impl<T> Future for Task<T> {
 	type Output = T;
 
 	#[inline(always)]
@@ -135,12 +147,13 @@ impl<T> Future for BackgroundTask<T> {
 	}
 }
 
+/// A task spawned by the [`Dispatcher`] scheduled to be run on the main thread.
 #[must_use]
 #[derive(Debug)]
-pub struct ForegroundTask<T>(async_task::Task<T, RunnableMeta>);
+pub struct Process<T>(async_task::Task<T, RunnableMeta>);
 
-impl<T> ForegroundTask<T> {
-	/// Detaching a task runs it to completion in the background
+impl<T> Process<T> {
+	/// Runs the process to completion, without blocking.
 	pub fn detach(self) {
 		self.0.detach();
 	}
@@ -154,20 +167,20 @@ impl<T> ForegroundTask<T> {
 	///
 	/// ```ignore
 	/// // Background task that gracefully handles app shutdown:
-	/// cx.background_spawn(async move {
+	/// cx.spawn(async move {
 	///     let result = foreground_task.fallible().await;
 	///     if let Some(value) = result {
 	///         // Process the value
 	///     }
 	///     // If None, app was shut down - just exit gracefully
-	/// }).detach();
+	/// });
 	/// ```
 	pub fn fallible(self) -> FallibleForegroundTask<T> {
 		FallibleForegroundTask(self.0.fallible())
 	}
 }
 
-impl<T> Future for ForegroundTask<T> {
+impl<T> Future for Process<T> {
 	type Output = T;
 
 	#[inline]
@@ -197,10 +210,23 @@ impl<T> Future for FallibleForegroundTask<T> {
 	}
 }
 
-/// BackgroundExecutor lets you run things on background threads.
-impl BackgroundExecutor {
+impl Runtime {
 	#[doc(hidden)]
-	pub fn new() -> Self {
+	pub fn new(dispatcher: Arc<dyn PlatformDispatcher>) -> Self {
+		#[cfg(any(test, feature = "test-support"))]
+		{
+			if dispatcher.as_test().is_some() {
+				let runtime = Arc::new(TimedShutdownRuntime::new(tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap()));
+				return Self {
+					normal_runtime: Arc::clone(&runtime),
+					low_runtime: runtime,
+
+					#[cfg(any(test, feature = "test-support"))]
+					dispatcher
+				};
+			}
+		}
+
 		let cpus = num_cpus::get();
 		let (normal_count, low_count) = if cpus < 4 {
 			((cpus.saturating_sub(1).max(1)), 1)
@@ -210,46 +236,52 @@ impl BackgroundExecutor {
 			((cpus - 3).min(8), 3)
 		};
 
+		let normal_runtime = Arc::new(TimedShutdownRuntime::new(
+			tokio::runtime::Builder::new_multi_thread()
+				.name("lucie")
+				.enable_all()
+				.thread_name("luciert")
+				.worker_threads(normal_count)
+				.build()
+				.unwrap()
+		));
+		let low_runtime = Arc::new(TimedShutdownRuntime::new(
+			tokio::runtime::Builder::new_multi_thread()
+				.name("lucie-low")
+				.enable_all()
+				.thread_name("luciert-low")
+				.worker_threads(low_count)
+				.on_thread_start({
+					let dispatcher = Arc::clone(&dispatcher);
+					move || {
+						dispatcher.set_thread_priority(ThreadPriority::Low);
+					}
+				})
+				.build()
+				.unwrap()
+		));
+
 		Self {
-			normal_runtime: Arc::new(TimedShutdownRuntime::new(
-				tokio::runtime::Builder::new_multi_thread()
-					.name("lucie")
-					.enable_all()
-					.thread_name("luciert")
-					.worker_threads(normal_count)
-					.build()
-					.unwrap()
-			)),
-			low_runtime: Arc::new(TimedShutdownRuntime::new(
-				tokio::runtime::Builder::new_multi_thread()
-					.name("lucie-low")
-					.enable_all()
-					.thread_name("luciert-low")
-					.worker_threads(low_count)
-					.on_thread_start({
-						let dispatcher = Arc::clone(&dispatcher);
-						move || {
-							dispatcher.set_thread_priority(ThreadPriority::Low);
-						}
-					})
-					.build()
-					.unwrap()
-			))
+			normal_runtime,
+			low_runtime,
+
+			#[cfg(any(test, feature = "test-support"))]
+			dispatcher
 		}
 	}
 
 	/// Enqueues the given future to be run to completion on a background thread.
 	#[track_caller]
-	pub fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
+	pub fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
-		self.spawn_with_priority(TaskPriority::default(), future)
+		self.spawn_with_priority(TaskPriority::inherit(), future)
 	}
 
 	/// Enqueues the given future to be run to completion on a background thread.
 	#[track_caller]
-	pub fn spawn_with_priority<R>(&self, priority: TaskPriority, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
+	pub fn spawn_with_priority<R>(&self, priority: TaskPriority, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
@@ -257,7 +289,7 @@ impl BackgroundExecutor {
 			TaskPriority::Normal => &self.normal_runtime,
 			TaskPriority::Low => &self.low_runtime
 		};
-		BackgroundTask { inner: runtime.spawn(future) }
+		Task { inner: runtime.spawn(future) }
 	}
 
 	/// Block the current thread until the given future resolves.
@@ -296,6 +328,57 @@ impl BackgroundExecutor {
 		runtime.block_on(tokio::time::timeout(duration, future))
 	}
 
+	#[cfg(any(test, feature = "test-support"))]
+	#[doc(hidden)]
+	pub fn block_test<Fut: Future>(&self, future: Fut) -> Result<Fut::Output, tokio::time::error::Elapsed> {
+		// Tests are single-threaded; since we're blocking w/ tokio, we need some way to tick dispatched processes. We
+		// do that by hijacking `future`'s poll and ticking the dispatcher while the future is still pending.
+		// Since `future` is the test entrypoint, it's always pending until the test finishes.
+		pin_project_lite::pin_project! {
+			struct DispatcherTicker<Fut> {
+				dispatcher: Arc<dyn PlatformDispatcher>,
+				#[pin]
+				future: Fut
+			}
+		}
+
+		impl<Fut: Future> Future for DispatcherTicker<Fut> {
+			type Output = Fut::Output;
+
+			fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+				let this = self.project();
+				let Some(dispatcher) = this.dispatcher.as_test() else {
+					return this.future.poll(cx);
+				};
+
+				match this.future.poll(cx) {
+					Poll::Ready(v) => Poll::Ready(v),
+					Poll::Pending => {
+						if !dispatcher.tick() {
+							return Poll::Pending;
+						}
+
+						// Ask tokio to immediately poll us again. This is exactly as horrible as it sounds.
+						// I actually think this whole thing could be replaced with a `Builder::on_after_task_poll` hook
+						// but that's an unstable API...
+						cx.waker().wake_by_ref();
+						Poll::Pending
+					}
+				}
+			}
+		}
+
+		let duration = Duration::from_secs(option_env!("LUCIE_TEST_TIMEOUT").and_then(|s| s.parse::<u64>().ok()).unwrap_or(180));
+		let _enter = self.normal_runtime.enter();
+		self.normal_runtime.block_on(tokio::time::timeout(
+			duration,
+			DispatcherTicker {
+				dispatcher: self.dispatcher.clone(),
+				future
+			}
+		))
+	}
+
 	/// Scoped lets you start a number of tasks and waits
 	/// for all of them to complete before returning.
 	pub async fn scoped<'scope, F>(&self, priority: TaskPriority, scheduler: F)
@@ -329,42 +412,40 @@ impl BackgroundExecutor {
 	}
 }
 
-/// ForegroundExecutor runs things on the main thread.
-impl ForegroundExecutor {
-	/// Creates a new ForegroundExecutor from the given PlatformDispatcher.
-	pub fn new(dispatcher: Arc<dyn PlatformDispatcher>, liveness: std::sync::Weak<()>) -> Self {
+impl Dispatcher {
+	#[doc(hidden)]
+	pub fn new(platform: Arc<dyn PlatformDispatcher>, liveness: std::sync::Weak<()>) -> Self {
 		Self {
-			dispatcher,
+			platform,
 			liveness,
 			not_send: PhantomData
 		}
 	}
 
-	/// Enqueues the given Task to run on the main thread at some point in the future. The task inherits the priority of
-	/// the caller; see [`Self::spawn_with_priority`] to override.
+	/// Schedules the given task to run on the main thread at some point in the future.
 	#[track_caller]
-	pub fn spawn<R>(&self, future: impl Future<Output = R> + 'static) -> ForegroundTask<R>
+	pub fn dispatch<R>(&self, future: impl Future<Output = R> + 'static) -> Process<R>
 	where
 		R: 'static
 	{
-		self.inner_spawn(self.liveness.clone(), TaskPriority::default(), future.boxed_local())
+		self.inner_dispatch(self.liveness.clone(), TaskPriority::inherit(), future.boxed_local())
 	}
 
-	/// Enqueues the given Task to run on the main thread at some point in the future.
+	/// Schedules the given task to run on the main thread at some point in the future, with a given priority level.
 	#[track_caller]
-	pub fn spawn_with_priority<R>(&self, priority: TaskPriority, future: impl Future<Output = R> + 'static) -> ForegroundTask<R>
+	pub fn dispatch_with_priority<R>(&self, priority: TaskPriority, future: impl Future<Output = R> + 'static) -> Process<R>
 	where
 		R: 'static
 	{
-		self.inner_spawn(self.liveness.clone(), priority, future.boxed_local())
+		self.inner_dispatch(self.liveness.clone(), priority, future.boxed_local())
 	}
 
 	#[track_caller]
-	pub(crate) fn inner_spawn<R>(&self, liveness: std::sync::Weak<()>, priority: TaskPriority, future: impl Future<Output = R> + 'static) -> ForegroundTask<R>
+	pub(crate) fn inner_dispatch<R>(&self, liveness: std::sync::Weak<()>, priority: TaskPriority, future: impl Future<Output = R> + 'static) -> Process<R>
 	where
 		R: 'static
 	{
-		let dispatcher = self.dispatcher.clone();
+		let dispatcher = self.platform.clone();
 		let location = core::panic::Location::caller();
 
 		let (runnable, task) = spawn_local_with_source_location(
@@ -377,28 +458,14 @@ impl ForegroundExecutor {
 			}
 		);
 		runnable.schedule();
-		ForegroundTask(task)
+		Process(task)
 	}
 
 	/// in tests, run all tasks that are ready to run. If after doing so
 	/// the test still has outstanding tasks, this will panic. (See also [`Self::allow_parking`])
 	#[cfg(any(test, feature = "test-support"))]
 	pub fn run_until_parked(&self) {
-		self.dispatcher.as_test().unwrap().run_until_parked()
-	}
-
-	/// in tests, prevents `run_until_parked` from panicking if there are outstanding tasks.
-	/// This is useful when you are integrating other (non-Lucie) futures, like disk access, that
-	/// do take real async time to run.
-	#[cfg(any(test, feature = "test-support"))]
-	pub fn allow_parking(&self) {
-		self.dispatcher.as_test().unwrap().allow_parking();
-	}
-
-	/// undoes the effect of [`Self::allow_parking`].
-	#[cfg(any(test, feature = "test-support"))]
-	pub fn forbid_parking(&self) {
-		self.dispatcher.as_test().unwrap().forbid_parking();
+		self.platform.as_test().unwrap().run_until_parked()
 	}
 }
 
@@ -454,7 +521,7 @@ where
 	unsafe { async_task::Builder::new().metadata(metadata).spawn_unchecked(move |_| future, schedule) }
 }
 
-/// Scope manages a set of tasks that are enqueued and waited on together. See [`BackgroundExecutor::scoped`].
+/// Scope manages a set of tasks that are enqueued and waited on together. See [`Runtime::scoped`].
 pub struct Scope<'a> {
 	handle: Handle,
 	priority: TaskPriority,
@@ -516,34 +583,31 @@ mod test {
 	use super::*;
 	use crate::{App, TestDispatcher, TestPlatform, http::FakeHttpClient};
 
-	/// Helper to create test infrastructure.
-	/// Returns (dispatcher, background_executor, app) where app's foreground_executor has liveness.
-	fn create_test_app() -> (TestDispatcher, BackgroundExecutor, Rc<crate::AppCell>) {
-		let dispatcher = TestDispatcher::new(Rng::with_seed(0));
-		let arc_dispatcher = Arc::new(dispatcher.clone());
+	fn create_test_app() -> Rc<crate::AppCell> {
+		let platform_dispatcher = TestDispatcher::new(Rng::with_seed(0));
+		let arc_dispatcher = Arc::new(platform_dispatcher.clone());
 		// Create liveness for task cancellation
 		let liveness = std::sync::Arc::new(());
 		let liveness_weak = std::sync::Arc::downgrade(&liveness);
-		let background_executor = BackgroundExecutor::new();
-		let foreground_executor = ForegroundExecutor::new(arc_dispatcher, liveness_weak);
+		let runtime = Runtime::new(arc_dispatcher.clone());
+		let dispatcher = Dispatcher::new(arc_dispatcher, liveness_weak);
 
-		let platform = TestPlatform::new(background_executor.clone(), foreground_executor);
+		let platform = TestPlatform::new(runtime.clone(), dispatcher);
 		let asset_source = Arc::new(());
 		let http_client = FakeHttpClient::with_404_response();
 
-		let app = App::new_app(platform, liveness, asset_source, http_client);
-		(dispatcher, background_executor, app)
+		App::new_app(platform, liveness, asset_source, http_client)
 	}
 
 	#[test]
 	fn sanity_test_tasks_run() {
-		let (dispatcher, _background_executor, app) = create_test_app();
-		let foreground_executor = app.borrow().foreground_executor.clone();
+		let app = create_test_app();
+		let dispatcher = app.borrow().dispatcher.clone();
 
 		let task_ran = Rc::new(RefCell::new(false));
 
-		foreground_executor
-			.spawn({
+		dispatcher
+			.dispatch({
 				let task_ran = Rc::clone(&task_ran);
 				async move {
 					*task_ran.borrow_mut() = true;
@@ -560,16 +624,16 @@ mod test {
 
 	#[test]
 	fn test_task_cancelled_when_app_dropped() {
-		let (dispatcher, _background_executor, app) = create_test_app();
-		let foreground_executor = app.borrow().foreground_executor.clone();
+		let app = create_test_app();
+		let dispatcher = app.borrow().dispatcher.clone();
 
 		let app_weak = Rc::downgrade(&app);
 
 		let task_ran = Rc::new(RefCell::new(false));
 		let task_ran_clone = Rc::clone(&task_ran);
 
-		foreground_executor
-			.spawn(async move {
+		dispatcher
+			.dispatch(async move {
 				*task_ran_clone.borrow_mut() = true;
 			})
 			.detach();
@@ -586,8 +650,8 @@ mod test {
 
 	#[test]
 	fn test_nested_tasks_both_cancel() {
-		let (dispatcher, _background_executor, app) = create_test_app();
-		let foreground_executor = app.borrow().foreground_executor.clone();
+		let app = create_test_app();
+		let dispatcher = app.borrow().dispatcher.clone();
 
 		let app_weak = Rc::downgrade(&app);
 
@@ -602,12 +666,12 @@ mod test {
 		// Channel to block the inner task until we're ready
 		let (tx, rx) = tokio::sync::oneshot::channel::<()>();
 
-		// We need clones of executor and liveness_token for the inner spawn
-		let inner_executor = foreground_executor.clone();
+		// We need clones of the dispatcher and liveness_token for the inner spawn
+		let dispatcher2 = dispatcher.clone();
 
-		foreground_executor
-			.spawn(async move {
-				let inner_task = inner_executor.spawn({
+		dispatcher
+			.dispatch(async move {
+				let inner_task = dispatcher2.dispatch({
 					let inner_flag = Rc::clone(&inner_flag);
 					async move {
 						rx.await.ok();
@@ -650,12 +714,13 @@ mod test {
 	#[test]
 	#[should_panic]
 	fn test_polling_cancelled_task_panics() {
-		let (dispatcher, background_executor, app) = create_test_app();
-		let foreground_executor = app.borrow().foreground_executor.clone();
+		let app = create_test_app();
+		let dispatcher = app.borrow().dispatcher.clone();
+		let runtime = app.borrow().runtime.clone();
 
 		let app_weak = Rc::downgrade(&app);
 
-		let task = foreground_executor.spawn(async move { 42 });
+		let task = dispatcher.dispatch(async move { 42 });
 
 		drop(app);
 
@@ -663,17 +728,18 @@ mod test {
 
 		dispatcher.run_until_parked();
 
-		background_executor.block(TaskPriority::Normal, task);
+		runtime.block(TaskPriority::Normal, task);
 	}
 
 	#[test]
 	fn test_polling_cancelled_task_returns_none_with_fallible() {
-		let (dispatcher, background_executor, app) = create_test_app();
-		let foreground_executor = app.borrow().foreground_executor.clone();
+		let app = create_test_app();
+		let dispatcher = app.borrow().dispatcher.clone();
+		let runtime = app.borrow().runtime.clone();
 
 		let app_weak = Rc::downgrade(&app);
 
-		let task = foreground_executor.spawn(async move { 42 }).fallible();
+		let task = dispatcher.dispatch(async move { 42 }).fallible();
 
 		drop(app);
 
@@ -681,7 +747,7 @@ mod test {
 
 		dispatcher.run_until_parked();
 
-		let result = background_executor.block(TaskPriority::Normal, task);
+		let result = runtime.block(TaskPriority::Normal, task);
 		assert_eq!(result, None, "Cancelled task should return None");
 	}
 }

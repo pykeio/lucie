@@ -1,8 +1,8 @@
 //! Test support for Lucie.
 //!
 //! Lucie provides first-class support for testing, which includes a macro to run test that rely on having a context,
-//! and a test implementation of the `ForegroundExecutor` and `BackgroundExecutor` which ensure that your tests run
-//! deterministically even in the face of arbitrary parallelism.
+//! and a test implementation of the `Runtime` and `Dispatcher` which ensure that your tests run
+//! mostly deterministically even in the face of arbitrary parallelism.
 //!
 //! The output of the `lucie::test` macro is understood by other rust test runners, so you can use it with `cargo test`
 //! or `cargo-nextest`, or another runner of your choice.

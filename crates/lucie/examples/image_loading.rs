@@ -36,7 +36,7 @@ impl Asset for LoadImageWithParameters {
 	type Output = Result<Arc<RenderImage>, ImageCacheError>;
 
 	fn load(parameters: Self::Source, cx: &mut App) -> impl std::future::Future<Output = Self::Output> + Send + 'static {
-		let timer = cx.background_executor().timer(parameters.timeout);
+		let timer = cx.runtime().timer(parameters.timeout);
 		let data = AssetLogger::<ImageAssetLoader>::load(Resource::Path(Path::new(IMAGE).to_path_buf().into()), cx);
 		async move {
 			timer.await;

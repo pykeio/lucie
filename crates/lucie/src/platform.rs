@@ -26,9 +26,9 @@ use smallvec::SmallVec;
 use tokio::sync::oneshot;
 
 use crate::{
-	Action, AnyWindowHandle, App, AsyncWindowContext, BackgroundExecutor, DEFAULT_WINDOW_SIZE, DispatchEventResult, ForegroundExecutor, GpuSpecs, ImageSource,
-	Keymap, PlatformInput, RenderImage, RenderImageParams, RenderSvgParams, Scene, SvgRenderer, SystemWindowTab, TaskPriority, TaskTiming, ThreadTaskTimings,
-	Window, WindowControlArea, hash
+	Action, AnyWindowHandle, App, AsyncWindowContext, DEFAULT_WINDOW_SIZE, DispatchEventResult, Dispatcher, GpuSpecs, ImageSource, Keymap, PlatformInput,
+	RenderImage, RenderImageParams, RenderSvgParams, Runtime, Scene, SvgRenderer, SystemWindowTab, TaskPriority, TaskTiming, ThreadTaskTimings, Window,
+	WindowControlArea, hash
 };
 
 mod app_menu;
@@ -66,13 +66,6 @@ pub(crate) use test::*;
 mod windows;
 #[cfg(target_os = "windows")]
 pub(crate) use windows::*;
-
-/// Returns a background executor for the current platform.
-pub fn background_executor() -> BackgroundExecutor {
-	// For standalone background executor, use a dead liveness since there's no App.
-	// Weak::new() creates a weak reference that always returns None on upgrade.
-	current_platform(true, std::sync::Weak::new()).background_executor()
-}
 
 #[cfg(target_os = "macos")]
 pub(crate) fn current_platform(headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
@@ -141,8 +134,8 @@ pub fn guess_compositor() -> &'static str {
 }
 
 pub(crate) trait Platform: 'static {
-	fn background_executor(&self) -> BackgroundExecutor;
-	fn foreground_executor(&self) -> ForegroundExecutor;
+	fn runtime(&self) -> Runtime;
+	fn dispatcher(&self) -> Dispatcher;
 
 	fn run(&self, on_finish_launching: Box<dyn 'static + FnOnce()>);
 	fn quit(&self);
@@ -556,10 +549,6 @@ pub trait PlatformDispatcher: Send + Sync {
 	fn get_current_thread_timings(&self) -> Vec<TaskTiming>;
 	fn is_main_thread(&self) -> bool;
 	fn dispatch_on_main_thread(&self, runnable: Runnable);
-
-	fn now(&self) -> Instant {
-		Instant::now()
-	}
 
 	fn set_thread_priority(&self, priority: ThreadPriority);
 

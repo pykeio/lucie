@@ -81,7 +81,7 @@ pub(crate) struct WindowsWindowInner {
 	pub(crate) handle: AnyWindowHandle,
 	pub(crate) hide_title_bar: bool,
 	pub(crate) is_movable: bool,
-	pub(crate) executor: ForegroundExecutor,
+	pub(crate) dispatcher: Dispatcher,
 	pub(crate) validation_number: usize,
 	pub(crate) main_receiver: PriorityQueueReceiver<Runnable>,
 	pub(crate) platform_window_handle: HWND,
@@ -228,7 +228,7 @@ impl WindowsWindowInner {
 			handle: context.handle,
 			hide_title_bar: context.hide_title_bar,
 			is_movable: context.is_movable,
-			executor: context.executor.clone(),
+			dispatcher: context.dispatcher.clone(),
 			validation_number: context.validation_number,
 			main_receiver: context.main_receiver.clone(),
 			platform_window_handle: context.platform_window_handle,
@@ -239,8 +239,8 @@ impl WindowsWindowInner {
 
 	fn toggle_fullscreen(self: &Rc<Self>) {
 		let this = self.clone();
-		self.executor
-			.spawn(async move {
+		self.dispatcher
+			.dispatch(async move {
 				let StyleAndBounds { style, x, y, cx, cy } = match this.state.fullscreen.take() {
 					Some(state) => state,
 					None => {
@@ -323,7 +323,7 @@ struct WindowCreateContext {
 	display: WindowsDisplay,
 	is_movable: bool,
 	min_size: Option<Size<Pixels>>,
-	executor: ForegroundExecutor,
+	dispatcher: Dispatcher,
 	current_cursor: Option<HCURSOR>,
 	drop_target_helper: IDropTargetHelper,
 	validation_number: usize,
@@ -340,7 +340,7 @@ impl WindowsWindow {
 	pub(crate) fn new(handle: AnyWindowHandle, params: WindowParams, creation_info: WindowCreationInfo) -> Result<Self> {
 		let WindowCreationInfo {
 			icon,
-			executor,
+			dispatcher,
 			current_cursor,
 			drop_target_helper,
 			validation_number,
@@ -416,7 +416,7 @@ impl WindowsWindow {
 			display,
 			is_movable: params.is_movable,
 			min_size: params.window_min_size,
-			executor,
+			dispatcher,
 			current_cursor,
 			drop_target_helper,
 			validation_number,
@@ -488,8 +488,8 @@ impl Drop for WindowsWindow {
 		// clone this `Rc` to prevent early release of the pointer
 		let this = self.0.clone();
 		self.0
-			.executor
-			.spawn(async move {
+			.dispatcher
+			.dispatch(async move {
 				let handle = this.hwnd;
 				unsafe {
 					RevokeDragDrop(handle).log_err();
@@ -527,8 +527,8 @@ impl PlatformWindow for WindowsWindow {
 		let rect = calculate_window_rect(bounds, &self.state.border_offset);
 
 		self.0
-			.executor
-			.spawn(async move {
+			.dispatcher
+			.dispatch(async move {
 				unsafe {
 					SetWindowPos(hwnd, None, bounds.origin.x.0, bounds.origin.y.0, rect.right - rect.left, rect.bottom - rect.top, SWP_NOMOVE)
 						.context("unable to set window content size")
@@ -584,8 +584,8 @@ impl PlatformWindow for WindowsWindow {
 		let handle = self.0.hwnd;
 		let answers = answers.to_vec();
 		self.0
-			.executor
-			.spawn(async move {
+			.dispatcher
+			.dispatch(async move {
 				unsafe {
 					let mut config = TASKDIALOGCONFIG::default();
 					config.cbSize = std::mem::size_of::<TASKDIALOGCONFIG>() as _;
@@ -657,8 +657,8 @@ impl PlatformWindow for WindowsWindow {
 		let hwnd = self.0.hwnd;
 		let this = self.0.clone();
 		self.0
-			.executor
-			.spawn(async move {
+			.dispatcher
+			.dispatch(async move {
 				this.set_window_placement().log_err();
 
 				unsafe {

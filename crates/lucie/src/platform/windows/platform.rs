@@ -33,8 +33,8 @@ pub(crate) struct WindowsPlatform {
 	// The below members will never change throughout the entire lifecycle of the app.
 	headless: bool,
 	icon: HICON,
-	background_executor: BackgroundExecutor,
-	foreground_executor: ForegroundExecutor,
+	runtime: Runtime,
+	dispatcher: Dispatcher,
 	drop_target_helper: Option<IDropTargetHelper>,
 	/// Flag to instruct the `VSyncProvider` thread to invalidate the directx devices
 	/// as resizing them has failed, causing us to have lost at least the render target.
@@ -122,12 +122,12 @@ impl WindowsPlatform {
 			)
 		};
 		let inner = context.inner.take().context("CreateWindowExW did not run correctly")??;
-		let dispatcher = context.dispatcher.take().context("CreateWindowExW did not run correctly")?;
+		let windows_dispatcher = context.dispatcher.take().context("CreateWindowExW did not run correctly")?;
 		let handle = result?;
 
 		let disable_direct_composition = std::env::var(DISABLE_DIRECT_COMPOSITION).is_ok_and(|value| value == "true" || value == "1");
-		let background_executor = BackgroundExecutor::new();
-		let foreground_executor = ForegroundExecutor::new(dispatcher, liveness);
+		let runtime = Runtime::new(windows_dispatcher.clone());
+		let dispatcher = Dispatcher::new(windows_dispatcher, liveness);
 
 		let drop_target_helper: Option<IDropTargetHelper> = if !headless {
 			Some(unsafe { CoCreateInstance(&CLSID_DragDropHelper, None, CLSCTX_INPROC_SERVER).context("Error creating drop target helper.")? })
@@ -142,8 +142,8 @@ impl WindowsPlatform {
 			raw_window_handles,
 			headless,
 			icon,
-			background_executor,
-			foreground_executor,
+			runtime,
+			dispatcher,
 			disable_direct_composition,
 			drop_target_helper,
 			invalidate_devices: Arc::new(AtomicBool::new(false))
@@ -168,7 +168,7 @@ impl WindowsPlatform {
 	fn generate_creation_info(&self) -> WindowCreationInfo {
 		WindowCreationInfo {
 			icon: self.icon,
-			executor: self.foreground_executor.clone(),
+			dispatcher: self.dispatcher.clone(),
 			current_cursor: self.inner.state.current_cursor.get(),
 			drop_target_helper: self.drop_target_helper.clone().unwrap(),
 			validation_number: self.inner.validation_number,
@@ -195,7 +195,7 @@ impl WindowsPlatform {
 			.map(|menu| (menu.name.clone(), menu.description.clone()))
 			.collect::<Vec<_>>();
 		let recent_workspaces = borrow.recent_workspaces.clone();
-		self.background_executor.spawn(async move {
+		self.runtime.spawn(async move {
 			update_jump_list(&recent_workspaces, &dock_menus).log_err();
 		});
 	}
@@ -264,12 +264,12 @@ fn translate_accelerator(msg: &MSG) -> Option<()> {
 }
 
 impl Platform for WindowsPlatform {
-	fn background_executor(&self) -> BackgroundExecutor {
-		self.background_executor.clone()
+	fn runtime(&self) -> Runtime {
+		self.runtime.clone()
 	}
 
-	fn foreground_executor(&self) -> ForegroundExecutor {
-		self.foreground_executor.clone()
+	fn dispatcher(&self) -> Dispatcher {
+		self.dispatcher.clone()
 	}
 
 	fn keyboard_layout(&self) -> Box<dyn PlatformKeyboardLayout> {
@@ -304,7 +304,7 @@ impl Platform for WindowsPlatform {
 	}
 
 	fn quit(&self) {
-		self.foreground_executor().spawn(async { unsafe { PostQuitMessage(0) } }).detach();
+		self.dispatcher().dispatch(async { unsafe { PostQuitMessage(0) } }).detach();
 	}
 
 	fn activate(&self, _ignoring_other_apps: bool) {}
@@ -594,7 +594,7 @@ impl Drop for WindowsPlatform {
 
 pub(crate) struct WindowCreationInfo {
 	pub(crate) icon: HICON,
-	pub(crate) executor: ForegroundExecutor,
+	pub(crate) dispatcher: Dispatcher,
 	pub(crate) current_cursor: Option<HCURSOR>,
 	pub(crate) drop_target_helper: IDropTargetHelper,
 	pub(crate) validation_number: usize,

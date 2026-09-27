@@ -184,7 +184,7 @@ impl ImageCache for SimpleLruCache {
 		}
 
 		let fut = AssetLogger::<ImageAssetLoader>::load(resource.clone(), cx);
-		let task = cx.background_executor().spawn(fut).shared();
+		let task = cx.runtime().spawn(fut).shared();
 		if self.usages.len() == self.max_items {
 			let oldest = self.usages.pop().unwrap();
 			let mut image = self.cache.remove(&oldest).expect("cache and usages must be in sync");
@@ -197,7 +197,7 @@ impl ImageCache for SimpleLruCache {
 
 		let entity = window.current_view();
 		window
-			.spawn(cx, {
+			.dispatch(cx, {
 				async move |cx| {
 					_ = task.await;
 					cx.on_next_frame(move |_, cx| {

@@ -11,8 +11,8 @@ use futures_util::FutureExt;
 
 use super::{App, AsyncWindowContext, Entity, KeystrokeEvent};
 use crate::{
-	AnyView, AnyWindowHandle, AppContext, AsyncApp, BackgroundTask, DispatchPhase, Effect, EntityId, EventEmitter, FocusHandle, FocusOutEvent, Focusable,
-	ForegroundTask, Global, KeystrokeObserver, Reservation, SubscriberSet, Subscription, TaskPriority, WeakEntity, WeakFocusHandle, Window, WindowHandle
+	AnyView, AnyWindowHandle, AppContext, AsyncApp, DispatchPhase, Effect, EntityId, EventEmitter, FocusHandle, FocusOutEvent, Focusable, Global,
+	KeystrokeObserver, Process, Reservation, SubscriberSet, Subscription, Task, TaskPriority, WeakEntity, WeakFocusHandle, Window, WindowHandle
 };
 
 /// The app context, with specialized behavior for the given entity.
@@ -203,14 +203,14 @@ impl<'a, T: 'static> Context<'a, T> {
 	/// The function is provided a weak handle to the entity owned by this context and a context that can be held across
 	/// await points. The returned task must be held or detached.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> ForegroundTask<R>
+	pub fn dispatch<AsyncFn, R>(&self, f: AsyncFn) -> Process<R>
 	where
 		T: 'static,
 		AsyncFn: AsyncFnOnce(WeakEntity<T>, &mut AsyncApp) -> R + 'static,
 		R: 'static
 	{
 		let this = self.weak_entity();
-		self.app.spawn(async move |cx| f(this, cx).await)
+		self.app.dispatch(async move |cx| f(this, cx).await)
 	}
 
 	/// Convenience method for accessing view state in an event callback.
@@ -541,13 +541,13 @@ impl<'a, T: 'static> Context<'a, T> {
 	/// It's also given an [`AsyncWindowContext`], which can be used to access the state of the entity across await
 	/// points. The returned future will be polled on the main thread.
 	#[track_caller]
-	pub fn spawn_in<AsyncFn, R>(&self, window: &Window, f: AsyncFn) -> ForegroundTask<R>
+	pub fn dispatch_in<AsyncFn, R>(&self, window: &Window, f: AsyncFn) -> Process<R>
 	where
 		R: 'static,
 		AsyncFn: AsyncFnOnce(WeakEntity<T>, &mut AsyncWindowContext) -> R + 'static
 	{
 		let view = self.weak_entity();
-		window.spawn(self, async move |cx| f(view, cx).await)
+		window.dispatch(self, async move |cx| f(view, cx).await)
 	}
 
 	/// Schedule a future to be run asynchronously with the given priority.
@@ -555,13 +555,13 @@ impl<'a, T: 'static> Context<'a, T> {
 	/// It's also given an [`AsyncWindowContext`], which can be used to access the state of the entity across await
 	/// points. The returned future will be polled on the main thread.
 	#[track_caller]
-	pub fn spawn_in_with_priority<AsyncFn, R>(&self, priority: TaskPriority, window: &Window, f: AsyncFn) -> ForegroundTask<R>
+	pub fn dispatch_in_with_priority<AsyncFn, R>(&self, priority: TaskPriority, window: &Window, f: AsyncFn) -> Process<R>
 	where
 		R: 'static,
 		AsyncFn: AsyncFnOnce(WeakEntity<T>, &mut AsyncWindowContext) -> R + 'static
 	{
 		let view = self.weak_entity();
-		window.spawn_with_priority(priority, self, async move |cx| f(view, cx).await)
+		window.dispatch_with_priority(priority, self, async move |cx| f(view, cx).await)
 	}
 
 	/// Register a callback to be invoked when the given global state changes.
@@ -686,11 +686,11 @@ impl<T> AppContext for Context<'_, T> {
 	}
 
 	#[inline]
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
+	fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
-		self.app.background_executor.spawn(future)
+		self.app.runtime.spawn(future)
 	}
 
 	#[inline]

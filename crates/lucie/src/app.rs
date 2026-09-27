@@ -33,11 +33,11 @@ use slotmap::SlotMap;
 use smallvec::SmallVec;
 
 use crate::{
-	Action, ActionBuildError, ActionRegistry, Any, AnyView, AnyWindowHandle, AppContext, Asset, AssetSource, BackgroundExecutor, BackgroundTask, ClipboardItem,
-	DispatchPhase, DisplayId, EventEmitter, FocusHandle, FocusMap, ForegroundExecutor, ForegroundTask, Global, KeyBinding, KeyContext, Keymap, Keystroke,
-	LayoutId, Menu, MenuItem, OwnedMenu, Platform, PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, PromptBuilder, PromptButton, PromptHandle,
-	PromptLevel, Render, RenderImage, RenderablePromptHandle, Reservation, SubscriberSet, Subscription, SvgRenderer, TaskPriority, Window, WindowAppearance,
-	WindowHandle, WindowId, WindowInvalidator,
+	Action, ActionBuildError, ActionRegistry, Any, AnyView, AnyWindowHandle, AppContext, Asset, AssetSource, ClipboardItem, DispatchPhase, Dispatcher,
+	DisplayId, EventEmitter, FocusHandle, FocusMap, Global, KeyBinding, KeyContext, Keymap, Keystroke, LayoutId, Menu, MenuItem, OwnedMenu, Platform,
+	PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper, Process, PromptBuilder, PromptButton, PromptHandle, PromptLevel, Render, RenderImage,
+	RenderablePromptHandle, Reservation, Runtime, SubscriberSet, Subscription, SvgRenderer, Task, TaskPriority, Window, WindowAppearance, WindowHandle,
+	WindowId, WindowInvalidator,
 	colors::{Colors, GlobalColors},
 	current_platform, hash,
 	http::{AsyncBody, HttpClient, Uri},
@@ -206,16 +206,14 @@ impl Application {
 		self
 	}
 
-	/// Returns a handle to the [`BackgroundExecutor`] associated with this app, which can be used to spawn futures in
-	/// the background.
-	pub fn background_executor(&self) -> BackgroundExecutor {
-		self.0.borrow().background_executor.clone()
+	/// Returns a handle to the async runtime.
+	pub fn runtime(&self) -> Runtime {
+		self.0.borrow().runtime.clone()
 	}
 
-	/// Returns a handle to the [`ForegroundExecutor`] associated with this app, which can be used to spawn futures in
-	/// the foreground.
-	pub fn foreground_executor(&self) -> ForegroundExecutor {
-		self.0.borrow().foreground_executor.clone()
+	/// Returns a handle to the main thread dispatcher.
+	pub fn dispatcher(&self) -> Dispatcher {
+		self.0.borrow().dispatcher.clone()
 	}
 
 	/// Returns a reference to the [`TextSystem`] associated with this app.
@@ -550,8 +548,8 @@ pub struct App {
 	pending_updates: usize,
 	pub(crate) actions: Rc<ActionRegistry>,
 	pub(crate) active_drag: Option<AnyDrag>,
-	pub(crate) background_executor: BackgroundExecutor,
-	pub(crate) foreground_executor: ForegroundExecutor,
+	pub(crate) runtime: Runtime,
+	pub(crate) dispatcher: Dispatcher,
 	pub(crate) loading_assets: RapidHashMap<(TypeId, u64), Box<dyn Any>>,
 	asset_source: Arc<dyn AssetSource>,
 	pub(crate) svg_renderer: SvgRenderer,
@@ -597,9 +595,9 @@ pub struct App {
 impl App {
 	#[allow(clippy::new_ret_no_self)]
 	pub(crate) fn new_app(platform: Rc<dyn Platform>, liveness: Arc<()>, asset_source: Arc<dyn AssetSource>, http_client: Arc<dyn HttpClient>) -> Rc<AppCell> {
-		let executor = platform.background_executor();
-		let foreground_executor = platform.foreground_executor();
-		assert!(foreground_executor.dispatcher.is_main_thread(), "must construct App on main thread");
+		let runtime = platform.runtime();
+		let dispatcher = platform.dispatcher();
+		assert!(dispatcher.platform.is_main_thread(), "must construct App on main thread");
 
 		let text_system = Arc::new(TextSystem::new());
 		let entities = EntityMap::new();
@@ -617,8 +615,8 @@ impl App {
 				flushing_effects: false,
 				pending_updates: 0,
 				active_drag: None,
-				background_executor: executor,
-				foreground_executor,
+				runtime,
+				dispatcher,
 				svg_renderer: SvgRenderer::new(asset_source.clone()),
 				loading_assets: Default::default(),
 				asset_source,
@@ -701,11 +699,7 @@ impl App {
 		self.quitting = true;
 
 		let futures = join_all(futures);
-		if self
-			.background_executor
-			.block_with_timeout(TaskPriority::Normal, SHUTDOWN_TIMEOUT, futures)
-			.is_err()
-		{
+		if self.runtime.block_with_timeout(TaskPriority::Normal, SHUTDOWN_TIMEOUT, futures).is_err() {
 			tracing::error!("timed out waiting on app_will_quit");
 		}
 
@@ -1242,28 +1236,28 @@ impl App {
 	pub fn to_async(&self) -> AsyncApp {
 		AsyncApp {
 			app: self.this.clone(),
-			background_executor: self.background_executor.clone(),
-			foreground_executor: self.foreground_executor.clone()
+			runtime: self.runtime.clone(),
+			dispatcher: self.dispatcher.clone()
 		}
 	}
 
-	/// Obtains a reference to the executor, which can be used to spawn futures.
-	pub fn background_executor(&self) -> &BackgroundExecutor {
-		&self.background_executor
+	/// Returns a reference to the async runtime.
+	pub fn runtime(&self) -> &Runtime {
+		&self.runtime
 	}
 
-	/// Obtains a reference to the executor, which can be used to spawn futures.
-	pub fn foreground_executor(&self) -> &ForegroundExecutor {
+	/// Returns a reference to the main thread dispatcher.
+	pub fn dispatcher(&self) -> &Dispatcher {
 		if self.quitting {
 			panic!("Can't spawn on main thread after on_app_quit")
 		};
-		&self.foreground_executor
+		&self.dispatcher
 	}
 
 	/// Spawns the future returned by the given function on the main thread. The closure will be invoked
 	/// with [AsyncApp], which allows the application state to be accessed across await points.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> ForegroundTask<R>
+	pub fn dispatch<AsyncFn, R>(&self, f: AsyncFn) -> Process<R>
 	where
 		AsyncFn: AsyncFnOnce(&mut AsyncApp) -> R + 'static,
 		R: 'static
@@ -1274,13 +1268,13 @@ impl App {
 
 		let mut cx = self.to_async();
 
-		self.foreground_executor.spawn(async move { f(&mut cx).await }.boxed_local())
+		self.dispatcher.dispatch(async move { f(&mut cx).await }.boxed_local())
 	}
 
 	/// Spawns the future returned by the given function on the main thread with
 	/// the given priority. The closure will be invoked with [AsyncApp], which
 	/// allows the application state to be accessed across await points.
-	pub fn spawn_with_priority<AsyncFn, R>(&self, priority: TaskPriority, f: AsyncFn) -> ForegroundTask<R>
+	pub fn dispatch_with_priority<AsyncFn, R>(&self, priority: TaskPriority, f: AsyncFn) -> Process<R>
 	where
 		AsyncFn: AsyncFnOnce(&mut AsyncApp) -> R + 'static,
 		R: 'static
@@ -1291,8 +1285,8 @@ impl App {
 
 		let mut cx = self.to_async();
 
-		self.foreground_executor
-			.spawn_with_priority(priority, async move { f(&mut cx).await }.boxed_local())
+		self.dispatcher
+			.dispatch_with_priority(priority, async move { f(&mut cx).await }.boxed_local())
 	}
 
 	/// Schedules the given function to be run at the end of the current effect cycle, allowing entities
@@ -1788,17 +1782,17 @@ impl App {
 	///
 	/// Note that the multiple calls to this method will only result in one `Asset::load` call at a
 	/// time, and the results of this call will be cached
-	pub fn fetch_asset<A: Asset>(&mut self, source: &A::Source) -> (Shared<BackgroundTask<A::Output>>, bool) {
+	pub fn fetch_asset<A: Asset>(&mut self, source: &A::Source) -> (Shared<Task<A::Output>>, bool) {
 		let asset_id = (TypeId::of::<A>(), hash(source));
 		let mut is_first = false;
 		let task = self
 			.loading_assets
 			.remove(&asset_id)
-			.map(|boxed_task| *boxed_task.downcast::<Shared<BackgroundTask<A::Output>>>().unwrap())
+			.map(|boxed_task| *boxed_task.downcast::<Shared<Task<A::Output>>>().unwrap())
 			.unwrap_or_else(|| {
 				is_first = true;
 				let future = A::load(source.clone(), self);
-				self.background_executor().spawn(future).shared()
+				self.runtime().spawn(future).shared()
 			});
 
 		self.loading_assets.insert(asset_id, Box::new(task.clone()));
@@ -1944,11 +1938,11 @@ impl AppContext for App {
 		Ok(read(view, self))
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
+	fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
-		self.background_executor.spawn(future)
+		self.runtime.spawn(future)
 	}
 
 	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R

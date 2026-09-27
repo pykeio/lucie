@@ -10,21 +10,21 @@ use tokio::sync::oneshot;
 
 use super::{Context, WeakEntity};
 use crate::{
-	AnyView, AnyWindowHandle, App, AppCell, AppContext, BackgroundExecutor, BackgroundTask, BorrowAppContext, Entity, EventEmitter, Focusable,
-	ForegroundExecutor, ForegroundTask, Global, PromptButton, PromptLevel, Render, Reservation, Result, Subscription, VisualContext, Window, WindowHandle
+	AnyView, AnyWindowHandle, App, AppCell, AppContext, BorrowAppContext, Dispatcher, Entity, EventEmitter, Focusable, Global, Process, PromptButton,
+	PromptLevel, Render, Reservation, Result, Runtime, Subscription, Task, VisualContext, Window, WindowHandle
 };
 
 /// An async-friendly version of [App] with a static lifetime so it can be held across `await` points in async code.
 /// You're provided with an instance when calling [App::spawn], and you can also create one with [App::to_async].
 ///
 /// Internally, this holds a weak reference to an `App`. Its methods theoretically panic if the app has been dropped,
-/// but this shouldn't happen in practice when using `cx.spawn()` as the executor ensures the app is alive before
+/// but this shouldn't happen in practice when using `cx.spawn()` as the dispatcher ensures the app is alive before
 /// running each task.
 #[derive(Clone)]
 pub struct AsyncApp {
 	pub(crate) app: Weak<AppCell>,
-	pub(crate) background_executor: BackgroundExecutor,
-	pub(crate) foreground_executor: ForegroundExecutor
+	pub(crate) runtime: Runtime,
+	pub(crate) dispatcher: Dispatcher
 }
 
 impl AsyncApp {
@@ -92,11 +92,11 @@ impl AppContext for AsyncApp {
 		lock.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
+	fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
-		self.background_executor.spawn(future)
+		self.runtime.spawn(future)
 	}
 
 	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R
@@ -117,14 +117,14 @@ impl AsyncApp {
 		lock.refresh_windows();
 	}
 
-	/// Get an executor which can be used to spawn futures in the background.
-	pub fn background_executor(&self) -> &BackgroundExecutor {
-		&self.background_executor
+	/// Returns a handle to the async runtime.
+	pub fn runtime(&self) -> &Runtime {
+		&self.runtime
 	}
 
-	/// Get an executor which can be used to spawn futures in the foreground.
-	pub fn foreground_executor(&self) -> &ForegroundExecutor {
-		&self.foreground_executor
+	/// Returns a handle to the main thread dispatcher.
+	pub fn dispatcher(&self) -> &Dispatcher {
+		&self.dispatcher
 	}
 
 	/// Invoke the given function in the context of the app, then flush any effects produced during its invocation.
@@ -159,13 +159,13 @@ impl AsyncApp {
 
 	/// Schedule a future to be polled in the foreground.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> ForegroundTask<R>
+	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> Process<R>
 	where
 		AsyncFn: AsyncFnOnce(&mut AsyncApp) -> R + 'static,
 		R: 'static
 	{
 		let mut cx = self.clone();
-		self.foreground_executor.spawn(async move { f(&mut cx).await }.boxed_local())
+		self.dispatcher.dispatch(async move { f(&mut cx).await }.boxed_local())
 	}
 
 	/// Determine whether global state of the specified type has been assigned.
@@ -284,13 +284,13 @@ impl AsyncWindowContext {
 	/// Schedule a future to be executed on the main thread. This is used for collecting
 	/// the results of background tasks and updating the UI.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> ForegroundTask<R>
+	pub fn spawn<AsyncFn, R>(&self, f: AsyncFn) -> Process<R>
 	where
 		AsyncFn: AsyncFnOnce(&mut AsyncWindowContext) -> R + 'static,
 		R: 'static
 	{
 		let mut cx = self.clone();
-		self.foreground_executor.spawn(async move { f(&mut cx).await }.boxed_local())
+		self.dispatcher.dispatch(async move { f(&mut cx).await }.boxed_local())
 	}
 
 	/// Present a platform dialog.
@@ -354,11 +354,11 @@ impl AppContext for AsyncWindowContext {
 		self.app.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
+	fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
-		self.app.background_executor.spawn(future)
+		self.app.runtime.spawn(future)
 	}
 
 	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R

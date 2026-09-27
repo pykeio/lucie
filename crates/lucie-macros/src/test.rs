@@ -119,12 +119,12 @@ fn generate_test_function(
 				if let Type::Path(ty) = &*arg.ty {
 					let last_segment = ty.path.segments.last();
 					match last_segment.map(|s| s.ident.to_string()).as_deref() {
-						Some("StdRng") => {
-							inner_fn_args.extend(quote!(rand::SeedableRng::seed_from_u64(_seed),));
+						Some("Rng") => {
+							inner_fn_args.extend(quote!(fastrand::Rng::with_seed(_seed),));
 							continue;
 						}
-						Some("BackgroundExecutor") => {
-							inner_fn_args.extend(quote!(lucie::BackgroundExecutor::new(std::sync::Arc::new(dispatcher.clone()),),));
+						Some("Runtime") => {
+							inner_fn_args.extend(quote!(lucie::Runtime::new(std::sync::Arc::new(dispatcher.clone()),),));
 							continue;
 						}
 						_ => {}
@@ -143,7 +143,7 @@ fn generate_test_function(
 						));
 						cx_teardowns.extend(quote!(
 							dispatcher.run_until_parked();
-							#cx_varname.foreground_executor().forbid_parking();
+							#cx_varname.dispatcher().forbid_parking();
 							#cx_varname.quit();
 							dispatcher.run_until_parked();
 						));
@@ -166,9 +166,9 @@ fn generate_test_function(
 					&[#seeds],
 					#max_retries,
 					&mut |dispatcher, _seed| {
-						let executor = lucie::BackgroundExecutor::new(std::sync::Arc::new(dispatcher.clone()));
+						let runtime = lucie::Runtime::new(std::sync::Arc::new(dispatcher.clone()));
 						#cx_vars
-						executor.block_test(#inner_fn_name(#inner_fn_args));
+						runtime.block_test(#inner_fn_name(#inner_fn_args));
 						#cx_teardowns
 					},
 					#on_failure_fn_name
@@ -186,8 +186,8 @@ fn generate_test_function(
 				if let Type::Path(ty) = &*arg.ty {
 					let last_segment = ty.path.segments.last();
 
-					if let Some("StdRng") = last_segment.map(|s| s.ident.to_string()).as_deref() {
-						inner_fn_args.extend(quote!(rand::SeedableRng::seed_from_u64(_seed),));
+					if let Some("Rng") = last_segment.map(|s| s.ident.to_string()).as_deref() {
+						inner_fn_args.extend(quote!(fastrand::Rng::with_seed(_seed),));
 						continue;
 					}
 				} else if let Type::Reference(ty) = &*arg.ty
@@ -224,7 +224,7 @@ fn generate_test_function(
 							));
 							cx_teardowns.extend(quote!(
 								dispatcher.run_until_parked();
-								#cx_varname.foreground_executor().forbid_parking();
+								#cx_varname.dispatcher().forbid_parking();
 								#cx_varname.quit();
 								dispatcher.run_until_parked();
 							));

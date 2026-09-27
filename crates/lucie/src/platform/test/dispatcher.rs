@@ -1,19 +1,9 @@
-use std::{
-	collections::VecDeque,
-	future::Future,
-	ops::RangeInclusive,
-	pin::Pin,
-	sync::Arc,
-	task::{Context, Poll},
-	time::{Duration, Instant}
-};
+use std::{collections::VecDeque, sync::Arc};
 
-use backtrace::Backtrace;
 use fastrand::Rng;
 use lucie_common::post_inc;
-use parking::Unparker;
 use parking_lot::Mutex;
-use rapidhash::fast::RapidHashMap;
+use rapidhash::{HashMapExt, fast::RapidHashMap};
 
 use crate::{PlatformDispatcher, Runnable};
 
@@ -28,234 +18,54 @@ pub struct TestDispatcher {
 
 struct TestDispatcherState {
 	random: Rng,
-	foreground: RapidHashMap<TestDispatcherId, VecDeque<Runnable>>,
-	background: Vec<Runnable>,
-	deprioritized_background: Vec<Runnable>,
-	delayed: Vec<(Duration, Runnable)>,
-	start_time: Instant,
-	time: Duration,
-	is_main_thread: bool,
-	next_id: TestDispatcherId,
-	allow_parking: bool,
-	waiting_hint: Option<String>,
-	waiting_backtrace: Option<Backtrace>,
-	block_on_ticks: RangeInclusive<usize>,
-	unparkers: Vec<Unparker>,
-	num_cpus_override: Option<usize>
+	processes: RapidHashMap<TestDispatcherId, VecDeque<Runnable>>,
+	next_id: TestDispatcherId
 }
 
 impl TestDispatcher {
 	pub fn new(random: Rng) -> Self {
 		let state = TestDispatcherState {
 			random,
-			foreground: RapidHashMap::default(),
-			background: Vec::new(),
-			deprioritized_background: Vec::new(),
-			delayed: Vec::new(),
-			time: Duration::ZERO,
-			start_time: Instant::now(),
-			is_main_thread: true,
-			next_id: TestDispatcherId(1),
-			allow_parking: false,
-			waiting_hint: None,
-			waiting_backtrace: None,
-			block_on_ticks: 0..=1000,
-			unparkers: Default::default(),
-			num_cpus_override: None
+			processes: RapidHashMap::new(),
+			next_id: TestDispatcherId(1)
 		};
-
 		TestDispatcher {
 			id: TestDispatcherId(0),
 			state: Arc::new(Mutex::new(state))
 		}
 	}
 
-	pub fn advance_clock(&self, by: Duration) {
-		let new_now = self.state.lock().time + by;
-		loop {
-			self.run_until_parked();
-			let state = self.state.lock();
-			let next_due_time = state.delayed.first().map(|(time, _)| *time);
-			drop(state);
-			if let Some(due_time) = next_due_time
-				&& due_time <= new_now
-			{
-				self.state.lock().time = due_time;
-				continue;
-			}
-			break;
-		}
-		self.state.lock().time = new_now;
-	}
+	pub fn tick(&self) -> bool {
+		let mut state_lock = self.state.lock();
 
-	pub fn advance_clock_to_next_delayed(&self) -> bool {
-		let next_due_time = self.state.lock().delayed.first().map(|(time, _)| *time);
-		if let Some(next_due_time) = next_due_time {
-			self.state.lock().time = next_due_time;
-			return true;
-		}
-		false
-	}
-
-	pub fn simulate_random_delay(&self) -> impl 'static + Send + Future<Output = ()> + use<> {
-		struct YieldNow {
-			pub(crate) count: usize
+		if state_lock.processes.values().map(|runnables| runnables.len()).sum::<usize>() == 0 {
+			return false;
 		}
 
-		impl Future for YieldNow {
-			type Output = ();
+		let state = &mut *state_lock;
+		let runnable = state
+			.random
+			.choice(state.processes.values_mut().filter(|runnables| !runnables.is_empty()).collect::<Vec<_>>())
+			.unwrap()
+			.pop_front()
+			.unwrap();
 
-			fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
-				if self.count > 0 {
-					self.count -= 1;
-					cx.waker().wake_by_ref();
-					Poll::Pending
-				} else {
-					Poll::Ready(())
-				}
-			}
-		}
-
-		YieldNow {
-			count: self.state.lock().random.usize(0..10)
-		}
-	}
-
-	pub fn tick(&self, background_only: bool) -> bool {
-		let mut state = self.state.lock();
-
-		while let Some((deadline, _)) = state.delayed.first() {
-			if *deadline > state.time {
-				break;
-			}
-			let (_, runnable) = state.delayed.remove(0);
-			state.background.push(runnable);
-		}
-
-		let foreground_len: usize = if background_only {
-			0
-		} else {
-			state.foreground.values().map(|runnables| runnables.len()).sum()
-		};
-		let background_len = state.background.len();
-
-		let runnable;
-		let main_thread;
-		if foreground_len == 0 && background_len == 0 {
-			let deprioritized_background_len = state.deprioritized_background.len();
-			if deprioritized_background_len == 0 {
-				return false;
-			}
-			let ix = state.random.usize(0..deprioritized_background_len);
-			main_thread = false;
-			runnable = state.deprioritized_background.swap_remove(ix);
-		} else {
-			main_thread = state.random.f32() < (foreground_len as f32 / (foreground_len + background_len) as f32);
-			if main_thread {
-				let state = &mut *state;
-				runnable = state
-					.random
-					.choice(
-						state
-							.foreground
-							.values_mut()
-							.filter(|runnables| !runnables.is_empty())
-							.collect::<Vec<_>>()
-					)
-					.unwrap()
-					.pop_front()
-					.unwrap();
-			} else {
-				let ix = state.random.usize(0..background_len);
-				runnable = state.background.swap_remove(ix);
-			};
-		};
-
-		let was_main_thread = state.is_main_thread;
-		state.is_main_thread = main_thread;
-		drop(state);
+		drop(state_lock);
 
 		// todo(localcc): add timings to tests
 		if !runnable.app_dropped() {
 			runnable.run_unprofiled();
 		}
 
-		self.state.lock().is_main_thread = was_main_thread;
-
 		true
 	}
 
 	pub fn run_until_parked(&self) {
-		while self.tick(false) {}
-	}
-
-	pub fn parking_allowed(&self) -> bool {
-		self.state.lock().allow_parking
-	}
-
-	pub fn allow_parking(&self) {
-		self.state.lock().allow_parking = true
-	}
-
-	pub fn forbid_parking(&self) {
-		self.state.lock().allow_parking = false
-	}
-
-	pub fn set_waiting_hint(&self, msg: Option<String>) {
-		self.state.lock().waiting_hint = msg
-	}
-
-	pub fn waiting_hint(&self) -> Option<String> {
-		self.state.lock().waiting_hint.clone()
-	}
-
-	pub fn start_waiting(&self) {
-		self.state.lock().waiting_backtrace = Some(Backtrace::new_unresolved());
-	}
-
-	pub fn finish_waiting(&self) {
-		self.state.lock().waiting_backtrace.take();
-	}
-
-	pub fn waiting_backtrace(&self) -> Option<Backtrace> {
-		self.state.lock().waiting_backtrace.take().map(|mut b| {
-			b.resolve();
-			b
-		})
+		while self.tick() {}
 	}
 
 	pub fn rng(&self) -> Rng {
 		self.state.lock().random.clone()
-	}
-
-	pub fn set_block_on_ticks(&self, range: std::ops::RangeInclusive<usize>) {
-		self.state.lock().block_on_ticks = range;
-	}
-
-	pub fn gen_block_on_ticks(&self) -> usize {
-		let mut lock = self.state.lock();
-		let block_on_ticks = lock.block_on_ticks.clone();
-		lock.random.usize(block_on_ticks)
-	}
-
-	pub fn unpark_all(&self) {
-		self.state.lock().unparkers.retain(|parker| parker.unpark());
-	}
-
-	pub fn push_unparker(&self, unparker: Unparker) {
-		let mut state = self.state.lock();
-		state.unparkers.push(unparker);
-	}
-
-	/// Override the value returned by `BackgroundExecutor::num_cpus()` in tests.
-	/// A value of 0 means no override (the default of 4 is used).
-	pub fn set_num_cpus(&self, count: usize) {
-		self.state.lock().num_cpus_override = Some(count);
-	}
-
-	/// Returns the overridden CPU count, or `None` if no override is set.
-	pub fn num_cpus_override(&self) -> Option<usize> {
-		self.state.lock().num_cpus_override
 	}
 }
 
@@ -279,17 +89,11 @@ impl PlatformDispatcher for TestDispatcher {
 	}
 
 	fn is_main_thread(&self) -> bool {
-		self.state.lock().is_main_thread
-	}
-
-	fn now(&self) -> Instant {
-		let state = self.state.lock();
-		state.start_time + state.time
+		true
 	}
 
 	fn dispatch_on_main_thread(&self, runnable: Runnable) {
-		self.state.lock().foreground.entry(self.id).or_default().push_back(runnable);
-		self.unpark_all();
+		self.state.lock().processes.entry(self.id).or_default().push_back(runnable);
 	}
 
 	fn as_test(&self) -> Option<&TestDispatcher> {

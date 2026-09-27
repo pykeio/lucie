@@ -47,10 +47,10 @@ use tokio::sync::oneshot;
 use crate::{
 	Action, AnyDrag, AnyElement, AnyImageCache, AnyTooltip, AnyView, App, AppContext, Asset, AsyncWindowContext, AtlasTextureKind, AtlasTileData,
 	AtlasTileWithMetadata, AvailableSpace, Capslock, Context, Decorations, DispatchActionListener, DispatchNodeId, DispatchTree, DisplayId, Effect, Empty,
-	Entity, EntityId, EventEmitter, FileDropEvent, ForegroundTask, Global, GlobalElementId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent,
-	KeyEvent, Keystroke, KeystrokeEvent, LayoutId, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent,
-	Path, PlatformAtlas, PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, PromptButton, PromptLevel, Quad, Render,
-	RenderImage, RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, Scene, Shadow, SubscriberSet, Subscription, SystemWindowTab,
+	Entity, EntityId, EventEmitter, FileDropEvent, Global, GlobalElementId, GpuSpecs, InputHandler, KeyBinding, KeyContext, KeyDownEvent, KeyEvent, Keystroke,
+	KeystrokeEvent, LayoutId, Modifiers, ModifiersChangedEvent, MonochromeSprite, MouseButton, MouseEvent, MouseMoveEvent, MouseUpEvent, Path, PlatformAtlas,
+	PlatformDisplay, PlatformInput, PlatformInputHandler, PlatformWindow, PolychromeSprite, Process, PromptButton, PromptLevel, Quad, Render, RenderImage,
+	RenderImageParams, RenderSvgParams, Replay, ResizeEdge, SMOOTH_SVG_SCALE_FACTOR, Scene, Shadow, SubscriberSet, Subscription, SystemWindowTab,
 	SystemWindowTabController, TabStopMap, TaffyLayoutEngine, TaskPriority, TransformationMatrix, Underline, WindowAppearance, WindowBackgroundAppearance,
 	WindowBounds, WindowControls, WindowDecorations, WindowOptions, WindowParams, prelude::*
 };
@@ -946,7 +946,7 @@ pub(crate) enum DrawPhase {
 struct PendingInput {
 	keystrokes: SmallVec<[Keystroke; 1]>,
 	focus: Option<FocusId>,
-	timer: Option<ForegroundTask<()>>,
+	timer: Option<Process<()>>,
 	needs_timeout: bool
 }
 
@@ -1675,13 +1675,13 @@ impl Window {
 	/// The closure is provided a handle to the current window and an `AsyncWindowContext` for
 	/// use within your future.
 	#[track_caller]
-	pub fn spawn<AsyncFn, R>(&self, cx: &App, f: AsyncFn) -> ForegroundTask<R>
+	pub fn dispatch<AsyncFn, R>(&self, cx: &App, f: AsyncFn) -> Process<R>
 	where
 		R: 'static,
 		AsyncFn: AsyncFnOnce(&mut AsyncWindowContext) -> R + 'static
 	{
 		let handle = self.handle;
-		cx.spawn(async move |app| {
+		cx.dispatch(async move |app| {
 			let mut async_window_cx = AsyncWindowContext::new_context(app.clone(), handle);
 			f(&mut async_window_cx).await
 		})
@@ -1691,13 +1691,13 @@ impl Window {
 	/// pool, with the given priority. The closure is provided a handle to the
 	/// current window and an `AsyncWindowContext` for use within your future.
 	#[track_caller]
-	pub fn spawn_with_priority<AsyncFn, R>(&self, priority: TaskPriority, cx: &App, f: AsyncFn) -> ForegroundTask<R>
+	pub fn dispatch_with_priority<AsyncFn, R>(&self, priority: TaskPriority, cx: &App, f: AsyncFn) -> Process<R>
 	where
 		R: 'static,
 		AsyncFn: AsyncFnOnce(&mut AsyncWindowContext) -> R + 'static
 	{
 		let handle = self.handle;
-		cx.spawn_with_priority(priority, async move |app| {
+		cx.dispatch_with_priority(priority, async move |app| {
 			let mut async_window_cx = AsyncWindowContext::new_context(app.clone(), handle);
 			f(&mut async_window_cx).await
 		})
@@ -2444,7 +2444,7 @@ impl Window {
 		task.clone().now_or_never().or_else(|| {
 			if is_first {
 				let entity_id = self.current_view();
-				self.spawn(cx, {
+				self.dispatch(cx, {
 					let task = task.clone();
 					async move |cx| {
 						task.await;
@@ -3433,8 +3433,8 @@ impl Window {
 			currently_pending.needs_timeout |= match_result.pending_has_binding || text_input_requires_timeout;
 
 			if currently_pending.needs_timeout {
-				currently_pending.timer = Some(self.spawn(cx, async move |cx| {
-					cx.background_executor.timer(Duration::from_secs(1)).await;
+				currently_pending.timer = Some(self.dispatch(cx, async move |cx| {
+					cx.runtime.timer(Duration::from_secs(1)).await;
 					cx.update(move |window, cx| {
 						let Some(currently_pending) = window.pending_input.take().filter(|pending| pending.focus == window.focus) else {
 							return;

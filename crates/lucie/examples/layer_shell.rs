@@ -19,10 +19,10 @@ mod example {
 
 	impl LayerShellExample {
 		fn new(cx: &mut Context<Self>) -> Self {
-			cx.spawn(async move |this, cx| {
+			cx.dispatch(async move |this, cx| {
 				loop {
 					let _ = this.update(cx, |_, cx| cx.notify());
-					cx.background_executor().timer(Duration::from_millis(500)).await;
+					cx.runtime().timer(Duration::from_millis(500)).await;
 				}
 			})
 			.detach();

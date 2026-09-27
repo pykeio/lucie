@@ -9,8 +9,8 @@ use lucie_style::{Style, StyleRefinement, Styled};
 use smallvec::SmallVec;
 
 use crate::{
-	AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, BackgroundTask, Element, ElementId, Entity, GlobalElementId, ImageAssetLoader, ImageCacheError,
-	IntoElement, LayoutId, ParentElement, RenderImage, Resource, Window, hash
+	AnyElement, AnyEntity, App, AppContext, Asset, AssetLogger, Element, ElementId, Entity, GlobalElementId, ImageAssetLoader, ImageCacheError, IntoElement,
+	LayoutId, ParentElement, RenderImage, Resource, Task, Window, hash
 };
 
 /// An image cache element, all its child img elements will use the cache specified by this element.
@@ -143,7 +143,7 @@ impl Element for ImageCacheElement {
 }
 
 /// An image loading task associated with an image cache.
-pub type ImageLoadingTask = Shared<BackgroundTask<Result<Arc<RenderImage>, ImageCacheError>>>;
+pub type ImageLoadingTask = Shared<Task<Result<Arc<RenderImage>, ImageCacheError>>>;
 
 /// An image cache item
 pub enum ImageCacheItem {
@@ -234,12 +234,12 @@ impl RetainAllImageCache {
 		}
 
 		let fut = AssetLogger::<ImageAssetLoader>::load(source.clone(), cx);
-		let task = cx.background_executor().spawn(fut).shared();
+		let task = cx.runtime().spawn(fut).shared();
 		self.0.insert(hash, ImageCacheItem::Loading(task.clone()));
 
 		let entity = window.current_view();
 		window
-			.spawn(cx, {
+			.dispatch(cx, {
 				async move |cx| {
 					_ = task.await;
 					cx.on_next_frame(move |_, cx| {

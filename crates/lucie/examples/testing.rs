@@ -6,7 +6,9 @@
 //! Run the app: cargo run --example testing
 //! Run tests:   cargo test --example testing --features test-support
 
-use lucie::{App, Application, Context, FocusHandle, Focusable, Render, Task, Window, WindowBounds, WindowOptions, actions, div, prelude::*, px, rgb, size};
+use lucie::{
+	App, Application, Context, FocusHandle, Focusable, Process, Render, Task, Window, WindowBounds, WindowOptions, actions, div, prelude::*, px, rgb, size
+};
 
 actions!(counter, [Increment, Decrement]);
 
@@ -44,8 +46,8 @@ impl Counter {
 		cx.notify();
 	}
 
-	fn load(&self, cx: &mut Context<Self>) -> Task<()> {
-		cx.spawn(async move |this, cx| {
+	fn load(&self, cx: &mut Context<Self>) -> Process<()> {
+		cx.dispatch(async move |this, cx| {
 			// Simulate loading data (e.g., from disk or network)
 			this.update(cx, |counter, _| {
 				counter.count = 100;
@@ -55,7 +57,7 @@ impl Counter {
 	}
 
 	fn reload(&self, cx: &mut Context<Self>) {
-		cx.spawn(async move |this, cx| {
+		cx.dispatch(async move |this, cx| {
 			// Simulate reloading data in the background
 			this.update(cx, |counter, _| {
 				counter.count += 50;
@@ -179,8 +181,8 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+	use fastrand::Rng;
 	use lucie::{TestAppContext, VisualTestContext};
-	use rand::prelude::*;
 
 	use super::*;
 
@@ -230,7 +232,7 @@ mod tests {
 	}
 
 	/// Lucie tests can also be async, simply add the async keyword before the test.
-	/// Note that the test executor is single thread, so async side effects (including
+	/// Note that the test dispatcher is single thread, so async side effects (including
 	/// background tasks) won't run until you explicitly yield control.
 	#[lucie::test]
 	async fn test_async_operations(cx: &mut TestAppContext) {
@@ -264,7 +266,7 @@ mod tests {
 	#[lucie::test]
 	async fn test_allow_parking(cx: &mut TestAppContext) {
 		// Allow the thread to park
-		cx.executor().allow_parking();
+		cx.dispatcher().allow_parking();
 
 		// Simulate an external system (like a file system) with an OS thread
 		let (tx, rx) = tokio::sync::oneshot::channel();
@@ -281,7 +283,7 @@ mod tests {
 
 	/// Lucie also provides support for property testing, via the iterations flag
 	#[lucie::test(iterations = 10)]
-	fn test_counter_random_operations(cx: &mut TestAppContext, mut rng: StdRng) {
+	fn test_counter_random_operations(cx: &mut TestAppContext, mut rng: Rng) {
 		let window = cx.update(|cx| cx.open_window(Default::default(), |_, cx| cx.new(|cx| Counter::new(cx))).unwrap());
 		let mut cx = VisualTestContext::from_window(window.into(), cx);
 
@@ -290,7 +292,7 @@ mod tests {
 		// Perform random increments/decrements
 		let mut expected = 0i32;
 		for _ in 0..100 {
-			if rng.random_bool(0.5) {
+			if rng.bool() {
 				expected += 1;
 				counter.update_in(&mut cx, |counter, window, cx| counter.increment(&Increment, window, cx));
 			} else {
@@ -307,6 +309,8 @@ mod tests {
 	/// Let's setup a mock network and enhance the counter to send messages over it.
 	mod distributed_systems {
 		use std::sync::{Arc, Mutex};
+
+		use fastrand::Rng;
 
 		/// The state of the mock network.
 		struct MockNetworkState {
@@ -382,13 +386,12 @@ mod tests {
 			fn increment(&mut self, delta: i32, cx: &mut Context<Self>) {
 				self.count += delta;
 
-				cx.background_spawn({
+				cx.spawn({
 					let client = self.client.clone();
 					async move {
 						client.send(delta);
 					}
-				})
-				.detach();
+				});
 			}
 
 			/// Process incoming increment requests.
@@ -415,8 +418,17 @@ mod tests {
 			b.read_with(cx_b, |b, _| assert_eq!(b.count, 42)); // B's count is set immediately
 			a.read_with(cx_a, |a, _| assert_eq!(a.count, 0)); // A's count is in a side effect
 
-			cx_b.run_until_parked(); // Send the delta from B
+			cx_a.runtime()
+				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
+			cx_b.runtime()
+				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
+
 			a.update(cx_a, |a, _| a.sync()); // Receive the delta at A
+
+			cx_a.runtime()
+				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
+			cx_b.runtime()
+				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
 
 			b.read_with(cx_b, |b, _| assert_eq!(b.count, 42)); // Both counts now match
 			a.read_with(cx_a, |a, _| assert_eq!(a.count, 42));
@@ -427,7 +439,7 @@ mod tests {
 		/// pick which app's tasks to run next. This allows you to test that your distributed code
 		/// is robust to different execution orderings.
 		#[lucie::test(iterations = 10)]
-		fn test_random_interleaving(cx_a: &mut TestAppContext, cx_b: &mut TestAppContext, mut rng: StdRng) {
+		fn test_random_interleaving(cx_a: &mut TestAppContext, cx_b: &mut TestAppContext, mut rng: Rng) {
 			let network = MockNetwork::new();
 
 			// Track execution order
@@ -435,11 +447,11 @@ mod tests {
 			let a = cx_a.new(|_| NetworkedCounter::new(MockNetwork::a_client(&network)));
 			let b = cx_b.new(|_| NetworkedCounter::new(MockNetwork::b_client(&network)));
 
-			let num_operations: usize = rng.random_range(3..8);
+			let num_operations = rng.usize(3..8);
 
 			for i in 0..num_operations {
 				let i = i as i32;
-				let which = rng.random_bool(0.5);
+				let which = rng.bool();
 
 				original_order.push(i);
 				if which {
@@ -448,6 +460,11 @@ mod tests {
 					a.update(cx_a, |a, cx| a.increment(i, cx));
 				}
 			}
+
+			cx_a.runtime()
+				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
+			cx_b.runtime()
+				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
 
 			// This will send all of the pending increment messages, from both a and b
 			cx_a.run_until_parked();

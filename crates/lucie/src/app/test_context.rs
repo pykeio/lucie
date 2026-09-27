@@ -9,10 +9,10 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
-	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace, BackgroundExecutor, BackgroundTask, BorrowAppContext, Capslock,
-	ClipboardItem, DrawPhase, Drawable, Element, Empty, EventEmitter, ForegroundExecutor, ForegroundTask, Global, InputEvent, Keystroke, Modifiers,
-	ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Platform, Render, Result, TestDispatcher, TestPlatform, TestWindow,
-	VisualContext, Window, WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, http::FakeHttpClient, util::Race
+	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, AsyncApp, AvailableSpace, BorrowAppContext, Capslock, ClipboardItem, Dispatcher, DrawPhase,
+	Drawable, Element, Empty, EventEmitter, Global, InputEvent, Keystroke, Modifiers, ModifiersChangedEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
+	MouseUpEvent, Platform, Process, Render, Result, Runtime, Task, TestDispatcher, TestPlatform, TestWindow, VisualContext, Window, WindowBounds,
+	WindowHandle, WindowOptions, app::RuntimeMode, http::FakeHttpClient, util::Race
 };
 
 /// A TestAppContext is provided to tests created with `#[lucie::test]`, it provides
@@ -22,11 +22,11 @@ pub struct TestAppContext {
 	#[doc(hidden)]
 	pub app: Rc<AppCell>,
 	#[doc(hidden)]
-	pub background_executor: BackgroundExecutor,
+	pub runtime: Runtime,
 	#[doc(hidden)]
-	pub foreground_executor: ForegroundExecutor,
+	pub dispatcher: Dispatcher,
 	#[doc(hidden)]
-	pub dispatcher: TestDispatcher,
+	pub platform_dispatcher: TestDispatcher,
 	test_platform: Rc<TestPlatform>,
 	text_system: Arc<TextSystem>,
 	fn_name: Option<&'static str>,
@@ -85,11 +85,11 @@ impl AppContext for TestAppContext {
 		app.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
+	fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
-		self.background_executor.spawn(future)
+		self.runtime.spawn(future)
 	}
 
 	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R
@@ -103,12 +103,12 @@ impl AppContext for TestAppContext {
 
 impl TestAppContext {
 	/// Creates a new `TestAppContext`. Usually you can rely on `#[lucie::test]` to do this for you.
-	pub fn build(dispatcher: TestDispatcher, fn_name: Option<&'static str>) -> Self {
-		let arc_dispatcher = Arc::new(dispatcher.clone());
+	pub fn build(platform_dispatcher: TestDispatcher, fn_name: Option<&'static str>) -> Self {
+		let arc_dispatcher = Arc::new(platform_dispatcher.clone());
 		let liveness = Arc::new(());
-		let background_executor = BackgroundExecutor::new();
-		let foreground_executor = ForegroundExecutor::new(arc_dispatcher, Arc::downgrade(&liveness));
-		let platform = TestPlatform::new(background_executor.clone(), foreground_executor.clone());
+		let runtime = Runtime::new(arc_dispatcher.clone());
+		let dispatcher = Dispatcher::new(arc_dispatcher, Arc::downgrade(&liveness));
+		let platform = TestPlatform::new(runtime.clone(), dispatcher.clone());
 		let asset_source = Arc::new(());
 		let http_client = FakeHttpClient::with_404_response();
 		let text_system = Arc::new(TextSystem::new());
@@ -118,9 +118,9 @@ impl TestAppContext {
 
 		Self {
 			app,
-			background_executor,
-			foreground_executor,
+			runtime,
 			dispatcher,
+			platform_dispatcher,
 			test_platform: platform,
 			text_system,
 			fn_name,
@@ -144,9 +144,9 @@ impl TestAppContext {
 		self.fn_name
 	}
 
-	/// returns a new `TestAppContext` re-using the same executors to interleave tasks.
+	/// returns a new `TestAppContext` re-using the same runtime & dispatcher to interleave tasks.
 	pub fn new_app(&self) -> TestAppContext {
-		Self::build(self.dispatcher.clone(), self.fn_name)
+		Self::build(self.platform_dispatcher.clone(), self.fn_name)
 	}
 
 	/// Called by the test helper to end the test.
@@ -168,14 +168,14 @@ impl TestAppContext {
 		Ok(())
 	}
 
-	/// Returns an executor (for running tasks in the background)
-	pub fn executor(&self) -> BackgroundExecutor {
-		self.background_executor.clone()
+	/// Returns a handle to the async runtime.
+	pub fn runtime(&self) -> Runtime {
+		self.runtime.clone()
 	}
 
-	/// Returns an executor (for running tasks on the main thread)
-	pub fn foreground_executor(&self) -> &ForegroundExecutor {
-		&self.foreground_executor
+	/// Returns a handle to the main thread dispatcher.
+	pub fn dispatcher(&self) -> &Dispatcher {
+		&self.dispatcher
 	}
 
 	#[expect(clippy::wrong_self_convention)]
@@ -308,12 +308,12 @@ impl TestAppContext {
 
 	/// Run the given task on the main thread.
 	#[track_caller]
-	pub fn spawn<Fut, R>(&self, f: impl FnOnce(AsyncApp) -> Fut) -> ForegroundTask<R>
+	pub fn dispatch<Fut, R>(&self, f: impl FnOnce(AsyncApp) -> Fut) -> Process<R>
 	where
 		Fut: Future<Output = R> + 'static,
 		R: 'static
 	{
-		self.foreground_executor.spawn(f(self.to_async()))
+		self.dispatcher.dispatch(f(self.to_async()))
 	}
 
 	/// true if the given global is defined
@@ -352,14 +352,14 @@ impl TestAppContext {
 	pub fn to_async(&self) -> AsyncApp {
 		AsyncApp {
 			app: Rc::downgrade(&self.app),
-			background_executor: self.background_executor.clone(),
-			foreground_executor: self.foreground_executor.clone()
+			runtime: self.runtime.clone(),
+			dispatcher: self.dispatcher.clone()
 		}
 	}
 
 	/// Wait until there are no more pending tasks.
 	pub fn run_until_parked(&mut self) {
-		self.foreground_executor.run_until_parked()
+		self.dispatcher.run_until_parked()
 	}
 
 	/// Simulate dispatching an action to the currently focused node in the window.
@@ -371,31 +371,31 @@ impl TestAppContext {
 			.update(self, |_, window, cx| window.dispatch_action(action.boxed_clone(), cx))
 			.unwrap();
 
-		self.foreground_executor.run_until_parked()
+		self.dispatcher.run_until_parked()
 	}
 
 	/// simulate_keystrokes takes a space-separated list of keys to type.
 	/// cx.simulate_keystrokes("cmd-shift-p b k s p enter")
 	/// in Zed, this will run backspace on the current editor through the command palette.
-	/// This will also run the background executor until it's parked.
+	/// This will also tick the dispatcher until it's parked.
 	pub fn simulate_keystrokes(&mut self, window: AnyWindowHandle, keystrokes: &str) {
 		for keystroke in keystrokes.split(' ').map(Keystroke::parse).map(Result::unwrap) {
 			self.dispatch_keystroke(window, keystroke);
 		}
 
-		self.foreground_executor.run_until_parked()
+		self.dispatcher.run_until_parked()
 	}
 
 	/// simulate_input takes a string of text to type.
 	/// cx.simulate_input("abc")
 	/// will type abc into your current editor
-	/// This will also run the background executor until it's parked.
+	/// This will also tick the dispatcher until it's parked.
 	pub fn simulate_input(&mut self, window: AnyWindowHandle, input: &str) {
 		for keystroke in input.split("").map(Keystroke::parse).map(Result::unwrap) {
 			self.dispatch_keystroke(window, keystroke);
 		}
 
-		self.foreground_executor.run_until_parked()
+		self.dispatcher.run_until_parked()
 	}
 
 	/// dispatches a single Keystroke (see also `simulate_keystrokes` and `simulate_input`)
@@ -454,7 +454,7 @@ impl TestAppContext {
 	/// Runs until the given condition becomes true. (Prefer `run_until_parked` if you
 	/// don't need to jump in at a specific time).
 	pub async fn condition<T: 'static>(&mut self, entity: &Entity<T>, mut predicate: impl FnMut(&mut T, &mut Context<T>) -> bool) {
-		let timer = self.executor().timer(Duration::from_secs(3));
+		let timer = self.runtime().timer(Duration::from_secs(3));
 		let mut notifications = self.notifications(entity);
 
 		use futures_util::FutureExt as _;
@@ -601,7 +601,7 @@ impl VisualTestContext {
 
 	/// Wait until there are no more pending tasks.
 	pub fn run_until_parked(&self) {
-		self.cx.foreground_executor.run_until_parked();
+		self.cx.dispatcher.run_until_parked();
 	}
 
 	/// Dispatch the action to the currently focused node.
@@ -732,7 +732,7 @@ impl VisualTestContext {
 	/// Make sure you've called [VisualTestContext::draw] first!
 	pub fn simulate_event<E: InputEvent>(&mut self, event: E) {
 		self.test_window(self.window).simulate_input(event.to_platform_input());
-		self.foreground_executor.run_until_parked();
+		self.dispatcher.run_until_parked();
 	}
 
 	/// Simulates the user blurring the window.
@@ -740,7 +740,7 @@ impl VisualTestContext {
 		if Some(self.window) == self.test_platform.active_window() {
 			self.test_platform.set_active_window(None)
 		}
-		self.foreground_executor.run_until_parked();
+		self.dispatcher.run_until_parked();
 	}
 
 	/// Simulates the user closing the window.
@@ -768,7 +768,7 @@ impl VisualTestContext {
 	pub fn into_mut(self) -> &'static mut Self {
 		let ptr = Box::into_raw(Box::new(self));
 		// safety: on_quit will be called after the test has finished.
-		// the executor will ensure that all tasks related to the test have stopped.
+		// the dispatcher will ensure that all tasks related to the test have stopped.
 		// so there is no way for cx to be accessed after on_quit is called.
 		// todo: This is unsound under stacked borrows (also tree borrows probably?)
 		// the mutable reference invalidates `ptr` which is later used in the closure
@@ -828,11 +828,11 @@ impl AppContext for VisualTestContext {
 		self.cx.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> BackgroundTask<R>
+	fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
-		self.cx.background_spawn(future)
+		self.cx.spawn(future)
 	}
 
 	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R

@@ -90,11 +90,11 @@ pub fn derive_app_context(input: TokenStream) -> TokenStream {
 				self.#app_variable.read_window(window, read)
 			}
 
-			fn background_spawn<R>(&self, future: impl std::future::Future<Output = R> + Send + 'static) -> lucie::Task<R>
+			fn spawn<R>(&self, future: impl std::future::Future<Output = R> + Send + 'static) -> lucie::Task<R>
 			where
 				R: Send + 'static,
 			{
-				self.#app_variable.background_spawn(future)
+				self.#app_variable.spawn(future)
 			}
 
 			fn read_global<G, R>(&self, callback: impl FnOnce(&G, &lucie::App) -> R) -> R

@@ -11,14 +11,14 @@ use parking_lot::Mutex;
 use tokio::sync::oneshot;
 
 use crate::{
-	AnyWindowHandle, BackgroundExecutor, ClipboardItem, DummyKeyboardMapper, ForegroundExecutor, Keymap, Platform, PlatformDisplay, PlatformKeyboardLayout,
-	PlatformKeyboardMapper, PromptButton, TestDisplay, TestWindow, WindowAppearance, WindowParams
+	AnyWindowHandle, ClipboardItem, Dispatcher, DummyKeyboardMapper, Keymap, Platform, PlatformDisplay, PlatformKeyboardLayout, PlatformKeyboardMapper,
+	PromptButton, Runtime, TestDisplay, TestWindow, WindowAppearance, WindowParams
 };
 
 /// TestPlatform implements the Platform trait for use in tests.
 pub(crate) struct TestPlatform {
-	background_executor: BackgroundExecutor,
-	foreground_executor: ForegroundExecutor,
+	runtime: Runtime,
+	dispatcher: Dispatcher,
 
 	pub(crate) active_window: RefCell<Option<TestWindow>>,
 	active_display: Rc<dyn PlatformDisplay>,
@@ -38,10 +38,10 @@ struct TestPrompt {
 }
 
 impl TestPlatform {
-	pub fn new(executor: BackgroundExecutor, foreground_executor: ForegroundExecutor) -> Rc<Self> {
+	pub fn new(runtime: Runtime, dispatcher: Dispatcher) -> Rc<Self> {
 		Rc::new_cyclic(|weak| TestPlatform {
-			background_executor: executor,
-			foreground_executor,
+			runtime,
+			dispatcher,
 			prompts: Default::default(),
 			active_cursor: Default::default(),
 			active_display: Rc::new(TestDisplay::new()),
@@ -85,12 +85,12 @@ impl TestPlatform {
 	}
 
 	pub(crate) fn set_active_window(&self, window: Option<TestWindow>) {
-		let executor = self.foreground_executor();
+		let dispatcher = self.dispatcher();
 		let previous_window = self.active_window.borrow_mut().take();
 		self.active_window.borrow_mut().clone_from(&window);
 
-		executor
-			.spawn(async move {
+		dispatcher
+			.dispatch(async move {
 				if let Some(previous_window) = previous_window {
 					if let Some(window) = window.as_ref()
 						&& Rc::ptr_eq(&previous_window.0, &window.0)
@@ -108,12 +108,12 @@ impl TestPlatform {
 }
 
 impl Platform for TestPlatform {
-	fn background_executor(&self) -> BackgroundExecutor {
-		self.background_executor.clone()
+	fn runtime(&self) -> Runtime {
+		self.runtime.clone()
 	}
 
-	fn foreground_executor(&self) -> ForegroundExecutor {
-		self.foreground_executor.clone()
+	fn dispatcher(&self) -> Dispatcher {
+		self.dispatcher.clone()
 	}
 
 	fn keyboard_layout(&self) -> Box<dyn PlatformKeyboardLayout> {
