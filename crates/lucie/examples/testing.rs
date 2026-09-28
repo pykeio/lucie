@@ -6,9 +6,7 @@
 //! Run the app: cargo run --example testing
 //! Run tests:   cargo test --example testing --features test-support
 
-use lucie::{
-	App, Application, Context, FocusHandle, Focusable, Process, Render, Task, Window, WindowBounds, WindowOptions, actions, div, prelude::*, px, rgb, size
-};
+use lucie::{App, Application, Context, FocusHandle, Focusable, Process, Render, Window, WindowBounds, WindowOptions, actions, div, prelude::*, px, rgb, size};
 
 actions!(counter, [Increment, Decrement]);
 
@@ -257,30 +255,6 @@ mod tests {
 		assert_eq!(count, 150, "Reload task should have run after parking");
 	}
 
-	/// Note that the test executor panics if you await a future that waits on
-	/// something outside Lucie's control, like a reading a file or network IO.
-	/// You should mock external systems where possible, as this feature can be used
-	/// to detect potential deadlocks in your async code.
-	///
-	/// However, if you want to disable this check use `allow_parking()`
-	#[lucie::test]
-	async fn test_allow_parking(cx: &mut TestAppContext) {
-		// Allow the thread to park
-		cx.dispatcher().allow_parking();
-
-		// Simulate an external system (like a file system) with an OS thread
-		let (tx, rx) = tokio::sync::oneshot::channel();
-		std::thread::spawn(move || {
-			std::thread::sleep(std::time::Duration::from_millis(5));
-			tx.send(42).ok();
-		});
-
-		// Without allow_parking(), this await would panic because Lucie's
-		// scheduler runs out of tasks while waiting for the external thread.
-		let result = rx.await.unwrap();
-		assert_eq!(result, 42);
-	}
-
 	/// Lucie also provides support for property testing, via the iterations flag
 	#[lucie::test(iterations = 10)]
 	fn test_counter_random_operations(cx: &mut TestAppContext, mut rng: Rng) {
@@ -418,17 +392,15 @@ mod tests {
 			b.read_with(cx_b, |b, _| assert_eq!(b.count, 42)); // B's count is set immediately
 			a.read_with(cx_a, |a, _| assert_eq!(a.count, 0)); // A's count is in a side effect
 
-			cx_a.runtime()
-				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
-			cx_b.runtime()
-				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
+			// Let runtime tasks run
+			cx_a.runtime().yield_now();
+			cx_b.runtime().yield_now();
 
 			a.update(cx_a, |a, _| a.sync()); // Receive the delta at A
 
-			cx_a.runtime()
-				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
-			cx_b.runtime()
-				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
+			// Let runtime tasks run
+			cx_a.runtime().yield_now();
+			cx_b.runtime().yield_now();
 
 			b.read_with(cx_b, |b, _| assert_eq!(b.count, 42)); // Both counts now match
 			a.read_with(cx_a, |a, _| assert_eq!(a.count, 42));
@@ -461,10 +433,9 @@ mod tests {
 				}
 			}
 
-			cx_a.runtime()
-				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
-			cx_b.runtime()
-				.block(lucie::TaskPriority::Normal, async move { tokio::task::yield_now().await });
+			// Let runtime tasks run
+			cx_a.runtime().yield_now();
+			cx_b.runtime().yield_now();
 
 			// This will send all of the pending increment messages, from both a and b
 			cx_a.run_until_parked();

@@ -410,6 +410,16 @@ impl Runtime {
 	pub fn set_shutdown_timeout(&self, timeout_ms: u32) {
 		self.normal_runtime.timeout_ms.store(timeout_ms, Ordering::Release);
 	}
+
+	/// Block while allowing some tasks to complete.
+	///
+	/// This does not guarantee that *all* pending tasks have been completed; await a signal instead if you need that
+	/// guarantee.
+	#[cfg(any(test, feature = "test-support"))]
+	pub fn yield_now(&self) {
+		// we only have the one runtime in tests
+		self.block(TaskPriority::Normal, async move { tokio::task::yield_now().await });
+	}
 }
 
 impl Dispatcher {
