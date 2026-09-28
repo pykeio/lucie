@@ -7,17 +7,16 @@ use std::{
 
 use fastrand::Rng;
 
-use crate::Priority;
+use crate::TaskPriority;
 
 struct PriorityQueues<T> {
-	high_priority: VecDeque<T>,
-	medium_priority: VecDeque<T>,
+	normal_priority: VecDeque<T>,
 	low_priority: VecDeque<T>
 }
 
 impl<T> PriorityQueues<T> {
 	fn is_empty(&self) -> bool {
-		self.high_priority.is_empty() && self.medium_priority.is_empty() && self.low_priority.is_empty()
+		self.normal_priority.is_empty() && self.low_priority.is_empty()
 	}
 }
 
@@ -29,17 +28,15 @@ struct PriorityQueueState<T> {
 }
 
 impl<T> PriorityQueueState<T> {
-	fn send(&self, priority: Priority, item: T) -> Result<(), SendError<T>> {
+	fn send(&self, priority: TaskPriority, item: T) -> Result<(), SendError<T>> {
 		if self.receiver_count.load(std::sync::atomic::Ordering::Relaxed) == 0 {
 			return Err(SendError(item));
 		}
 
 		let mut queues = self.queues.lock();
 		match priority {
-			Priority::Realtime(_) => unreachable!(),
-			Priority::High => queues.high_priority.push_back(item),
-			Priority::Medium => queues.medium_priority.push_back(item),
-			Priority::Low => queues.low_priority.push_back(item)
+			TaskPriority::Normal => queues.normal_priority.push_back(item),
+			TaskPriority::Low => queues.low_priority.push_back(item)
 		};
 		self.condvar.notify_one();
 		Ok(())
@@ -81,7 +78,7 @@ impl<T> PriorityQueueSender<T> {
 		Self { state }
 	}
 
-	pub(crate) fn send(&self, priority: Priority, item: T) -> Result<(), SendError<T>> {
+	pub(crate) fn send(&self, priority: TaskPriority, item: T) -> Result<(), SendError<T>> {
 		self.state.send(priority, item)?;
 		Ok(())
 	}
@@ -126,8 +123,7 @@ impl<T> PriorityQueueReceiver<T> {
 	pub(crate) fn new() -> (PriorityQueueSender<T>, Self) {
 		let state = PriorityQueueState {
 			queues: parking_lot::Mutex::new(PriorityQueues {
-				high_priority: VecDeque::new(),
-				medium_priority: VecDeque::new(),
+				normal_priority: VecDeque::new(),
 				low_priority: VecDeque::new()
 			}),
 			condvar: parking_lot::Condvar::new(),
@@ -189,7 +185,7 @@ impl<T> PriorityQueueReceiver<T> {
 	// algorithm is the loaded die from biased coin from
 	// https://www.keithschwarz.com/darts-dice-coins/
 	fn pop_inner(&mut self, block: bool) -> Result<Option<T>, RecvError> {
-		use Priority as P;
+		use TaskPriority as P;
 
 		let mut queues = if !block {
 			let Some(queues) = self.state.try_recv()? else {
@@ -200,25 +196,16 @@ impl<T> PriorityQueueReceiver<T> {
 			self.state.recv()?
 		};
 
-		let high = P::High.probability() * !queues.high_priority.is_empty() as u32;
-		let medium = P::Medium.probability() * !queues.medium_priority.is_empty() as u32;
+		let high = P::Normal.probability() * !queues.normal_priority.is_empty() as u32;
 		let low = P::Low.probability() * !queues.low_priority.is_empty() as u32;
-		let mut mass = high + medium + low; //%
+		let mut mass = high + low; //%
 
-		if !queues.high_priority.is_empty() {
-			let flip = self.rand.f32() < (P::High.probability() as f32 / mass as f32);
+		if !queues.normal_priority.is_empty() {
+			let flip = self.rand.f32() < (P::Normal.probability() as f32 / mass as f32);
 			if flip {
-				return Ok(queues.high_priority.pop_front());
+				return Ok(queues.normal_priority.pop_front());
 			}
-			mass -= P::High.probability();
-		}
-
-		if !queues.medium_priority.is_empty() {
-			let flip = self.rand.f32() < (P::Medium.probability() as f32 / mass as f32);
-			if flip {
-				return Ok(queues.medium_priority.pop_front());
-			}
-			mass -= P::Medium.probability();
+			mass -= P::Normal.probability();
 		}
 
 		if !queues.low_priority.is_empty() {
@@ -279,26 +266,23 @@ mod tests {
 	#[test]
 	fn all_tasks_get_yielded() {
 		let (tx, mut rx) = PriorityQueueReceiver::new();
-		tx.send(Priority::Medium, 20).unwrap();
-		tx.send(Priority::High, 30).unwrap();
-		tx.send(Priority::Low, 10).unwrap();
-		tx.send(Priority::Medium, 21).unwrap();
-		tx.send(Priority::High, 31).unwrap();
+		tx.send(TaskPriority::Normal, 20).unwrap();
+		tx.send(TaskPriority::Low, 10).unwrap();
 
 		drop(tx);
 
-		assert_eq!(rx.iter().collect::<RapidHashSet<_>>(), [30, 31, 20, 21, 10].into_iter().collect::<RapidHashSet<_>>())
+		assert_eq!(rx.iter().collect::<RapidHashSet<_>>(), [20, 10].into_iter().collect::<RapidHashSet<_>>())
 	}
 
 	#[test]
 	fn new_high_prio_task_get_scheduled_quickly() {
 		let (tx, mut rx) = PriorityQueueReceiver::new();
 		for _ in 0..100 {
-			tx.send(Priority::Low, 1).unwrap();
+			tx.send(TaskPriority::Low, 1).unwrap();
 		}
 
 		assert_eq!(rx.pop().unwrap(), 1);
-		tx.send(Priority::High, 3).unwrap();
+		tx.send(TaskPriority::Normal, 3).unwrap();
 		assert_eq!(rx.pop().unwrap(), 3);
 		assert_eq!(rx.pop().unwrap(), 1);
 	}

@@ -240,8 +240,8 @@ impl Render for WindowDemo {
 
 				// Restore the application after 3 seconds
 				window
-					.spawn(cx, async move |cx| {
-						cx.background_executor().timer(std::time::Duration::from_secs(3)).await;
+					.dispatch(cx, async move |cx| {
+						cx.runtime().timer(std::time::Duration::from_secs(3)).await;
 						cx.update(|_, cx| {
 							cx.activate(false);
 						})
@@ -255,7 +255,7 @@ impl Render for WindowDemo {
 			.child(button("Prompt", |window, cx| {
 				let answer = window.prompt(PromptLevel::Info, "Are you sure?", None, &["Ok", "Cancel"], cx);
 
-				cx.spawn(async move |_| {
+				cx.dispatch(async move |_| {
 					if answer.await.unwrap() == 0 {
 						println!("You have clicked Ok");
 					} else {
@@ -267,7 +267,7 @@ impl Render for WindowDemo {
 			.child(button("Prompt (non-English)", |window, cx| {
 				let answer = window.prompt(PromptLevel::Info, "Are you sure?", None, &[PromptButton::ok("确定"), PromptButton::cancel("取消")], cx);
 
-				cx.spawn(async move |_| {
+				cx.dispatch(async move |_| {
 					if answer.await.unwrap() == 0 {
 						println!("You have clicked Ok");
 					} else {

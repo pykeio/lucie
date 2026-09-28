@@ -15,7 +15,6 @@ mod assets;
 pub mod colors;
 mod element;
 mod elements;
-mod executor;
 mod global;
 pub mod http;
 mod input;
@@ -28,6 +27,7 @@ pub mod prelude;
 mod profiler;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod queue;
+mod runtime;
 mod scene;
 mod subscription;
 mod svg_renderer;
@@ -63,7 +63,6 @@ pub use asset_cache::*;
 pub use assets::*;
 pub use element::*;
 pub use elements::*;
-pub use executor::*;
 pub use global::*;
 pub use input::*;
 pub use interactive::*;
@@ -83,6 +82,7 @@ pub use platform::*;
 pub use profiler::*;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub(crate) use queue::{PriorityQueueReceiver, PriorityQueueSender};
+pub use runtime::*;
 pub use scene::*;
 pub use subscription::*;
 pub use svg_renderer::*;
@@ -136,7 +136,7 @@ pub trait AppContext {
 		T: 'static;
 
 	/// Spawn a future on a background thread
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static;
 

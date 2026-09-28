@@ -564,8 +564,8 @@ impl WindowsWindowInner {
 	fn handle_activate_msg(self: &Rc<Self>, wparam: WPARAM) -> Option<isize> {
 		let activated = wparam.loword() > 0;
 		let this = self.clone();
-		self.executor
-			.spawn(async move {
+		self.dispatcher
+			.dispatch(async move {
 				if let Some(mut func) = this.state.callbacks.active_status_change.take() {
 					func(activated);
 					this.state.callbacks.active_status_change.set(Some(func));

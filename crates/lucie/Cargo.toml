@@ -97,7 +97,6 @@ inventory = "0.3.19"
 itertools = "0.15"
 tracing.workspace = true
 num_cpus = "1.13"
-parking = "2.0.0"
 parking_lot.workspace = true
 profiling = "1"
 pin-project-lite = "0.2"
@@ -118,7 +117,6 @@ taffy = { version = "0.11", default-features = false, features = [
 	"content_size"
 ] }
 thiserror = "2.0.12"
-waker-fn = "1.2.0"
 lyon_tessellation = "1.0"
 lyon_algorithms = "1.0"
 circular-buffer = "1.0"

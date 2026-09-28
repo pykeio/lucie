@@ -4,7 +4,7 @@
 //! measurement. This is much faster than the full layout system, but only works for
 //! elements with uniform height.
 
-use std::{cell::RefCell, cmp, ops::Range, rc::Rc, usize};
+use std::{cell::RefCell, cmp, ops::Range, rc::Rc};
 
 use lucie_common::geometry::{Bounds, IsZero, Pixels, Point, Size, point, size};
 use lucie_style::{Overflow, StyleRefinement, Styled};

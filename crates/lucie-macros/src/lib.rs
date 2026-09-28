@@ -161,11 +161,10 @@ pub fn box_shadow_style_methods(input: TokenStream) -> TokenStream {
 /// async fn test_foo(mut cx: &TestAppContext) {}
 /// ```
 ///
-/// In addition to passing a TestAppContext, you can also ask for a `StdRnd` instance.
+/// In addition to passing a TestAppContext, you can also ask for a [`fastrand::Rng`] instance.
 /// this will be seeded with the `SEED` environment variable and is used internally by
-/// the ForegroundExecutor and BackgroundExecutor to run tasks deterministically in tests.
-/// Using the same `StdRng` for behavior in your test will allow you to exercise a wide
-/// variety of scenarios and interleavings just by changing the seed.
+/// the `Dispatcher` to run tasks deterministically in tests. Using the same `Rng` for behavior in your test will allow
+/// you to exercise a wide variety of scenarios and interleavings just by changing the seed.
 ///
 /// # Arguments
 ///

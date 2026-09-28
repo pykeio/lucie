@@ -41,8 +41,8 @@ use super::ImageCacheProvider;
 use crate::{
 	Action, AnyDrag, AnyElement, AnyTooltip, AnyView, App, ClickEvent, DispatchPhase, Element, ElementId, Entity, FocusHandle, Global, GlobalElementId, Hitbox,
 	HitboxBehavior, HitboxId, IntoElement, KeyContext, KeyDownEvent, KeyUpEvent, KeyboardButton, KeyboardClickEvent, LayoutId, ModifiersChangedEvent,
-	MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent, MousePressureEvent, MouseUpEvent, ParentElement, Render, ScrollWheelEvent, Task, TooltipId,
-	Window, WindowControlArea,
+	MouseButton, MouseClickEvent, MouseDownEvent, MouseMoveEvent, MousePressureEvent, MouseUpEvent, ParentElement, Process, Render, ScrollWheelEvent,
+	TooltipId, Window, WindowControlArea,
 	util::{overflow_mask, paint_style}
 };
 
@@ -2245,12 +2245,12 @@ pub struct ElementHoverState {
 
 pub(crate) enum ActiveTooltip {
 	/// Currently delaying before showing the tooltip.
-	WaitingForShow { _task: Task<()> },
+	WaitingForShow { _task: Process<()> },
 	/// Tooltip is visible, element was hovered or for hoverable tooltips, the tooltip was hovered.
 	Visible { tooltip: AnyTooltip, is_hoverable: bool },
 	/// Tooltip is visible and hoverable, but the mouse is no longer hovering. Currently delaying
 	/// before hiding it.
-	WaitingForHide { tooltip: AnyTooltip, _task: Task<()> }
+	WaitingForHide { tooltip: AnyTooltip, _task: Process<()> }
 }
 
 pub(crate) fn clear_active_tooltip(active_tooltip: &Rc<RefCell<Option<ActiveTooltip>>>, window: &mut Window) {
@@ -2369,12 +2369,12 @@ fn handle_tooltip_mouse_move(
 			active_tooltip.borrow_mut().take();
 		}
 		Action::ScheduleShow => {
-			let delayed_show_task = window.spawn(cx, {
+			let delayed_show_task = window.dispatch(cx, {
 				let active_tooltip = active_tooltip.clone();
 				let build_tooltip = build_tooltip.clone();
 				let check_is_hovered_during_prepaint = check_is_hovered_during_prepaint.clone();
 				async move |cx| {
-					cx.background_executor().timer(TOOLTIP_SHOW_DELAY).await;
+					cx.runtime().timer(TOOLTIP_SHOW_DELAY).await;
 					cx.update(|window, cx| {
 						let new_tooltip = build_tooltip(window, cx).map(|(view, tooltip_is_hoverable)| {
 							let active_tooltip = active_tooltip.clone();
@@ -2452,10 +2452,10 @@ fn handle_tooltip_check_visible_and_update(
 		Action::None => {}
 		Action::Hide => clear_active_tooltip(active_tooltip, window),
 		Action::ScheduleHide(tooltip) => {
-			let delayed_hide_task = window.spawn(cx, {
+			let delayed_hide_task = window.dispatch(cx, {
 				let active_tooltip = active_tooltip.clone();
 				async move |cx| {
-					cx.background_executor().timer(HOVERABLE_TOOLTIP_HIDE_DELAY).await;
+					cx.runtime().timer(HOVERABLE_TOOLTIP_HIDE_DELAY).await;
 					if active_tooltip.borrow_mut().take().is_some() {
 						cx.update(|window, _cx| window.refresh()).ok();
 					}

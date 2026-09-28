@@ -234,12 +234,12 @@ impl RetainAllImageCache {
 		}
 
 		let fut = AssetLogger::<ImageAssetLoader>::load(source.clone(), cx);
-		let task = cx.background_executor().spawn(fut).shared();
+		let task = cx.runtime().spawn(fut).shared();
 		self.0.insert(hash, ImageCacheItem::Loading(task.clone()));
 
 		let entity = window.current_view();
 		window
-			.spawn(cx, {
+			.dispatch(cx, {
 				async move |cx| {
 					_ = task.await;
 					cx.on_next_frame(move |_, cx| {

@@ -4,9 +4,9 @@ use anyhow::anyhow;
 use image::RgbaImage;
 
 use crate::{
-	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, BackgroundExecutor, Bounds, ClipboardItem, Context, Entity, ForegroundExecutor, Global,
-	InputEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Platform, Point, Render, Result, Size, Task,
-	TextSystem, Window, WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, current_platform, http::FakeHttpClient
+	Action, AnyView, AnyWindowHandle, App, AppCell, AppContext, Bounds, ClipboardItem, Context, Dispatcher, Entity, Global, InputEvent, Keystroke, Modifiers,
+	MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent, Pixels, Platform, Point, Process, Render, Result, Runtime, Size, Task, TextSystem, Window,
+	WindowBounds, WindowHandle, WindowOptions, app::RuntimeMode, current_platform, http::FakeHttpClient
 };
 
 /// A test context that uses real platform rendering instead of mocked rendering.
@@ -19,12 +19,9 @@ use crate::{
 /// so they are invisible to the user but still fully rendered by the compositor.
 #[derive(Clone)]
 pub struct VisualTestAppContext {
-	/// The underlying app cell
 	pub app: Rc<AppCell>,
-	/// The background executor for running async tasks
-	pub background_executor: BackgroundExecutor,
-	/// The foreground executor for running tasks on the main thread
-	pub foreground_executor: ForegroundExecutor,
+	pub runtime: Runtime,
+	pub dispatcher: Dispatcher,
 	platform: Rc<dyn Platform>,
 	text_system: Arc<TextSystem>
 }
@@ -39,8 +36,8 @@ impl VisualTestAppContext {
 	pub fn new() -> Self {
 		let liveness = Arc::new(());
 		let platform = current_platform(false, Arc::downgrade(&liveness));
-		let background_executor = platform.background_executor();
-		let foreground_executor = platform.foreground_executor();
+		let runtime = platform.runtime();
+		let dispatcher = platform.dispatcher();
 		let text_system = Arc::new(TextSystem::new());
 
 		let asset_source = Arc::new(());
@@ -51,8 +48,8 @@ impl VisualTestAppContext {
 
 		Self {
 			app,
-			background_executor,
-			foreground_executor,
+			runtime,
+			dispatcher,
 			platform,
 			text_system
 		}
@@ -104,19 +101,19 @@ impl VisualTestAppContext {
 		&self.text_system
 	}
 
-	/// Returns the background executor.
-	pub fn executor(&self) -> BackgroundExecutor {
-		self.background_executor.clone()
+	/// Returns the async runtime.
+	pub fn runtime(&self) -> Runtime {
+		self.runtime.clone()
 	}
 
-	/// Returns the foreground executor.
-	pub fn foreground_executor(&self) -> ForegroundExecutor {
-		self.foreground_executor.clone()
+	/// Returns the main thread dispatcher.
+	pub fn dispatcher(&self) -> Dispatcher {
+		self.dispatcher.clone()
 	}
 
 	/// Runs pending background tasks until there's nothing left to do.
 	pub fn run_until_parked(&self) {
-		self.background_executor.run_until_parked();
+		self.dispatcher.run_until_parked();
 	}
 
 	/// Updates the app state.
@@ -140,13 +137,13 @@ impl VisualTestAppContext {
 		lock.update_window(window, f)
 	}
 
-	/// Spawns a task on the foreground executor.
-	pub fn spawn<F, R>(&self, f: F) -> Task<R>
+	/// Dispatches a task to the main thread.
+	pub fn spawn<F, R>(&self, f: F) -> Process<R>
 	where
 		F: Future<Output = R> + 'static,
 		R: 'static
 	{
-		self.foreground_executor.spawn(f)
+		self.dispatcher.dispatch(f)
 	}
 
 	/// Checks if a global of type G exists.
@@ -300,7 +297,7 @@ impl VisualTestAppContext {
 			}
 
 			self.run_until_parked();
-			self.background_executor.timer(Duration::from_millis(10)).await;
+			self.runtime.timer(Duration::from_millis(10)).await;
 		}
 	}
 
@@ -315,7 +312,7 @@ impl VisualTestAppContext {
 
 	/// Waits for animations to complete by waiting a couple of frames.
 	pub async fn wait_for_animations(&self) {
-		self.background_executor.timer(Duration::from_millis(32)).await;
+		self.runtime.timer(Duration::from_millis(32)).await;
 		self.run_until_parked();
 	}
 }
@@ -378,11 +375,11 @@ impl AppContext for VisualTestAppContext {
 		app.read_window(window, read)
 	}
 
-	fn background_spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
+	fn spawn<R>(&self, future: impl Future<Output = R> + Send + 'static) -> Task<R>
 	where
 		R: Send + 'static
 	{
-		self.background_executor.spawn(future)
+		self.runtime.spawn(future)
 	}
 
 	fn read_global<G, R>(&self, callback: impl FnOnce(&G, &App) -> R) -> R
