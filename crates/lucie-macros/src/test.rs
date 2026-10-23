@@ -143,7 +143,6 @@ fn generate_test_function(
 						));
 						cx_teardowns.extend(quote!(
 							dispatcher.run_until_parked();
-							#cx_varname.dispatcher().forbid_parking();
 							#cx_varname.quit();
 							dispatcher.run_until_parked();
 						));
@@ -168,7 +167,7 @@ fn generate_test_function(
 					&mut |dispatcher, _seed| {
 						let runtime = lucie::Runtime::new(std::sync::Arc::new(dispatcher.clone()));
 						#cx_vars
-						runtime.block_test(#inner_fn_name(#inner_fn_args));
+						runtime.block_test(#inner_fn_name(#inner_fn_args)).expect("timed out");
 						#cx_teardowns
 					},
 					#on_failure_fn_name
@@ -224,7 +223,6 @@ fn generate_test_function(
 							));
 							cx_teardowns.extend(quote!(
 								dispatcher.run_until_parked();
-								#cx_varname.dispatcher().forbid_parking();
 								#cx_varname.quit();
 								dispatcher.run_until_parked();
 							));

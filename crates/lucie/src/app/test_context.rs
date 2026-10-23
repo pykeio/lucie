@@ -105,15 +105,14 @@ impl TestAppContext {
 	/// Creates a new `TestAppContext`. Usually you can rely on `#[lucie::test]` to do this for you.
 	pub fn build(platform_dispatcher: TestDispatcher, fn_name: Option<&'static str>) -> Self {
 		let arc_dispatcher = Arc::new(platform_dispatcher.clone());
-		let liveness = Arc::new(());
 		let runtime = Runtime::new(arc_dispatcher.clone());
-		let dispatcher = Dispatcher::new(arc_dispatcher, Arc::downgrade(&liveness));
+		let dispatcher = Dispatcher::new(arc_dispatcher);
 		let platform = TestPlatform::new(runtime.clone(), dispatcher.clone());
 		let asset_source = Arc::new(());
 		let http_client = FakeHttpClient::with_404_response();
 		let text_system = Arc::new(TextSystem::new());
 
-		let app = App::new_app(platform.clone(), liveness, asset_source, http_client);
+		let app = App::new_app(platform.clone(), asset_source, http_client);
 		app.borrow_mut().mode = RuntimeMode::test();
 
 		Self {

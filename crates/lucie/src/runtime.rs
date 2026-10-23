@@ -9,7 +9,7 @@ use std::{
 	rc::Rc,
 	sync::{
 		Arc,
-		atomic::{AtomicU32, Ordering}
+		atomic::{AtomicBool, AtomicU32, Ordering}
 	},
 	task::{Context, Poll},
 	thread::{self, ThreadId},
@@ -80,7 +80,7 @@ impl Drop for TimedShutdownRuntime {
 pub struct Dispatcher {
 	#[doc(hidden)]
 	pub platform: Arc<dyn PlatformDispatcher>,
-	liveness: std::sync::Weak<()>,
+	closed: Arc<AtomicBool>,
 	not_send: PhantomData<Rc<()>>
 }
 
@@ -424,12 +424,20 @@ impl Runtime {
 
 impl Dispatcher {
 	#[doc(hidden)]
-	pub fn new(platform: Arc<dyn PlatformDispatcher>, liveness: std::sync::Weak<()>) -> Self {
+	pub fn new(platform: Arc<dyn PlatformDispatcher>) -> Self {
 		Self {
 			platform,
-			liveness,
+			closed: Arc::new(AtomicBool::new(false)),
 			not_send: PhantomData
 		}
+	}
+
+	pub fn is_closed(&self) -> bool {
+		self.closed.load(Ordering::Acquire)
+	}
+
+	pub fn close(&self) {
+		self.closed.store(true, Ordering::Release);
 	}
 
 	/// Schedules the given task to run on the main thread at some point in the future.
@@ -438,7 +446,7 @@ impl Dispatcher {
 	where
 		R: 'static
 	{
-		self.inner_dispatch(self.liveness.clone(), TaskPriority::inherit(), future.boxed_local())
+		self.inner_dispatch(TaskPriority::inherit(), future.boxed_local())
 	}
 
 	/// Schedules the given task to run on the main thread at some point in the future, with a given priority level.
@@ -447,11 +455,11 @@ impl Dispatcher {
 	where
 		R: 'static
 	{
-		self.inner_dispatch(self.liveness.clone(), priority, future.boxed_local())
+		self.inner_dispatch(priority, future.boxed_local())
 	}
 
 	#[track_caller]
-	pub(crate) fn inner_dispatch<R>(&self, liveness: std::sync::Weak<()>, priority: TaskPriority, future: impl Future<Output = R> + 'static) -> Process<R>
+	pub(crate) fn inner_dispatch<R>(&self, priority: TaskPriority, future: impl Future<Output = R> + 'static) -> Process<R>
 	where
 		R: 'static
 	{
@@ -463,8 +471,8 @@ impl Dispatcher {
 			move |runnable| dispatcher.dispatch_on_main_thread(Runnable(runnable)),
 			RunnableMeta {
 				location,
-				liveness: Some(liveness),
-				priority
+				priority,
+				closed: Some(Arc::clone(&self.closed))
 			}
 		);
 		runnable.schedule();
@@ -596,17 +604,14 @@ mod test {
 	fn create_test_app() -> Rc<crate::AppCell> {
 		let platform_dispatcher = TestDispatcher::new(Rng::with_seed(0));
 		let arc_dispatcher = Arc::new(platform_dispatcher.clone());
-		// Create liveness for task cancellation
-		let liveness = std::sync::Arc::new(());
-		let liveness_weak = std::sync::Arc::downgrade(&liveness);
 		let runtime = Runtime::new(arc_dispatcher.clone());
-		let dispatcher = Dispatcher::new(arc_dispatcher, liveness_weak);
+		let dispatcher = Dispatcher::new(arc_dispatcher);
 
 		let platform = TestPlatform::new(runtime.clone(), dispatcher);
 		let asset_source = Arc::new(());
 		let http_client = FakeHttpClient::with_404_response();
 
-		App::new_app(platform, liveness, asset_source, http_client)
+		App::new_app(platform, asset_source, http_client)
 	}
 
 	#[test]
@@ -676,7 +681,7 @@ mod test {
 		// Channel to block the inner task until we're ready
 		let (tx, rx) = tokio::sync::oneshot::channel::<()>();
 
-		// We need clones of the dispatcher and liveness_token for the inner spawn
+		// We need a clone of the dispatcher for the inner spawn
 		let dispatcher2 = dispatcher.clone();
 
 		dispatcher

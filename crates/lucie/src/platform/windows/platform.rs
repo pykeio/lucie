@@ -88,7 +88,7 @@ impl WindowsPlatformState {
 }
 
 impl WindowsPlatform {
-	pub(crate) fn new(headless: bool, liveness: std::sync::Weak<()>) -> Result<Self> {
+	pub(crate) fn new(headless: bool) -> Result<Self> {
 		unsafe { OleInitialize(None).context("unable to initialize Windows OLE")? };
 
 		let directx_devices = if !headless { Some(DirectXDevices::new().context("Creating DirectX devices")?) } else { None };
@@ -127,7 +127,7 @@ impl WindowsPlatform {
 
 		let disable_direct_composition = std::env::var(DISABLE_DIRECT_COMPOSITION).is_ok_and(|value| value == "true" || value == "1");
 		let runtime = Runtime::new(windows_dispatcher.clone());
-		let dispatcher = Dispatcher::new(windows_dispatcher, liveness);
+		let dispatcher = Dispatcher::new(windows_dispatcher);
 
 		let drop_target_helper: Option<IDropTargetHelper> = if !headless {
 			Some(unsafe { CoCreateInstance(&CLSID_DragDropHelper, None, CLSCTX_INPROC_SERVER).context("Error creating drop target helper.")? })
@@ -495,9 +495,10 @@ impl WindowsPlatformInner {
 			'timeout_loop: loop {
 				if start.elapsed().as_millis() >= MAIN_TASK_TIMEOUT {
 					tracing::debug!("foreground task timeout reached");
-					// we spent our budget on lucie tasks, we likely have a lot of work queued so drain system events first to stay
-					// responsive then quit out of foreground work to allow us to process other lucie events first before returning back
-					// to foreground task work if we don't we might not for example process window quit events
+					// we spent our budget on lucie tasks, we likely have a lot of work queued so drain system events
+					// first to stay responsive then quit out of foreground work to allow us to
+					// process other lucie events first before returning back to foreground task
+					// work if we don't we might not for example process window quit events
 					let mut msg = MSG::default();
 					let process_message = |msg: &_| {
 						if translate_accelerator(msg).is_none() {
@@ -506,9 +507,9 @@ impl WindowsPlatformInner {
 						}
 					};
 					let peek_msg = |msg: &mut _, msg_kind| unsafe { PeekMessageW(msg, None, 0, 0, PM_REMOVE | msg_kind).as_bool() };
-					// We need to process a paint message here as otherwise we will re-enter `run_foreground_task` before painting if we
-					// have work remaining. The reason for this is that windows prefers custom application message processing over
-					// system messages.
+					// We need to process a paint message here as otherwise we will re-enter `run_foreground_task`
+					// before painting if we have work remaining. The reason for this is that
+					// windows prefers custom application message processing over system messages.
 					if peek_msg(&mut msg, PM_QS_PAINT) {
 						process_message(&msg);
 					}

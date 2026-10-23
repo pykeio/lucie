@@ -7,7 +7,10 @@ use std::{
 	path::{Path, PathBuf},
 	pin::Pin,
 	rc::Rc,
-	sync::Arc,
+	sync::{
+		Arc,
+		atomic::{AtomicBool, Ordering}
+	},
 	time::Instant
 };
 
@@ -68,35 +71,35 @@ mod windows;
 pub(crate) use windows::*;
 
 #[cfg(target_os = "macos")]
-pub(crate) fn current_platform(headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
-	Rc::new(MacPlatform::new(headless, liveness))
+pub(crate) fn current_platform(headless: bool) -> Rc<dyn Platform> {
+	Rc::new(MacPlatform::new(headless))
 }
 
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-pub(crate) fn current_platform(headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
+pub(crate) fn current_platform(headless: bool) -> Rc<dyn Platform> {
 	#[cfg(feature = "x11")]
 	use anyhow::Context as _;
 
 	if headless {
-		return Rc::new(HeadlessClient::new(liveness));
+		return Rc::new(HeadlessClient::new());
 	}
 
 	match guess_compositor() {
 		#[cfg(feature = "wayland")]
-		"Wayland" => Rc::new(WaylandClient::new(liveness)),
+		"Wayland" => Rc::new(WaylandClient::new()),
 
 		#[cfg(feature = "x11")]
-		"X11" => Rc::new(X11Client::new(liveness).context("Failed to initialize X11 client.").unwrap()),
+		"X11" => Rc::new(X11Client::new().context("Failed to initialize X11 client.").unwrap()),
 
-		"Headless" => Rc::new(HeadlessClient::new(liveness)),
+		"Headless" => Rc::new(HeadlessClient::new()),
 		_ => unreachable!()
 	}
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn current_platform(headless: bool, liveness: std::sync::Weak<()>) -> Rc<dyn Platform> {
+pub(crate) fn current_platform(headless: bool) -> Rc<dyn Platform> {
 	Rc::new(
-		WindowsPlatform::new(headless, liveness)
+		WindowsPlatform::new(headless)
 			.inspect_err(|err| show_error("Failed to launch", err.to_string()))
 			.unwrap()
 	)
@@ -469,8 +472,7 @@ pub struct RunnableMeta {
 	pub priority: TaskPriority,
 	/// Location of the runnable
 	pub location: &'static core::panic::Location<'static>,
-	/// Weak reference to check if the app is still alive before running this task
-	pub liveness: Option<std::sync::Weak<()>>
+	pub closed: Option<Arc<AtomicBool>>
 }
 
 impl std::fmt::Debug for RunnableMeta {
@@ -478,16 +480,15 @@ impl std::fmt::Debug for RunnableMeta {
 		f.debug_struct("RunnableMeta")
 			.field("priority", &self.priority)
 			.field("location", &self.location)
-			.field("app_alive", &self.is_app_alive())
+			.field("closed", &self.is_dispatcher_closed())
 			.finish()
 	}
 }
 
 impl RunnableMeta {
-	/// Returns true if the app is still alive (or if no app tracking is configured).
-	pub fn is_app_alive(&self) -> bool {
-		match &self.liveness {
-			Some(weak) => weak.strong_count() > 0,
+	pub fn is_dispatcher_closed(&self) -> bool {
+		match &self.closed {
+			Some(closed) => closed.load(Ordering::Acquire),
 			None => true
 		}
 	}
@@ -498,7 +499,7 @@ pub struct Runnable(pub(crate) async_task::Runnable<RunnableMeta>);
 
 impl Runnable {
 	fn run_and_profile(self) -> Instant {
-		if self.app_dropped() {
+		if self.is_dispatcher_closed() {
 			return Instant::now();
 		}
 
@@ -515,8 +516,8 @@ impl Runnable {
 		timing.start
 	}
 
-	fn app_dropped(&self) -> bool {
-		!self.0.metadata().is_app_alive()
+	fn is_dispatcher_closed(&self) -> bool {
+		self.0.metadata().is_dispatcher_closed()
 	}
 
 	fn location(&self) -> &'static core::panic::Location<'static> {

@@ -53,7 +53,7 @@ impl TestDispatcher {
 		drop(state_lock);
 
 		// todo(localcc): add timings to tests
-		if !runnable.app_dropped() {
+		if !runnable.is_dispatcher_closed() {
 			runnable.run_unprofiled();
 		}
 

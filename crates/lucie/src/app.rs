@@ -140,16 +140,14 @@ impl Application {
 		#[cfg(any(test, feature = "test-support"))]
 		tracing::info!("Lucie was compiled in test mode");
 
-		let liveness = Arc::new(());
-		Self(App::new_app(current_platform(false, Arc::downgrade(&liveness)), liveness, Arc::new(()), Arc::new(NullHttpClient)))
+		Self(App::new_app(current_platform(false), Arc::new(()), Arc::new(NullHttpClient)))
 	}
 
 	/// Build an app in headless mode. This prevents opening windows,
 	/// but makes it possible to run an application in an context like
 	/// SSH, where GUI applications are not allowed.
 	pub fn headless() -> Self {
-		let liveness = Arc::new(());
-		Self(App::new_app(current_platform(true, Arc::downgrade(&liveness)), liveness, Arc::new(()), Arc::new(NullHttpClient)))
+		Self(App::new_app(current_platform(true), Arc::new(()), Arc::new(NullHttpClient)))
 	}
 
 	/// Assign
@@ -540,7 +538,6 @@ impl RuntimeMode {
 /// You need a reference to an `App` to access the state of a [Entity].
 pub struct App {
 	pub(crate) this: Weak<AppCell>,
-	pub(crate) _liveness: Arc<()>,
 	pub(crate) platform: Rc<dyn Platform>,
 	pub(crate) mode: RuntimeMode,
 	text_system: Arc<TextSystem>,
@@ -594,7 +591,7 @@ pub struct App {
 
 impl App {
 	#[allow(clippy::new_ret_no_self)]
-	pub(crate) fn new_app(platform: Rc<dyn Platform>, liveness: Arc<()>, asset_source: Arc<dyn AssetSource>, http_client: Arc<dyn HttpClient>) -> Rc<AppCell> {
+	pub(crate) fn new_app(platform: Rc<dyn Platform>, asset_source: Arc<dyn AssetSource>, http_client: Arc<dyn HttpClient>) -> Rc<AppCell> {
 		let runtime = platform.runtime();
 		let dispatcher = platform.dispatcher();
 		assert!(dispatcher.platform.is_main_thread(), "must construct App on main thread");
@@ -607,7 +604,6 @@ impl App {
 		let app = Rc::new_cyclic(|this| AppCell {
 			app: RefCell::new(App {
 				this: this.clone(),
-				_liveness: liveness,
 				platform: platform.clone(),
 				text_system,
 				mode: RuntimeMode::Production,
@@ -903,8 +899,9 @@ impl App {
 					window.defer(cx, |window: &mut Window, cx| window.appearance_changed(cx));
 
 					// allow a window to draw at least once before returning
-					// this didn't cause any issues on non windows platforms as it seems we always won the race to on_request_frame
-					// on windows we quite frequently lose the race and return a window that has never rendered, which leads to a crash
+					// this didn't cause any issues on non windows platforms as it seems we always won the race to
+					// on_request_frame on windows we quite frequently lose the race and return a
+					// window that has never rendered, which leads to a crash
 					// where DispatchTree::root_node_id asserts on empty nodes
 					let clear = window.draw(cx);
 					clear.clear();
@@ -1951,6 +1948,12 @@ impl AppContext for App {
 	{
 		let mut g = self.global::<G>();
 		callback(g, self)
+	}
+}
+
+impl Drop for App {
+	fn drop(&mut self) {
+		self.dispatcher.close();
 	}
 }
 
