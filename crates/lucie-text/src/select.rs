@@ -3,6 +3,7 @@
 use std::{mem::swap, ops::Range};
 
 use lucie_common::geometry::{Bounds, Point, ScaledPixels, point, size};
+use parley::Cluster;
 
 use crate::{layout::Layout, style::Brush};
 
@@ -237,10 +238,23 @@ impl Selection {
 			};
 			let line = line.parley_line();
 			let metrics = line.metrics();
-			let line_min = metrics.block_min_coord;
-			let line_max = metrics.block_max_coord;
+			let line_min = f32::min(metrics.block_min_coord, metrics.content_block_min_coord);
+			let line_max = f32::max(metrics.block_max_coord, metrics.content_block_max_coord);
 			let newline_whitespace = if line.break_reason() == parley::BreakReason::Explicit {
-				(metrics.ascent + metrics.descent) * NEWLINE_WHITESPACE_WIDTH_RATIO
+				match line
+					.text_range()
+					.end
+					.checked_sub(1)
+					.and_then(|index| Cluster::from_byte_index(layout.layout(), index))
+				{
+					Some(newline_cluster) => {
+						debug_assert!(newline_cluster.is_hard_line_break(), "Expected the line's last logical run to be a newline cluster.");
+						let run = newline_cluster.run();
+						let font_metrics = run.font_metrics();
+						(font_metrics.ascent + font_metrics.descent) * NEWLINE_WHITESPACE_WIDTH_RATIO
+					}
+					None => 0.0
+				}
 			} else {
 				0.0
 			};

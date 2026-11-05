@@ -11,7 +11,7 @@ use lucie_common::{
 };
 use lucie_style::{StrikethroughStyle, TextStyle, TextStyleRefinement, UnderlineStyle};
 use parking_lot::Mutex;
-use parley::fontique;
+use parley::{VerticalAlign, fontique};
 
 mod font;
 mod glyph;
@@ -182,7 +182,9 @@ impl<'s> RangedBuilder<'s> {
 			kind: parley::InlineBoxKind::InFlow,
 			index: char_index,
 			width: size.width.0,
-			height: size.height.0
+			height: size.height.0,
+			baseline: None,
+			vertical_align: VerticalAlign::MIDDLE
 		});
 	}
 
