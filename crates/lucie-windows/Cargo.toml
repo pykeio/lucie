@@ -1,0 +1,39 @@
+[package]
+name = "lucie-windows"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+lucie = { workspace = true, default-features = false }
+lucie-common.workspace = true
+lucie-style.workspace = true
+
+anyhow.workspace = true
+etagere = "0.3"
+itertools = "0.15"
+flume = "0.12"
+image.workspace = true
+smallvec.workspace = true
+raw-window-handle = "0.6"
+parking_lot.workspace = true
+tracing.workspace = true
+rapidhash.workspace = true
+tokio.workspace = true
+fastrand.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows.workspace = true
+windows-core.workspace = true
+windows-numerics = "0.3"
+windows-registry = "0.6"
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+windows-registry = "0.6"

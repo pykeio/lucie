@@ -595,7 +595,7 @@ impl Render for InputExample {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		cx.bind_keys([
 			KeyBinding::new("backspace", Backspace, None),
 			KeyBinding::new("delete", Delete, None),

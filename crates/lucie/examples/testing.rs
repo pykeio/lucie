@@ -159,7 +159,7 @@ impl Render for Counter {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		cx.bind_keys([lucie::KeyBinding::new("up", Increment, Some("Counter")), lucie::KeyBinding::new("down", Decrement, Some("Counter"))]);
 
 		cx.open_window(

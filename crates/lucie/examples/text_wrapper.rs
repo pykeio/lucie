@@ -108,7 +108,7 @@ impl Render for HelloWorld {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		cx.open_window(
 			WindowOptions {
 				window_bounds: Some(WindowBounds::centered(size(px(800.0), px(600.0)), cx)),

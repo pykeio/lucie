@@ -30,7 +30,7 @@ impl Render for ExampleWindow {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		let WindowBounds::Windowed(mut bounds) = WindowBounds::centered(size(px(500.), px(500.0)), cx) else {
 			unreachable!();
 		};

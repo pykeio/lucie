@@ -37,73 +37,16 @@ use crate::{
 mod app_menu;
 mod keyboard;
 mod keystroke;
+#[cfg(all(target_os = "linux", feature = "wayland"))]
+pub mod layer_shell;
 pub use app_menu::*;
 pub use keyboard::*;
 pub use keystroke::*;
 
-#[cfg(any(
-	all(any(target_os = "linux", target_os = "freebsd"), any(feature = "x11", feature = "wayland")),
-	all(target_os = "macos", feature = "macos-blade")
-))]
-mod blade;
-
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
-mod linux;
-#[cfg(all(target_os = "linux", feature = "wayland"))]
-pub use linux::layer_shell;
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
-pub(crate) use linux::*;
-
-#[cfg(target_os = "macos")]
-mod mac;
-#[cfg(target_os = "macos")]
-pub(crate) use mac::*;
-
 #[cfg(any(test, feature = "test-support"))]
 mod test;
 #[cfg(any(test, feature = "test-support"))]
-pub use test::TestDispatcher;
-#[cfg(any(test, feature = "test-support"))]
-pub(crate) use test::*;
-#[cfg(target_os = "windows")]
-mod windows;
-#[cfg(target_os = "windows")]
-pub(crate) use windows::*;
-
-#[cfg(target_os = "macos")]
-pub(crate) fn current_platform(headless: bool) -> Rc<dyn Platform> {
-	Rc::new(MacPlatform::new(headless))
-}
-
-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
-pub(crate) fn current_platform(headless: bool) -> Rc<dyn Platform> {
-	#[cfg(feature = "x11")]
-	use anyhow::Context as _;
-
-	if headless {
-		return Rc::new(HeadlessClient::new());
-	}
-
-	match guess_compositor() {
-		#[cfg(feature = "wayland")]
-		"Wayland" => Rc::new(WaylandClient::new()),
-
-		#[cfg(feature = "x11")]
-		"X11" => Rc::new(X11Client::new().context("Failed to initialize X11 client.").unwrap()),
-
-		"Headless" => Rc::new(HeadlessClient::new()),
-		_ => unreachable!()
-	}
-}
-
-#[cfg(target_os = "windows")]
-pub(crate) fn current_platform(headless: bool) -> Rc<dyn Platform> {
-	Rc::new(
-		WindowsPlatform::new(headless)
-			.inspect_err(|err| show_error("Failed to launch", err.to_string()))
-			.unwrap()
-	)
-}
+pub use test::*;
 
 /// Return which compositor we're guessing we'll use.
 /// Does not attempt to connect to the given compositor
@@ -136,7 +79,7 @@ pub fn guess_compositor() -> &'static str {
 	}
 }
 
-pub(crate) trait Platform: 'static {
+pub trait Platform: 'static {
 	fn runtime(&self) -> Runtime;
 	fn dispatcher(&self) -> Dispatcher;
 
@@ -236,6 +179,19 @@ pub trait PlatformDisplay: Send + Sync + Debug {
 /// An opaque identifier for a hardware display
 #[derive(PartialEq, Eq, Hash, Copy, Clone)]
 pub struct DisplayId(pub(crate) u32);
+
+impl DisplayId {
+	/// Create a new `DisplayId` from a raw platform display identifier.
+	pub fn new(id: u32) -> Self {
+		Self(id)
+	}
+}
+
+impl From<u32> for DisplayId {
+	fn from(id: u32) -> Self {
+		Self(id)
+	}
+}
 
 impl From<DisplayId> for u32 {
 	fn from(id: DisplayId) -> Self {
@@ -349,13 +305,14 @@ impl Tiling {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
-pub(crate) struct RequestFrameOptions {
-	pub(crate) require_presentation: bool,
+pub struct RequestFrameOptions {
+	/// Whether a presentation is required.
+	pub require_presentation: bool,
 	/// Force refresh of all rendering states when true
-	pub(crate) force_render: bool
+	pub force_render: bool
 }
 
-pub(crate) trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
+pub trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
 	fn bounds(&self) -> Bounds<Pixels>;
 	fn is_maximized(&self) -> bool;
 	fn window_bounds(&self) -> WindowBounds;
@@ -418,7 +375,7 @@ pub(crate) trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
 	fn set_tabbing_identifier(&self, _identifier: Option<String>) {}
 
 	#[cfg(target_os = "windows")]
-	fn get_raw_handle(&self) -> windows::HWND;
+	fn get_raw_handle(&self) -> windows::Win32::Foundation::HWND;
 
 	// Linux specific methods
 	fn inner_window_bounds(&self) -> WindowBounds {
@@ -455,17 +412,7 @@ pub(crate) trait PlatformWindow: HasWindowHandle + HasDisplayHandle {
 }
 
 #[doc(hidden)]
-pub struct TimerResolutionGuard {
-	cleanup: Option<Box<dyn FnOnce() + Send>>
-}
-
-impl Drop for TimerResolutionGuard {
-	fn drop(&mut self) {
-		if let Some(cleanup) = self.cleanup.take() {
-			cleanup();
-		}
-	}
-}
+pub type TimerResolutionGuard = lucie_common::Deferred<Box<dyn FnOnce() + Send>>;
 
 #[doc(hidden)]
 pub struct RunnableMeta {
@@ -498,7 +445,7 @@ impl RunnableMeta {
 pub struct Runnable(pub(crate) async_task::Runnable<RunnableMeta>);
 
 impl Runnable {
-	fn run_and_profile(self) -> Instant {
+	pub fn run_and_profile(self) -> Instant {
 		if self.is_dispatcher_closed() {
 			return Instant::now();
 		}
@@ -529,7 +476,7 @@ impl Runnable {
 		self.0.run();
 	}
 
-	fn priority(&self) -> TaskPriority {
+	pub fn priority(&self) -> TaskPriority {
 		self.0.metadata().priority
 	}
 }
@@ -563,7 +510,7 @@ pub trait PlatformDispatcher: Send + Sync {
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT license.
 #[allow(dead_code)]
-pub(crate) fn get_gamma_correction_ratios(gamma: f32) -> [f32; 4] {
+pub fn get_gamma_correction_ratios(gamma: f32) -> [f32; 4] {
 	const GAMMA_INCORRECT_TARGET_RATIOS: [[f32; 4]; 13] = [
 		[0.0000 / 4.0, 0.0000 / 4.0, 0.0000 / 4.0, 0.0000 / 4.0],   // gamma = 1.0
 		[0.0166 / 4.0, -0.0807 / 4.0, 0.2227 / 4.0, -0.0751 / 4.0], // gamma = 1.1
@@ -590,7 +537,7 @@ pub(crate) fn get_gamma_correction_ratios(gamma: f32) -> [f32; 4] {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-pub(crate) enum AtlasKey {
+pub enum AtlasKey {
 	Glyph(GlyphKey),
 	Svg(RenderSvgParams),
 	Image(RenderImageParams)
@@ -614,21 +561,21 @@ impl From<RenderImageParams> for AtlasKey {
 	}
 }
 
-pub(crate) struct AtlasTileData<'a> {
-	pub(crate) size: Size<DevicePixels>,
-	pub(crate) data: Cow<'a, [u8]>,
-	pub(crate) texture_kind: AtlasTextureKind,
-	pub(crate) draw_offset: Point<ScaledPixels>
+pub struct AtlasTileData<'a> {
+	pub size: Size<DevicePixels>,
+	pub data: Cow<'a, [u8]>,
+	pub texture_kind: AtlasTextureKind,
+	pub draw_offset: Point<ScaledPixels>
 }
 
-pub(crate) trait PlatformAtlas: Send + Sync {
+pub trait PlatformAtlas: Send + Sync {
 	fn get_or_insert_with<'a>(&self, key: &AtlasKey, build: &mut dyn FnMut() -> Result<Option<AtlasTileData<'a>>>) -> Result<Option<AtlasTileWithMetadata>>;
 	fn remove(&self, key: &AtlasKey);
 }
 
-struct AtlasTextureList<T> {
-	textures: Vec<Option<T>>,
-	free_list: Vec<usize>
+pub struct AtlasTextureList<T> {
+	pub textures: Vec<Option<T>>,
+	pub free_list: Vec<usize>
 }
 
 impl<T> Default for AtlasTextureList<T> {
@@ -649,55 +596,50 @@ impl<T> ops::Index<usize> for AtlasTextureList<T> {
 }
 
 impl<T> AtlasTextureList<T> {
-	#[allow(unused)]
-	fn drain(&mut self) -> std::vec::Drain<'_, Option<T>> {
+	pub fn drain(&mut self) -> std::vec::Drain<'_, Option<T>> {
 		self.free_list.clear();
 		self.textures.drain(..)
 	}
 
-	#[allow(dead_code)]
-	fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut T> {
+	pub fn iter_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut T> {
 		self.textures.iter_mut().flatten()
 	}
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct AtlasTileWithMetadata {
-	pub(crate) tile: AtlasTile,
-	pub(crate) draw_offset: Point<ScaledPixels>
+#[repr(C)]
+pub struct AtlasTileWithMetadata {
+	pub tile: AtlasTile,
+	pub draw_offset: Point<ScaledPixels>
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
-pub(crate) struct AtlasTile {
-	pub(crate) texture_id: AtlasTextureId,
-	pub(crate) tile_id: TileId,
-	pub(crate) padding: u32,
-	pub(crate) bounds: Bounds<DevicePixels>
+pub struct AtlasTile {
+	pub texture_id: AtlasTextureId,
+	pub tile_id: TileId,
+	pub padding: u32,
+	pub bounds: Bounds<DevicePixels>
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
-pub(crate) struct AtlasTextureId {
+pub struct AtlasTextureId {
 	// We use u32 instead of usize for Metal Shader Language compatibility
-	pub(crate) index: u32,
-	pub(crate) kind: AtlasTextureKind
+	pub index: u32,
+	pub kind: AtlasTextureKind
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(C)]
-#[cfg_attr(
-	all(any(target_os = "linux", target_os = "freebsd"), not(any(feature = "x11", feature = "wayland"))),
-	allow(dead_code)
-)]
-pub(crate) enum AtlasTextureKind {
+pub enum AtlasTextureKind {
 	Monochrome = 0,
 	Polychrome = 1
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(C)]
-pub(crate) struct TileId(pub(crate) u32);
+pub struct TileId(pub u32);
 
 impl From<etagere::AllocId> for TileId {
 	fn from(id: etagere::AllocId) -> Self {
@@ -711,7 +653,7 @@ impl From<TileId> for etagere::AllocId {
 	}
 }
 
-pub(crate) struct PlatformInputHandler {
+pub struct PlatformInputHandler {
 	cx: AsyncWindowContext,
 	handler: Box<dyn InputHandler>
 }
@@ -725,7 +667,7 @@ impl PlatformInputHandler {
 		Self { cx, handler }
 	}
 
-	fn selected_text_range(&mut self, ignore_disabled_input: bool) -> Option<UTF16Selection> {
+	pub fn selected_text_range(&mut self, ignore_disabled_input: bool) -> Option<UTF16Selection> {
 		self.cx
 			.update(|window, cx| self.handler.selected_text_range(ignore_disabled_input, window, cx))
 			.ok()
@@ -733,19 +675,19 @@ impl PlatformInputHandler {
 	}
 
 	#[cfg_attr(target_os = "windows", allow(dead_code))]
-	fn marked_text_range(&mut self) -> Option<Range<usize>> {
+	pub fn marked_text_range(&mut self) -> Option<Range<usize>> {
 		self.cx.update(|window, cx| self.handler.marked_text_range(window, cx)).ok().flatten()
 	}
 
 	#[cfg_attr(any(target_os = "linux", target_os = "freebsd", target_os = "windows"), allow(dead_code))]
-	fn text_for_range(&mut self, range_utf16: Range<usize>, adjusted: &mut Option<Range<usize>>) -> Option<String> {
+	pub fn text_for_range(&mut self, range_utf16: Range<usize>, adjusted: &mut Option<Range<usize>>) -> Option<String> {
 		self.cx
 			.update(|window, cx| self.handler.text_for_range(range_utf16, adjusted, window, cx))
 			.ok()
 			.flatten()
 	}
 
-	fn replace_text_in_range(&mut self, replacement_range: Option<Range<usize>>, text: &str) {
+	pub fn replace_text_in_range(&mut self, replacement_range: Option<Range<usize>>, text: &str) {
 		self.cx
 			.update(|window, cx| {
 				self.handler.replace_text_in_range(replacement_range, text, window, cx);
@@ -763,11 +705,11 @@ impl PlatformInputHandler {
 	}
 
 	#[cfg_attr(target_os = "windows", allow(dead_code))]
-	fn unmark_text(&mut self) {
+	pub fn unmark_text(&mut self) {
 		self.cx.update(|window, cx| self.handler.unmark_text(window, cx)).ok();
 	}
 
-	fn bounds_for_range(&mut self, range_utf16: Range<usize>) -> Option<Bounds<Pixels>> {
+	pub fn bounds_for_range(&mut self, range_utf16: Range<usize>) -> Option<Bounds<Pixels>> {
 		self.cx
 			.update(|window, cx| self.handler.bounds_for_range(range_utf16, window, cx))
 			.ok()
@@ -775,11 +717,11 @@ impl PlatformInputHandler {
 	}
 
 	#[allow(dead_code)]
-	fn apple_press_and_hold_enabled(&mut self) -> bool {
+	pub fn apple_press_and_hold_enabled(&mut self) -> bool {
 		self.handler.apple_press_and_hold_enabled()
 	}
 
-	pub(crate) fn dispatch_input(&mut self, input: &str, window: &mut Window, cx: &mut App) {
+	pub fn dispatch_input(&mut self, input: &str, window: &mut Window, cx: &mut App) {
 		self.handler.replace_text_in_range(None, input, window, cx);
 	}
 
@@ -805,7 +747,7 @@ impl PlatformInputHandler {
 	}
 
 	#[allow(dead_code)]
-	pub(crate) fn accepts_text_input(&mut self, window: &mut Window, cx: &mut App) -> bool {
+	pub fn accepts_text_input(&mut self, window: &mut Window, cx: &mut App) -> bool {
 		self.handler.accepts_text_input(window, cx)
 	}
 }
@@ -953,7 +895,7 @@ pub struct WindowOptions {
 	all(any(target_os = "linux", target_os = "freebsd"), not(any(feature = "x11", feature = "wayland"))),
 	allow(dead_code)
 )]
-pub(crate) struct WindowParams {
+pub struct WindowParams {
 	pub bounds: Bounds<Pixels>,
 
 	/// The titlebar configuration of the window
@@ -1205,8 +1147,7 @@ impl PromptButton {
 		PromptButton::Cancel(label.into())
 	}
 
-	#[allow(dead_code)]
-	pub(crate) fn is_cancel(&self) -> bool {
+	pub fn is_cancel(&self) -> bool {
 		matches!(self, PromptButton::Cancel(_))
 	}
 
@@ -1233,7 +1174,7 @@ impl From<&str> for PromptButton {
 /// A clipboard item that should be copied to the clipboard
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClipboardItem {
-	entries: Vec<ClipboardEntry>
+	pub entries: Vec<ClipboardEntry>
 }
 
 /// Either a ClipboardString or a ClipboardImage
@@ -1406,7 +1347,7 @@ pub struct Image {
 	/// The raw image bytes
 	pub bytes: Vec<u8>,
 	/// The unique ID for the image
-	id: u64
+	pub id: u64
 }
 
 impl Hash for Image {
@@ -1500,8 +1441,8 @@ impl Image {
 /// A clipboard item that should be copied to the clipboard
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClipboardString {
-	pub(crate) text: String,
-	pub(crate) metadata: Option<String>
+	pub text: String,
+	pub metadata: Option<String>
 }
 
 impl ClipboardString {
@@ -1531,8 +1472,7 @@ impl ClipboardString {
 		self.metadata.as_deref()
 	}
 
-	#[cfg_attr(any(target_os = "linux", target_os = "freebsd"), allow(dead_code))]
-	pub(crate) fn text_hash(text: &str) -> u64 {
+	pub fn text_hash(text: &str) -> u64 {
 		let mut hasher = rapidhash::quality::RapidHasher::default();
 		text.hash(&mut hasher);
 		hasher.finish()

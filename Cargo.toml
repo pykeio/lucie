@@ -1,15 +1,7 @@
 [workspace]
 resolver = "2"
-members = [
-	"crates/lucie-common",
-    "crates/lucie-macros",
-	"crates/lucie-style",
-	"crates/lucie-text",
-    "crates/lucie",
-    "crates/media",
-    "crates/reqwest_client",
-]
-default-members = ["crates/lucie"]
+members = [ "crates/*" ]
+default-members = [ "crates/lucie" ]
 
 [workspace.package]
 version = "0.0.0"
@@ -28,6 +20,7 @@ authors = ["Carson M. <carson@pyke.io>"]
 
 lucie-common = { path = "crates/lucie-common" }
 lucie-macros = { path = "crates/lucie-macros" }
+lucie-platform = { path = "crates/lucie-platform" }
 lucie-style = { path = "crates/lucie-style" }
 lucie-text = { path = "crates/lucie-text" }
 lucie = { path = "crates/lucie", default-features = false }

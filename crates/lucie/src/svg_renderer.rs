@@ -15,9 +15,9 @@ use crate::{AssetSource, RenderImage, Result};
 pub const SMOOTH_SVG_SCALE_FACTOR: f32 = 2.;
 
 #[derive(Clone, PartialEq, Hash, Eq)]
-pub(crate) struct RenderSvgParams {
-	pub(crate) path: SharedString,
-	pub(crate) size: Size<DevicePixels>
+pub struct RenderSvgParams {
+	pub path: SharedString,
+	pub size: Size<DevicePixels>
 }
 
 #[derive(Clone)]

@@ -287,7 +287,7 @@ impl Render for TextExample {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		cx.set_menus(vec![Menu {
 			name: "Lucie Typography".into(),
 			items: vec![]

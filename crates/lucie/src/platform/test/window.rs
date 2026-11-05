@@ -34,7 +34,7 @@ pub(crate) struct TestWindowState {
 }
 
 #[derive(Clone)]
-pub(crate) struct TestWindow(pub(crate) Rc<Mutex<TestWindowState>>);
+pub struct TestWindow(pub(crate) Rc<Mutex<TestWindowState>>);
 
 impl HasWindowHandle for TestWindow {
 	fn window_handle(&self) -> Result<raw_window_handle::WindowHandle<'_>, raw_window_handle::HandleError> {
@@ -49,7 +49,7 @@ impl HasDisplayHandle for TestWindow {
 }
 
 impl TestWindow {
-	pub fn new(handle: AnyWindowHandle, params: WindowParams, platform: Weak<TestPlatform>, display: Rc<dyn PlatformDisplay>) -> Self {
+	pub(crate) fn new(handle: AnyWindowHandle, params: WindowParams, platform: Weak<TestPlatform>, display: Rc<dyn PlatformDisplay>) -> Self {
 		Self(Rc::new(Mutex::new(TestWindowState {
 			bounds: params.bounds,
 			display,

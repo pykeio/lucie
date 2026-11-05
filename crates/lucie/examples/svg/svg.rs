@@ -44,7 +44,7 @@ impl Render for SvgExample {
 }
 
 fn main() {
-	Application::new()
+	lucie_platform::application()
 		.with_assets(Assets {
 			base: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples")
 		})

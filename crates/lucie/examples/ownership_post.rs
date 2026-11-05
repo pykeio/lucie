@@ -11,7 +11,7 @@ struct Change {
 impl EventEmitter<Change> for Counter {}
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		let counter: Entity<Counter> = cx.new(|_cx| Counter { count: 0 });
 		let subscriber = cx.new(|cx: &mut Context<Counter>| {
 			cx.subscribe(&counter, |subscriber, _emitter, event, _cx| {

@@ -200,7 +200,7 @@ impl Render for GradientViewer {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		cx.open_window(WindowOptions { focus: true, ..Default::default() }, |_, cx| cx.new(|_| GradientViewer::new()))
 			.unwrap();
 		cx.activate(true);

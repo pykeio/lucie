@@ -37,7 +37,7 @@ impl Render for Scrollable {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		cx.open_window(
 			WindowOptions {
 				window_bounds: Some(WindowBounds::centered(size(px(500.), px(500.0)), cx)),

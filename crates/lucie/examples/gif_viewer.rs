@@ -22,7 +22,7 @@ impl Render for GifViewer {
 
 fn main() {
 	tracing_subscriber::fmt::init();
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		let gif_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/image/black-cat-typing.gif");
 
 		cx.open_window(WindowOptions { focus: true, ..Default::default() }, |_, cx| cx.new(|_| GifViewer::new(gif_path)))

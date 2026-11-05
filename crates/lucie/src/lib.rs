@@ -25,8 +25,8 @@ mod path_builder;
 mod platform;
 pub mod prelude;
 mod profiler;
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-mod queue;
+#[doc(hidden)]
+pub mod queue;
 mod runtime;
 mod scene;
 mod subscription;
@@ -80,8 +80,6 @@ pub use lucie_text::{Layout as TextLayout, *};
 pub use path_builder::*;
 pub use platform::*;
 pub use profiler::*;
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-pub(crate) use queue::{PriorityQueueReceiver, PriorityQueueSender};
 pub use runtime::*;
 pub use scene::*;
 pub use subscription::*;

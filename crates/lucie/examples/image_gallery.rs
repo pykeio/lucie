@@ -216,7 +216,7 @@ actions!(image, [Quit]);
 fn main() {
 	tracing_subscriber::fmt::init();
 
-	Application::new().run(move |cx: &mut App| {
+	lucie_platform::application().run(move |cx: &mut App| {
 		let http_client = ReqwestClient::user_agent("LucieExample/1.0").unwrap();
 		cx.set_http_client(Arc::new(http_client));
 

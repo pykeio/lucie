@@ -135,7 +135,7 @@ impl Render for Example {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		cx.bind_keys([KeyBinding::new("tab", Tab, None), KeyBinding::new("shift-tab", TabPrev, None)]);
 
 		cx.open_window(

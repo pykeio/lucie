@@ -39,7 +39,7 @@ use crate::{
 	RenderablePromptHandle, Reservation, Runtime, SubscriberSet, Subscription, SvgRenderer, Task, TaskPriority, Window, WindowAppearance, WindowHandle,
 	WindowId, WindowInvalidator,
 	colors::{Colors, GlobalColors},
-	current_platform, hash,
+	hash,
 	http::{AsyncBody, HttpClient, Uri},
 	init_app_menus
 };
@@ -54,10 +54,6 @@ pub use self::entity_map::*;
 mod test_context;
 #[cfg(any(test, feature = "test-support"))]
 pub use self::test_context::*;
-#[cfg(any(test, feature = "test-support"))]
-mod visual_test_context;
-#[cfg(any(test, feature = "test-support"))]
-pub use self::visual_test_context::*;
 
 /// The duration for which futures returned from [Context::on_app_quit] can run before the application fully quits.
 pub const SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(100);
@@ -134,20 +130,8 @@ pub struct Application(Rc<AppCell>);
 /// Represents an application before it is fully launched. Once your app is
 /// configured, you'll start the app with `App::run`.
 impl Application {
-	/// Builds an app with the given asset source.
-	#[allow(clippy::new_without_default)]
-	pub fn new() -> Self {
-		#[cfg(any(test, feature = "test-support"))]
-		tracing::info!("Lucie was compiled in test mode");
-
-		Self(App::new_app(current_platform(false), Arc::new(()), Arc::new(NullHttpClient)))
-	}
-
-	/// Build an app in headless mode. This prevents opening windows,
-	/// but makes it possible to run an application in an context like
-	/// SSH, where GUI applications are not allowed.
-	pub fn headless() -> Self {
-		Self(App::new_app(current_platform(true), Arc::new(()), Arc::new(NullHttpClient)))
+	pub fn new(platform: Rc<dyn Platform>) -> Self {
+		Self(App::new_app(platform, Arc::new(()), Arc::new(NullHttpClient)))
 	}
 
 	/// Assign

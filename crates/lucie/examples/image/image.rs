@@ -115,7 +115,7 @@ fn main() {
 
 	let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-	Application::new()
+	lucie_platform::application()
 		.with_assets(Assets { base: manifest_dir.join("examples") })
 		.run(move |cx: &mut App| {
 			let http_client = ReqwestClient::user_agent("LucieExample/1.0").unwrap();

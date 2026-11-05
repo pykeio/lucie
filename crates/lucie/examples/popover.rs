@@ -1,4 +1,4 @@
-use lucie::{App, Application, Context, Corner, Div, Hsla, Stateful, Window, WindowOptions, anchored, deferred, div, prelude::*, px};
+use lucie::{App, Context, Corner, Div, Hsla, Stateful, Window, WindowOptions, anchored, deferred, div, prelude::*, px};
 
 /// An example show use deferred to create a floating layers.
 struct HelloWorld {
@@ -130,7 +130,7 @@ impl Render for HelloWorld {
 }
 
 fn main() {
-	Application::new().run(|cx: &mut App| {
+	lucie_platform::application().run(|cx: &mut App| {
 		cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| HelloWorld { open: false, secondary_open: false }))
 			.unwrap();
 		cx.activate(true);

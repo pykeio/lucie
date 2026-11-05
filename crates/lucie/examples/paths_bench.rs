@@ -63,7 +63,7 @@ impl Render for PaintingViewer {
 }
 
 fn main() {
-	Application::new().run(|cx| {
+	lucie_platform::application().run(|cx| {
 		cx.open_window(
 			WindowOptions {
 				titlebar: Some(TitlebarOptions {

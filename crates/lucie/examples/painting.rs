@@ -351,7 +351,7 @@ impl Render for PaintingViewer {
 }
 
 fn main() {
-	Application::new().run(|cx| {
+	lucie_platform::application().run(|cx| {
 		cx.open_window(WindowOptions { focus: true, ..Default::default() }, |window, cx| cx.new(|cx| PaintingViewer::new(window, cx)))
 			.unwrap();
 		cx.on_window_closed(|cx| {

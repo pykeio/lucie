@@ -1,0 +1,18 @@
+[package]
+name = "lucie-platform"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+lucie = { workspace = true, default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+lucie-windows = { path = "../lucie-windows" }
