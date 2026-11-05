@@ -17,12 +17,12 @@ lucie-common.workspace = true
 lucie-style.workspace = true
 
 anyhow.workspace = true
-etagere = "0.3"
-itertools = "0.15"
+etagere.workspace = true
+itertools.workspace = true
 flume = "0.12"
 image.workspace = true
 smallvec.workspace = true
-raw-window-handle = "0.6"
+raw-window-handle.workspace = true
 parking_lot.workspace = true
 tracing.workspace = true
 rapidhash.workspace = true

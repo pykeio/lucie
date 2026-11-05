@@ -641,18 +641,6 @@ pub enum AtlasTextureKind {
 #[repr(C)]
 pub struct TileId(pub u32);
 
-impl From<etagere::AllocId> for TileId {
-	fn from(id: etagere::AllocId) -> Self {
-		Self(id.serialize())
-	}
-}
-
-impl From<TileId> for etagere::AllocId {
-	fn from(id: TileId) -> Self {
-		Self::deserialize(id.0)
-	}
-}
-
 pub struct PlatformInputHandler {
 	cx: AsyncWindowContext,
 	handler: Box<dyn InputHandler>

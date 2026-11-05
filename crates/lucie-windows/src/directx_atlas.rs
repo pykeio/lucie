@@ -219,7 +219,7 @@ impl DirectXAtlasTexture {
 		let allocation = self.allocator.allocate(size_to_etagere(size))?;
 		let tile = AtlasTile {
 			texture_id: self.id,
-			tile_id: allocation.id.into(),
+			tile_id: lucie::TileId(allocation.id.serialize()),
 			bounds: Bounds {
 				origin: point_from_etagere(allocation.rectangle.min),
 				size

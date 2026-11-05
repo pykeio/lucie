@@ -42,12 +42,14 @@ core-foundation = "=0.10.0"
 core-foundation-sys = "0.8.6"
 core-video = { version = "0.4.3", features = ["metal"] }
 derive_more = "0.99.17"
+etagere = "0.3"
 fastrand = "2.4.1"
 futures-core = { version = "0.3", default-features = false, features = [ "std" ] }
 futures-util = { version = "0.3", default-features = false, features = [ "std" ] }
 http = "1.1"
 http-body = "1.0"
 image = { version = "0.25.1", default-features = false, features = [ "gif", "jpeg", "png", "webp" ] }
+itertools = "0.15"
 mach2 = "0.5"
 metal = "0.29"
 naga = { version = "25.0", features = ["wgsl-in"] }
@@ -79,6 +81,7 @@ objc2-foundation = { version = "=0.3.1", default-features = false, features = [
 ] }
 parking_lot = "0.12.1"
 rapidhash = "4.1"
+raw-window-handle = "0.6"
 smallvec = { version = "1.6", features = [ "union", "const_new", "const_generics" ] }
 tokio = { version = "1.48", default-features = false }
 tokio-stream = { version = "0.1", default-features = false }
