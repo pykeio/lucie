@@ -11,6 +11,10 @@ authors.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = [ "manifest" ]
+manifest = []
+
 [dependencies]
 lucie = { workspace = true, default-features = false }
 lucie-common.workspace = true

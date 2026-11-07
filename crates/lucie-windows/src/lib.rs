@@ -9,6 +9,8 @@ mod dispatcher;
 mod display;
 mod events;
 mod keyboard;
+#[cfg(feature = "manifest")]
+mod manifest;
 mod platform;
 mod system_settings;
 mod util;

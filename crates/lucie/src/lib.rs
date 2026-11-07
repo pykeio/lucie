@@ -38,8 +38,6 @@ pub mod test;
 mod util;
 mod view;
 mod window;
-#[cfg(all(windows, feature = "windows-manifest"))]
-mod windows_manifest;
 
 /// Do not touch, here be dragons for use by lucie_macros and such.
 #[doc(hidden)]
